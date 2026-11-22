@@ -11,7 +11,7 @@ extends CharacterBody3D
 ## from the barrel at the reticle, V punch, B kick, MMB ping (defaults;
 ## players can rebind them, and a controller works too).
 
-enum S { MOVE, CROUCH, PRONE, COVER, AIR, ROLL, SLIDE, VAULT, CLIMB, KICK, DOWNED }
+enum S { MOVE, CROUCH, PRONE, COVER, AIR, ROLL, SLIDE, VAULT, CLIMB, KICK, DOWNED, VEHICLE }
 ## What a melee strike was (see struck).
 enum Strike { PUNCH, KICK, BARGE }
 
@@ -48,6 +48,7 @@ signal fired(origin: Vector3, dir: Vector3, alt_tool: bool)
 signal struck(origin: Vector3, dir: Vector3, kind: Strike)
 
 const MAX_HP := 100.0
+const LIMP_SPEED := 2.0       # m/s top speed with a leg wound
 ## Hold interact this long next to a downed teammate to get them up.
 const REVIVE_TIME := 2.0
 const REVIVE_RANGE := 1.6
@@ -68,6 +69,31 @@ var _fall_v := 0.0
 var stagger_t := 0.0
 
 var peer_id := 1
+
+# --- Vehicles (Phase 1.3) ---
+## The police car this officer sits in, and which seat (0 driver, 1 front
+## passenger, 2 rear left, 3 rear right).
+var car: PoliceCar = null
+var seat := -1
+const ENTER_RANGE := 1.4      # m from a door to get in
+const BOOT_RANGE := 1.4       # m from the boot to use the ammo box and kit
+const BOOT_TIME := 1.5        # s holding interact at the boot
+var _boot_t := 0.0
+
+# --- Injuries (Phase 1.2 addition) ---
+## Wounds that last until treated: a leg wound limps, an arm wound shakes
+## the aim, bleeding drains health.
+const LEG := 1
+const ARM := 2
+const BLEED := 4
+const BLEED_RATE := 1.2       # hp a second
+const POUCH_MAX := 3          # field dressings in the first aid pouch
+const TREAT_SELF := 3.0       # s to treat yourself
+const TREAT_MATE := 1.5       # s for a teammate to treat you
+var injuries := 0
+var pouch := POUCH_MAX
+var treat_t := 0.0
+var _rng_inj := RandomNumberGenerator.new()
 var state: S = S.MOVE
 var state_t := 0.0
 var aim_yaw := 0.0
@@ -162,6 +188,8 @@ func _ready() -> void:
 
 
 func is_aiming() -> bool:
+	if state == S.VEHICLE:
+		return (buttons & PlayerInput.AIM) != 0 and gun_up() and seat > 0
 	return (buttons & PlayerInput.AIM) != 0 and gun_up() and state in [S.MOVE, S.CROUCH, S.PRONE, S.COVER, S.AIR]
 
 
@@ -220,9 +248,17 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 	if punch_t <= 0.0:
 		barging = false
 
+	if injuries & BLEED and state != S.DOWNED:
+		hp = maxf(hp - BLEED_RATE * delta, 0.5)
+		if hp <= 0.5 and Net.is_host():
+			take_damage(1.0, Vector3.ZERO, "bleed")
 	match state:
 		S.DOWNED:
 			_downed_step(delta)
+			return
+		S.VEHICLE:
+			_vehicle_step()
+			_fire_step()
 			return
 		S.ROLL, S.VAULT, S.CLIMB:
 			_scripted_move(delta)
@@ -294,6 +330,11 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 			velocity.z = f.z * BARGE_SPEED
 	if is_reviving():
 		wish = Vector3.ZERO
+	if state in [S.MOVE, S.CROUCH] and _pressed(PlayerInput.INTERACT) and not is_reviving() and _try_enter_car():
+		return
+	_boot_and_treat(delta)
+	if treat_t > 0.0 or _boot_t > 0.0:
+		wish = Vector3.ZERO
 
 	# Speed for the current stance.
 	var speed := RUN
@@ -304,8 +345,10 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 		_:
 			if is_aiming():
 				speed = WALK_AIM
-			elif buttons & PlayerInput.SPRINT:
+			elif buttons & PlayerInput.SPRINT and not injuries & LEG:
 				speed = SPRINT
+	if injuries & LEG:
+		speed = minf(speed, LIMP_SPEED)
 	if state == S.COVER:
 		# Moving away from the cover leaves it; so does the cover being
 		# shot or blown away.
@@ -337,7 +380,7 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 	elif state == S.AIR and state_t > 0.1:
 		_set_state(S.MOVE)
 		if _fall_v > FALL_HURT_V:
-			take_damage((_fall_v - FALL_HURT_V) * 18.0, Vector3.DOWN)
+			take_damage((_fall_v - FALL_HURT_V) * 18.0, Vector3.DOWN, "fall")
 	if state == S.AIR:
 		_fall_v = maxf(_fall_v, -velocity.y)
 	else:
@@ -377,7 +420,10 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 	if on_floor and state in [S.MOVE, S.CROUCH, S.COVER]:
 		_step_up(target * delta, global_position - before)
 	_set_capsule()
+	_fire_step()
 
+
+func _fire_step() -> void:
 	if buttons & PlayerInput.FIRE and (is_aiming() or is_blind_firing()) and _cooldown <= 0.0 and reload_t <= 0.0:
 		_cooldown = FIRE_GAP
 		if ammo <= 0:
@@ -400,10 +446,15 @@ func _fwd() -> Vector3:
 
 
 ## Host only: bullets, blasts, falls and blows. At 0 hp the officer is downed.
-func take_damage(amount: float, dir := Vector3.ZERO) -> void:
+## where: "leg", "arm", "torso", "blast", "fall", "bleed" or "" (unknown),
+## for the wound it may leave.
+func take_damage(amount: float, dir := Vector3.ZERO, where := "") -> void:
 	if not Net.is_host() or state == S.DOWNED or amount <= 0.0:
 		return
 	hp -= amount
+	_wound(amount, where)
+	if hp <= 0.0 and state == S.VEHICLE:
+		_leave_car(true)
 	if hp <= 0.0:
 		hp = 0.0
 		revive_t = 0.0
@@ -414,6 +465,263 @@ func take_damage(amount: float, dir := Vector3.ZERO) -> void:
 			rig.set_downed(true, (dir + Vector3.UP * 0.3) * 30.0)
 	elif rig:
 		rig.hit_reaction(dir, clampf(amount * 0.25, 2.0, 10.0))
+
+
+## Which wound a hit leaves, if any (host only).
+func _wound(amount: float, where: String) -> void:
+	if amount < 8.0 or where == "bleed":
+		return
+	var r := _rng_inj.randf()
+	match where:
+		"leg":
+			if r < 0.7:
+				injuries |= LEG
+		"arm":
+			if r < 0.7:
+				injuries |= ARM
+		"torso":
+			if r < 0.5:
+				injuries |= BLEED
+		"blast":
+			injuries |= BLEED
+			if r < 0.5:
+				injuries |= LEG
+		"fall":
+			if amount >= 15.0:
+				injuries |= LEG
+		_:
+			if r < 0.3:
+				injuries |= BLEED
+
+
+## Where on the body a point is, for wounds.
+func body_part_at(p: Vector3) -> String:
+	var h := p.y - global_position.y
+	var low := 0.35 if state == S.PRONE else 0.85
+	if state in [S.PRONE, S.DOWNED]:
+		return "torso"
+	if h < low:
+		return "leg"
+	var side := (p - global_position) * Vector3(1, 0, 1)
+	var right := Vector3(cos(rotation.y), 0, -sin(rotation.y))
+	if absf(side.dot(right)) > 0.2:
+		return "arm"
+	return "torso"
+
+
+## Treats the worst wound: bleeding (bandage), then the leg (splint), then
+## the arm (sling). Returns what was used.
+func treat_one() -> String:
+	if injuries & BLEED:
+		injuries &= ~BLEED
+		return "bandage"
+	if injuries & LEG:
+		injuries &= ~LEG
+		return "splint"
+	if injuries & ARM:
+		injuries &= ~ARM
+		return "sling"
+	return ""
+
+
+static func injury_names(bits: int) -> PackedStringArray:
+	var out: PackedStringArray = []
+	if bits & BLEED:
+		out.append("BLEEDING")
+	if bits & LEG:
+		out.append("LEG WOUND")
+	if bits & ARM:
+		out.append("ARM WOUND")
+	return out
+
+
+## Holding interact: at a police car's boot, restock ammo and first aid; next
+## to a wounded teammate, treat them; else treat yourself (pouch permitting).
+func _boot_and_treat(delta: float) -> void:
+	var held := (buttons & PlayerInput.INTERACT) != 0 and state in [S.MOVE, S.CROUCH] and not is_reviving()
+	if not held:
+		_boot_t = 0.0
+		treat_t = 0.0
+		return
+	var at_boot := false
+	for c in get_tree().get_nodes_in_group("police_cars"):
+		var bp: Vector3 = (c as PoliceCar).boot_point()
+		if Vector2(bp.x - global_position.x, bp.z - global_position.z).length() < BOOT_RANGE:
+			at_boot = true
+	if at_boot:
+		treat_t = 0.0
+		_boot_t += delta
+		if _boot_t >= BOOT_TIME:
+			_boot_t = 0.0
+			reserve = RESERVE_MAX
+			pouch = POUCH_MAX
+			injuries = 0
+			hp = minf(hp + 25.0, MAX_HP)
+		return
+	_boot_t = 0.0
+	if pouch <= 0:
+		treat_t = 0.0
+		return
+	var target := treat_target()
+	if target == null:
+		treat_t = 0.0
+		return
+	treat_t += delta
+	if treat_t >= (TREAT_SELF if target == self else TREAT_MATE):
+		treat_t = 0.0
+		if target.treat_one() != "":
+			pouch -= 1
+
+
+## Who holding interact would treat: a wounded teammate close by first.
+func treat_target() -> Officer:
+	for n in get_tree().get_nodes_in_group("officers"):
+		var o := n as Officer
+		if o and o != self and o.injuries != 0 and o.state in [S.MOVE, S.CROUCH, S.COVER, S.PRONE] \
+				and o.global_position.distance_to(global_position) < REVIVE_RANGE:
+			return o
+	return self if injuries != 0 else null
+
+
+func treat_time() -> float:
+	var tt := treat_target()
+	return TREAT_SELF if tt == self else TREAT_MATE
+
+
+# --- Vehicles ----------------------------------------------------------------
+
+## Interact next to a police car door: get in that seat, or the nearest
+## free one in the car.
+func _try_enter_car() -> bool:
+	var best: PoliceCar = null
+	var best_d := ENTER_RANGE
+	var best_door := -1
+	for c in get_tree().get_nodes_in_group("police_cars"):
+		var pc := c as PoliceCar
+		for i in 4:
+			var dp := pc.door_point(i)
+			var d := Vector2(dp.x - global_position.x, dp.z - global_position.z).length()
+			if d < best_d:
+				best_d = d
+				best = pc
+				best_door = i
+	if best == null:
+		return false
+	var taken := best.occupants()
+	var s := best_door
+	if taken.has(s):
+		s = -1
+		var dd := INF
+		for i in 4:
+			if not taken.has(i):
+				var d := best.door_point(i).distance_to(global_position)
+				if d < dd:
+					dd = d
+					s = i
+	if s < 0:
+		return false
+	_enter_seat(best, s)
+	return true
+
+
+func _enter_seat(c: PoliceCar, s: int) -> void:
+	car = c
+	seat = s
+	_dash = false
+	_boot_t = 0.0
+	treat_t = 0.0
+	velocity = Vector3.ZERO
+	_set_state(S.VEHICLE)
+	collision_layer = 0
+	collision_mask = 0
+	_place_in_seat()
+
+
+## In a car: sit in the seat as it moves. Interact gets out; the stance key
+## (Ctrl / B) shuffles to the next free seat. Passengers aim out of their
+## window and can shoot.
+func _vehicle_step() -> void:
+	if car == null or not is_instance_valid(car):
+		_leave_car(true)
+		return
+	if _pressed(PlayerInput.INTERACT):
+		_leave_car()
+		return
+	if _pressed(PlayerInput.CROUCH) or _pressed(PlayerInput.STAND) or _pressed(PlayerInput.PRONE) or _pressed(PlayerInput.DIVE):
+		var taken := car.occupants()
+		for k in range(1, 4):
+			var j := (seat + k) % 4
+			if not taken.has(j):
+				seat = j
+				break
+	_place_in_seat()
+
+
+func _place_in_seat() -> void:
+	if car == null:
+		return
+	var local: Vector3 = PoliceCar.SEATS[seat]
+	if is_aiming():
+		# Leaning out of the window, sat on the sill.
+		local.x += signf(local.x) * 0.42
+		local.y += 0.22
+	global_position = car.global_transform * local
+	var f := car.global_transform.basis.z
+	rotation.y = atan2(f.x, f.z)
+	velocity = car.linear_velocity
+
+
+## Out of the car by this seat's door, or the other side's if that is
+## blocked. forced: thrown out (downed, car gone) wherever there is room.
+func _leave_car(forced := false) -> void:
+	var c := car
+	var s := seat
+	car = null
+	seat = -1
+	collision_layer = 2
+	collision_mask = 1 | 4 | 16
+	if c == null or not is_instance_valid(c):
+		_set_state(S.MOVE)
+		return
+	var spot := Vector3.INF
+	for d in [s, s ^ 1, (s + 2) % 4, (s + 2) % 4 ^ 1]:
+		var p := c.door_point(d)
+		if _room_at(p):
+			spot = p
+			break
+	if spot == Vector3.INF:
+		if not forced:
+			car = c
+			seat = s
+			collision_layer = 0
+			collision_mask = 0
+			return   # boxed in: stay put
+		spot = c.global_position + Vector3(0, 1.6, 0)
+	global_position = _ground_below(spot)
+	velocity = c.linear_velocity * Vector3(0.6, 0, 0.6)
+	_set_state(S.MOVE)
+
+
+func _room_at(p: Vector3) -> bool:
+	var q := PhysicsShapeQueryParameters3D.new()
+	var cap := CapsuleShape3D.new()
+	cap.radius = 0.3
+	cap.height = 1.6
+	q.shape = cap
+	q.transform = Transform3D(Basis(), _ground_below(p) + Vector3(0, 0.85, 0))
+	q.collision_mask = 1 | 4 | 16
+	q.exclude = [get_rid()]
+	return get_world_3d().direct_space_state.intersect_shape(q, 1).is_empty()
+
+
+func _ground_below(p: Vector3) -> Vector3:
+	var from := p + Vector3(0, 1.5, 0)
+	var hit := get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(from, from + Vector3.DOWN * 4.0, 1 | 16, [get_rid()]))
+	return (hit.position + Vector3(0, 0.05, 0)) if hit else Vector3(p.x, p.y, p.z)
+
+
+func in_car() -> bool:
+	return state == S.VEHICLE and car != null
 
 
 ## Host only: a push from a blow or a barge.
@@ -438,6 +746,8 @@ func _downed_step(delta: float) -> void:
 		revive_t = maxf(0.0, revive_t - delta)
 	if revive_t >= REVIVE_TIME or state_t >= SELF_REVIVE:
 		hp = 50.0 if revive_t >= REVIVE_TIME else 25.0
+		if revive_t >= REVIVE_TIME:
+			injuries &= ~BLEED   # the teammate patched the bleeding
 		revive_t = 0.0
 		_set_state(S.CROUCH)
 
@@ -500,7 +810,9 @@ func _weapon(delta: float) -> void:
 ## Bullets go where you point, give or take: steady aimed shots are tight,
 ## rapid fire opens up, blind fire from cover is wild.
 func _spread(dir: Vector3, blind: bool) -> Vector3:
-	var deg := 0.4 + bloom * 1.2 + (9.0 if blind else 0.0)
+	var deg := 0.4 + bloom * 1.2 + (9.0 if blind else 0.0) + (2.2 if injuries & ARM else 0.0)
+	if state == S.VEHICLE:
+		deg += 1.0 + car.linear_velocity.length() * 0.08 if car else 1.0
 	if state == S.PRONE:
 		deg *= 0.5
 	var r := deg_to_rad(deg)
@@ -922,6 +1234,11 @@ func encode_state(b: StreamPeerBuffer) -> void:
 	b.put_half(revive_t)
 	b.put_u8(1 if barging else 0)
 	b.put_half(stagger_t)
+	b.put_8(car.net_id if car else -1)
+	b.put_u8(seat + 1)
+	b.put_u8(injuries | (pouch << 4))
+	b.put_half(treat_t)
+	b.put_half(_boot_t)
 
 
 func decode_state(b: StreamPeerBuffer) -> Dictionary:
@@ -935,6 +1252,7 @@ func decode_state(b: StreamPeerBuffer) -> Dictionary:
 		"cl": b.get_u8(),
 		"ammo": b.get_u8(), "rs": b.get_u8(), "rl": b.get_half(), "ht": b.get_half(), "cd": b.get_half(), "bl": b.get_half(),
 		"hp": b.get_u8(), "rv": b.get_half(), "bg": b.get_u8() == 1, "sg": b.get_half(),
+		"car": b.get_8(), "seat": b.get_u8() - 1, "inj": b.get_u8(), "tr": b.get_half(), "bt": b.get_half(),
 	}
 
 
@@ -970,7 +1288,18 @@ func apply_state(s: Dictionary) -> void:
 	revive_t = s.rv
 	barging = s.bg
 	stagger_t = s.sg
-	collision_mask = 0 if state in [S.VAULT, S.CLIMB] else (1 | 4 | 16)
+	injuries = s.inj & 15
+	pouch = s.inj >> 4
+	treat_t = s.tr
+	_boot_t = s.bt
+	seat = s.seat
+	car = null
+	if s.car >= 0 and is_inside_tree():
+		for c in get_tree().get_nodes_in_group("police_cars"):
+			if c.net_id == s.car:
+				car = c
+	collision_mask = 0 if state in [S.VAULT, S.CLIMB, S.VEHICLE] else (1 | 4 | 16)
+	collision_layer = 0 if state == S.VEHICLE else 2
 
 
 func blend_state(a: Dictionary, c: Dictionary, t: float) -> Dictionary:
@@ -991,16 +1320,19 @@ func _process(delta: float) -> void:
 	if rig and rig.tree:
 		if rig.downed != (state == S.DOWNED):
 			rig.set_downed(state == S.DOWNED)
+		if state == S.VEHICLE and car:
+			_place_in_seat()   # stay in the seat between ticks (and on remote copies)
+			car.set_window_down(PoliceCar.SEAT_WINDOW[seat], is_aiming())
 		rig.update_from(self, delta)
 		for g in rig.model.find_children("gun_*", "", true, false):
-			g.visible = gun_in_hand() and state not in [S.ROLL, S.VAULT, S.CLIMB, S.SLIDE, S.KICK, S.DOWNED]
+			g.visible = gun_in_hand() and state not in [S.ROLL, S.VAULT, S.CLIMB, S.SLIDE, S.KICK, S.DOWNED] and not (state == S.VEHICLE and seat == 0)
 		_update_torch()
 
 
 ## The torch: a beam from the chest along the aim, on while the player has it
 ## switched on (a synced button), so everyone sees it.
 func _update_torch() -> void:
-	var on := (buttons & PlayerInput.TORCH) != 0 and not holstered
+	var on := (buttons & PlayerInput.TORCH) != 0 and not holstered and state != S.VEHICLE
 	if on and _torch == null:
 		_torch = SpotLight3D.new()
 		_torch.light_color = Color("fff4d6")

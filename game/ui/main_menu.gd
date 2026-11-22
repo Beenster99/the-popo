@@ -1,11 +1,8 @@
 extends Control
-## The opening menu: Single Player, Online, Settings, Quit. Single Player
-## lists the playable scenes; Online opens the host / join lobby.
-
-const LAUNCHER := preload("res://prototypes/launcher/launcher.gd")
+## The opening menu: Single Player (straight into the game), Online (the
+## host / join lobby), Settings, Quit. Test scenes are under Settings > Debug.
 
 var _home: VBoxContainer
-var _single: VBoxContainer
 
 
 func _ready() -> void:
@@ -37,28 +34,10 @@ func _ready() -> void:
 	_home = VBoxContainer.new()
 	_home.add_theme_constant_override("separation", 14)
 	col.add_child(_home)
-	_home.add_child(UiTheme.big_button("Single Player", _show_single))
+	_home.add_child(UiTheme.big_button("Single Player", func(): _play(Scenes.GAME)))
 	_home.add_child(UiTheme.big_button("Online", func(): get_tree().change_scene_to_file("res://prototypes/launcher/launcher.tscn")))
 	_home.add_child(UiTheme.big_button("Settings", _open_settings))
 	_home.add_child(UiTheme.big_button("Quit", func(): get_tree().quit()))
-
-	_single = VBoxContainer.new()
-	_single.add_theme_constant_override("separation", 8)
-	_single.visible = false
-	col.add_child(_single)
-	_single.add_child(UiTheme.title("Pick a place to play", 26))
-	for p in LAUNCHER.PROTOTYPES:
-		var b := Button.new()
-		b.text = p[0]
-		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		b.custom_minimum_size = Vector2(560, 40)
-		b.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-		var path: String = p[1]
-		b.pressed.connect(func(): _play(path))
-		_single.add_child(b)
-	var back := UiTheme.big_button("Back", _show_home)
-	back.custom_minimum_size = Vector2(200, 48)
-	_single.add_child(back)
 
 	var foot := UiTheme.title("v%s   ·   test build for friends   ·   a game controller works too" %
 		ProjectSettings.get_setting("application/config/version", "dev"), 16, UiTheme.DIM)
@@ -70,18 +49,6 @@ func _ready() -> void:
 	(_home.get_child(0) as Button).grab_focus.call_deferred()
 
 
-func _show_single() -> void:
-	_home.visible = false
-	_single.visible = true
-	(_single.get_child(1) as Button).grab_focus()
-
-
-func _show_home() -> void:
-	_single.visible = false
-	_home.visible = true
-	(_home.get_child(0) as Button).grab_focus()
-
-
 func _open_settings() -> void:
 	var s := SettingsScreen.new()
 	s.closed.connect(func(): (_home.get_child(2) as Button).grab_focus())
@@ -90,12 +57,6 @@ func _open_settings() -> void:
 
 func _play(path: String) -> void:
 	get_tree().change_scene_to_file(path)
-
-
-func _unhandled_input(event: InputEvent) -> void:
-	if (event.is_action_pressed("ui_cancel") or event.is_action_pressed("back_to_launcher")) and _single.visible:
-		get_viewport().set_input_as_handled()
-		_show_home()
 
 
 ## A night-time city skyline, drawn once into a texture.

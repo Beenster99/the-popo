@@ -2,18 +2,7 @@ extends Control
 ## Wave 0 launcher: host or join a game, see the lobby, and pick a prototype.
 ## The host picks the prototype and everyone in the lobby loads it.
 
-const PROTOTYPES := [
-	["0.1 Pipeline check (Blender asset with collision)", "res://prototypes/p01_pipeline/pipeline.tscn"],
-	["0.2 Two players in one room", "res://prototypes/p02_netroom/netroom.tscn"],
-	["0.3 Destruction spike", "res://prototypes/p03_destruction/destruction.tscn"],
-	["0.3 Destruction stress test", "res://prototypes/p03_destruction/stress.tscn"],
-	["0.4 Car spike", "res://prototypes/p04_car/car.tscn"],
-	["0.5 Look spike (cel shading, camera, roofs)", "res://prototypes/p05_look/look.tscn"],
-	["0.6 Movement and animation course", "res://prototypes/p06_movement/movement.tscn"],
-	["0.7 Sound spike", "res://prototypes/p07_sound/sound.tscn"],
-	["1.1 City block (generated, breakable)", "res://prototypes/p08_block/block.tscn"],
-	["1.2 Training yard (movement, cover, melee, revive)", "res://prototypes/p09_yard/yard.tscn"],
-]
+const PROTOTYPES := Scenes.TESTS
 
 var _name: LineEdit
 var _addr: LineEdit
@@ -98,18 +87,18 @@ func _ready() -> void:
 	var right := VBoxContainer.new()
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	root.add_child(right)
-	right.add_child(_label("Prototypes (the host picks for everyone)"))
+	right.add_child(_label("When everyone is in, the host starts the game."))
 	_list = VBoxContainer.new()
 	right.add_child(_list)
-	for p in PROTOTYPES:
-		var b := _button(p[0], func(): _start(p[1]))
-		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		_list.add_child(b)
+	var start := _button("Start the game", func(): _start(Scenes.GAME))
+	start.custom_minimum_size = Vector2(320, 56)
+	start.add_theme_font_size_override("font_size", 22)
+	_list.add_child(start)
 	right.add_child(_label("\nEsc opens the menu (Settings, Leave). F3 toggles the network overlay. Q/E rotate the camera, mouse wheel zooms.\nA game controller works too."))
 	right.add_child(_button("Controls...", func(): add_child(load("res://prototypes/launcher/controls_screen.gd").new())))
 
 	Net.lobby_changed.connect(_refresh)
-	Net.joined.connect(func(): _status.text = "Joined. Waiting for the host to pick a prototype."; _refresh())
+	Net.joined.connect(func(): _status.text = "Joined. Waiting for the host to start the game."; _refresh())
 	Net.join_failed.connect(func(r): _status.text = r; _refresh())
 	Net.left.connect(func(): _status.text = "Disconnected."; _refresh())
 	_refresh()
@@ -154,7 +143,7 @@ func _on_join() -> void:
 
 func _start(path: String) -> void:
 	if Net.is_online() and not Net.is_host():
-		_status.text = "Only the host picks the prototype."
+		_status.text = "Only the host starts the game."
 		return
 	_save()
 	if Net.is_online():

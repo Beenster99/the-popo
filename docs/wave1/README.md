@@ -107,3 +107,36 @@ city block. It is built phase by phase; each phase ends with a build.
 ![Menu](img/menu_v0_2_3.png)
 ![Settings](img/settings_v0_2_3.png)
 ![Low cover and reload](img/cover_v0_2_3.png)
+
+## Phase 1.3: police car (v0.2.4)
+
+- Patrol car built in Blender (`tools/blender/build_police_car.py` writes
+  `assets/models/vehicles/police_car.glb`): body, four doors, bonnet, boot,
+  bumpers, push bar, mirrors, six windows, roof light bar and an interior.
+  It drives on the shared `Car` physics (`game/vehicles/police_car.gd`).
+- Damage: body, doors, bonnet and boot dent; parts near a hard hit build up
+  damage and come off as loose physics pieces past their limit. Every
+  window shatters when shot. Shots and blasts are worked out on the host
+  and sent to everyone (`game/actors/gunfire.gd`, `car_sync.gd`).
+- Lights and siren: the driver's T cycles lights, lights and wail, lights
+  and yelp, off. Lenses flash and light the street; the siren is heard by
+  everyone nearby.
+- Four seats, so all three officers fit in one car. F at a door gets in,
+  F again gets out at the nearest clear door, Ctrl moves to the next free
+  seat. The officer in seat 0 drives; passengers hold aim to wind the
+  window down, lean out and shoot (with extra spread).
+- The boot: hold F behind the car for spare ammo and first aid.
+- Injuries (added to the plan after 1.2): shots can wound the leg (limp, no
+  sprint), the arm (shaky aim) or cause bleeding (health drains). Holding F
+  treats one wound on yourself or a teammate from a pouch of 3; the boot
+  fixes everything and refills the pouch.
+- Menu change (beenster): Single Player goes straight into the city block,
+  which now has two police cars. Online is host / join plus Start the game.
+  The test scenes moved to Settings > Debug > Open a test scene, including
+  "1.3 Patrol", a test lot with two police cars, civilian cars and ramps.
+- Throwing things round or over cover is in a later phase (throwables).
+
+![Parked](img/patrol_parked.png)
+![Leaning out](img/patrol_leanout.png)
+![Wrecked](img/patrol_wrecked.png)
+![City block with police cars](img/block_overview_v0_2_4.png)

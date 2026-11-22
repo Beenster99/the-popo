@@ -4,8 +4,9 @@ Double-click ThePopo-vVERSION.exe. If Windows warns about an unknown app,
 choose More info, then Run anyway.
 
 PLAYING
-The opening menu has Single Player (pick a scene and play), Online (host or
-join friends), Settings and Quit. Esc in a game opens the menu: Resume,
+The opening menu has Single Player (straight into the city), Online (host or
+join friends, then the host presses Start the game), Settings and Quit. The
+old test scenes are still there under Settings > Debug > Open a test scene. Esc in a game opens the menu: Resume,
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
@@ -45,8 +46,20 @@ Q/E rotate camera, mouse wheel zoom, F3 network overlay, Esc menu.
 Ammo: bottom right shows rounds in the gun and spare rounds.
 Health: shots (friendly fire, can be turned off in Settings), blasts and long falls hurt. At zero
 you go down; a teammate gets you up, or you get up by yourself after 30 s.
-Car: WASD drive, Space handbrake, H horn, T switches who simulates the car.
-City block (1.1): 1 pistol, 2 demolition charge, G (host) builds a new
+POLICE CAR (1.3)
+F at a door gets in (the nearest free seat); F again gets out. Ctrl moves
+you to the next free seat. Up to three officers fit in one car.
+Driver: WASD drive, Space handbrake, H horn, T lights, then lights and wail,
+then yelp, then off. Passengers: hold right mouse to lean out of the window
+and shoot. Windows shatter when shot; doors, bonnet, boot, bumpers and
+mirrors come off in big crashes. Hold F at the boot for ammo and first aid.
+INJURIES
+Shots can wound: a leg wound makes you limp (no sprint), an arm wound shakes
+your aim, bleeding drains health. Hold F to treat yourself or a teammate
+(uses one first aid from your pouch of 3; one wound per use). The car boot
+fixes everything and refills the pouch.
+Civilian box car (test scenes): WASD drive, Space handbrake, H horn.
+City block (the game for now): two police cars on the roads, 1 pistol, 2 demolition charge, G (host) builds a new
 block for everyone. Two buildings have open doors, rooms and stairs; kick
 the shut doors of the others in.
 Training yard (1.2): everything above in one place; hold F at the ammo box

@@ -10,8 +10,8 @@ extends Node3D
 const MODEL := preload("res://assets/models/characters/officer.glb")
 const UPPER_BONES := ["spine", "chest_2", "neck_2", "head_2", "upper_arm.L", "forearm.L", "hand.L", "upper_arm.R", "forearm.R", "hand.R"]
 const LOWER_STATES := ["idle", "walk", "run", "crouch_idle", "crouch_walk", "prone_idle", "crawl", "cover_idle",
-	"peek", "slide", "roll", "mantle", "climb", "jump", "fall", "kick", "cover_low_idle"]
-const UPPER_STATES := ["none", "aim_hold", "ready_hold", "punch", "reload", "holster", "draw"]
+	"peek", "slide", "roll", "mantle", "climb", "jump", "fall", "kick", "cover_low_idle", "limp", "sit"]
+const UPPER_STATES := ["none", "aim_hold", "ready_hold", "punch", "reload", "holster", "draw", "drive"]
 var RUN_CLIP_SPEED := 3.3    # m/s of the run cycle (2.27 for the mocap run)
 const WALK_CLIP_SPEED := 1.4
 const CROUCH_CLIP_SPEED := 1.0
@@ -40,7 +40,7 @@ func _ready() -> void:
 	var lib := OfficerClips.library(anim_player, skeleton)
 	anim_player.remove_animation_library("")
 	anim_player.add_animation_library("", lib)
-	for n in ["idle", "walk", "run", "crouch_idle", "crouch_walk", "prone_idle", "crawl", "cover_idle", "cover_low_idle", "fall", "aim_hold", "ready_hold", "peek"]:
+	for n in ["idle", "walk", "run", "crouch_idle", "crouch_walk", "prone_idle", "crawl", "cover_idle", "cover_low_idle", "fall", "aim_hold", "ready_hold", "peek", "limp", "sit", "drive"]:
 		if lib.has_animation(n):
 			lib.get_animation(n).loop_mode = Animation.LOOP_LINEAR
 	if "run" in OfficerClips.mocap_clips:
@@ -152,6 +152,7 @@ func update_from(o: Officer, delta: float) -> void:
 	tree.set("parameters/split/blend_amount", 0.0 if upper == "none" else 1.0)
 	var hs := Vector2(o.velocity.x, o.velocity.z).length()
 	tree.set("parameters/ts_run/scale", clampf(hs / RUN_CLIP_SPEED, 0.6, 1.7))
+	tree.set("parameters/ts_limp/scale", clampf(hs / WALK_CLIP_SPEED, 0.5, 1.6))
 	tree.set("parameters/ts_walk/scale", 0.9 if o.turning and hs < 0.2 else clampf(hs / WALK_CLIP_SPEED, 0.5, 1.6))
 	tree.set("parameters/ts_crouch_walk/scale", clampf(hs / CROUCH_CLIP_SPEED, 0.5, 1.8))
 	tree.set("parameters/ts_crawl/scale", clampf(hs / CRAWL_CLIP_SPEED, 0.5, 2.0))
@@ -163,11 +164,15 @@ func update_from(o: Officer, delta: float) -> void:
 	# Line the barrel up with the aim point, but never fold the body over
 	# to aim at the ground at the officer's feet: the target's pitch from
 	# the chest is held within 50 degrees, and points closer than 1 m are ignored.
-	var chest_p := o.global_position + Vector3(0, 0.4 if o.state == Officer.S.PRONE else 1.35, 0)
+	var chest_p := o.global_position + Vector3(0, 0.4 if o.state == Officer.S.PRONE else (0.95 if o.state == Officer.S.VEHICLE else 1.35), 0)
 	var to := o.aim_point - chest_p
 	var horiz := Vector2(to.x, to.z).length()
 	procedural.aim_active = o.is_aiming() and o.aim_point != Vector3.ZERO and horiz > 1.0
 	to.y = clampf(to.y, -horiz * 1.19, horiz * 1.19)
+	if o.injuries & Officer.ARM:
+		# A wounded arm can't hold the gun still.
+		var tt := Time.get_ticks_msec() / 1000.0
+		to += Vector3(sin(tt * 7.3) + sin(tt * 13.1) * 0.4, sin(tt * 5.1) * 0.6, cos(tt * 6.7)) * 0.035 * maxf(horiz, 1.0)
 	procedural.aim_target = chest_p + to
 	if not procedural.have_slide:
 		var sl := model.find_child("gun_slide", true, false) as Node3D
@@ -213,6 +218,7 @@ func _lower_state(o: Officer) -> String:
 		Officer.S.PRONE: return "crawl" if hs > 0.1 else "prone_idle"
 		Officer.S.CROUCH: return "crouch_walk" if hs > 0.2 else "crouch_idle"
 		Officer.S.DOWNED: return "prone_idle"
+		Officer.S.VEHICLE: return "sit"
 		Officer.S.COVER:
 			if o.is_aiming():
 				return "walk" if hs > 0.2 else "idle"
@@ -223,12 +229,16 @@ func _lower_state(o: Officer) -> String:
 		return "crouch_idle"
 	if hs < 0.2:
 		return "walk" if o.turning else "idle"
+	if o.injuries & Officer.LEG:
+		return "limp"
 	return "walk" if hs < 2.2 else "run"
 
 
 func _upper_state(o: Officer) -> String:
 	if o.state in [Officer.S.ROLL, Officer.S.SLIDE, Officer.S.VAULT, Officer.S.CLIMB, Officer.S.PRONE, Officer.S.KICK, Officer.S.DOWNED] or o.is_reviving():
 		return "none"
+	if o.state == Officer.S.VEHICLE and o.seat == 0:
+		return "drive"
 	if o.punch_t > 0.0:
 		return "punch"
 	if o.holster_t > 0.0 and not o.is_aiming():

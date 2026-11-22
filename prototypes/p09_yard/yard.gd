@@ -135,19 +135,8 @@ func _label3d(t: String, at: Vector3) -> void:
 
 
 func _on_fired(origin: Vector3, dir: Vector3, alt: bool, shooter: Officer) -> void:
-	var hit := Melee.bullet_ray(get_world_3d().direct_space_state, origin, dir, shooter)
-	if alt:
-		var at: Vector3 = hit.position if hit else origin + dir * 8.0
-		world.explode(at, 3.5, 200.0, 9.0)
-		for o in get_tree().get_nodes_in_group("officers"):
-			var d: float = (o as Officer).global_position.distance_to(at)
-			if d < 4.5:
-				(o as Officer).take_damage(110.0 * (1.0 - d / 4.5), ((o as Officer).global_position - at).normalized())
-	elif hit and hit.collider is Officer:
-		(hit.collider as Officer).take_damage(25.0, dir)
-	elif hit:
-		world.bullet_hit(hit.collider, hit.position, hit.normal, dir)
-	_tracer(origin, hit.position if hit else origin + dir * 60.0)
+	var end := Gunfire.resolve(world, null, origin, dir, alt, shooter)
+	_tracer(origin, end)
 
 
 func _tracer(a: Vector3, b: Vector3) -> void:
