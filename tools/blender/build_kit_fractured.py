@@ -21,9 +21,10 @@ c.reset()
 random.seed(1983)
 
 MAT = {
-    "wall": (c.material("kit_wall", (0.78, 0.72, 0.62)), c.material("kit_wall_inner", (0.62, 0.38, 0.3))),
-    "slab": (c.material("kit_slab", (0.62, 0.62, 0.64)), c.material("kit_slab_inner", (0.45, 0.45, 0.47))),
-    "column": (c.material("kit_column", (0.55, 0.55, 0.6)), c.material("kit_column_inner", (0.42, 0.42, 0.45))),
+    # Linear colour values (Blender), so they look darker here than on screen.
+    "wall": (c.material("kit_wall", (0.42, 0.13, 0.08)), c.material("kit_wall_inner", (0.5, 0.42, 0.34))),
+    "slab": (c.material("kit_slab", (0.33, 0.33, 0.35)), c.material("kit_slab_inner", (0.22, 0.22, 0.23))),
+    "column": (c.material("kit_column", (0.3, 0.3, 0.34)), c.material("kit_column_inner", (0.2, 0.2, 0.22))),
 }
 
 # Piece definitions: list of convex boxes (size, centre) in piece space, metres.

@@ -140,7 +140,9 @@ func _build_body_mesh() -> void:
 					var a: float = (i + d[0]) / float(nu) * 2.0 - 1.0
 					var b: float = (j + d[1]) / float(nv) * 2.0 - 1.0
 					quad.append((n + u * a + v * b) * h)
-				for k in [0, 2, 1, 0, 3, 2]:
+				# Godot treats clockwise triangles as front faces.
+				var order := [0, 2, 1, 0, 3, 2] if u.cross(v).dot(n) > 0.0 else [0, 1, 2, 0, 2, 3]
+				for k in order:
 					st.set_normal(n)
 					st.add_vertex(quad[k])
 	st.index()
