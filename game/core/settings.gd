@@ -127,6 +127,7 @@ const SCHEMA := [
 		null, "Officers' bullets, punches and kicks hurt other officers. Blasts always hurt."],
 	["Gameplay", "", "Camera", "head"],
 	["Gameplay", "cam_rotate_speed", "Rotate speed (hold Q / E)", "range", 120.0, [30.0, 360.0, 10.0, " deg/s"]],
+	["Gameplay", "tp_sensitivity", "Third-person mouse sensitivity (Tab switches view)", "range", 1.0, [0.2, 3.0, 0.05, "x"]],
 	["Gameplay", "cam_follow", "Follow tightness", "range", 8.0, [2.0, 20.0, 0.5, ""]],
 	["Gameplay", "cam_zoom", "Starting zoom", "range", 16.0, [6.0, 48.0, 1.0, ""]],
 	["Gameplay", "cam_zoom_max", "Furthest zoom", "range", 48.0, [16.0, 96.0, 2.0, ""]],
