@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      export:
+        description: "Also export Windows and Linux builds"
+        type: boolean
+        default: false
+
+env:
+  GODOT_VERSION: 4.7.2
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot
+        run: |
+          curl -sSL -o godot.zip https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip
+          unzip -q godot.zip
+          sudo mv Godot_v${GODOT_VERSION}-stable_linux.x86_64 /usr/local/bin/godot
+      - name: Import assets
+        run: godot --headless --import || true
+      - name: Run tests
+        run: godot --headless --path . -s res://tests/runner.gd
+      - name: Two-process network test (150 ms, 10% loss)
+        run: tests/net/run_net_test.sh 150 0.1
+      - name: Two-process collapse test (100 ms, 5% loss)
+        run: tests/net/run_collapse_test.sh 100 0.05
+      - name: Driving delay under both authority options (100 ms)
+        run: tests/net/run_car_test.sh 100 0.02
+
+  export:
+    if: github.event_name == 'workflow_dispatch' && inputs.export
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot and export templates
+        run: |
+          curl -sSL -o godot.zip https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip
+          unzip -q godot.zip
+          sudo mv Godot_v${GODOT_VERSION}-stable_linux.x86_64 /usr/local/bin/godot
+          curl -sSL -o t.tpz https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz
+          mkdir -p ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          unzip -q t.tpz -d /tmp/tpl
+          mv /tmp/tpl/templates/* ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/
+      - name: Export
+        run: |
+          godot --headless --import || true
+          mkdir -p build/windows build/linux
+          godot --headless --export-release "Windows" build/windows/ThePopo.exe
+          godot --headless --export-release "Linux" build/linux/ThePopo.x86_64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: the-popo-builds
+          path: build/
