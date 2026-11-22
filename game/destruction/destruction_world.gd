@@ -33,7 +33,18 @@ const FALLING_LAYER := 32
 const CRUSH_TIME := 0.6
 const MAX_LOCAL_DEBRIS := 700
 
-const HP := {"wall": 120.0, "wall_window": 80.0, "wall_door": 90.0, "slab": 220.0, "column": 160.0}
+const HP := {"wall": 120.0, "wall_window": 80.0, "wall_door": 90.0, "slab": 220.0, "column": 160.0,
+	"wall_half": 80.0, "wall_half_window": 60.0, "wall_shopfront": 70.0, "wall_shopdoor": 70.0, "wall_garage": 70.0,
+	"parapet": 60.0, "parapet_half": 40.0, "int_wall": 60.0, "int_wall_door": 45.0, "int_wall_half": 40.0,
+	"slab_half": 150.0, "slab_stairwell": 180.0, "stairs": 150.0, "roof": 180.0, "roof_half": 130.0, "column_thin": 90.0,
+	"glass_window": 4.0, "glass_half_window": 3.0, "glass_shopfront": 6.0, "glass_shopdoor": 4.0,
+	"door_closed": 40.0, "garage_door": 60.0, "pavement": 400.0, "road": 600.0, "road_line": 600.0, "road_crossing": 600.0,
+	"low_wall": 90.0, "bollard": 80.0, "lamp_post": 60.0}
+## Pieces whose bottom is below this stand on the ground (the pavement is
+## 0.15 m high, and buildings stand on it).
+const ANCHOR_Y := 0.2
+## Floors and roofs: need support on two opposite sides.
+const SLABS := ["slab", "slab_half", "slab_stairwell", "roof", "roof_half"]
 
 enum { BREAK_SHATTER, BREAK_RELEASE, BREAK_BODY_SHATTER }
 
@@ -72,7 +83,10 @@ func _exit_tree() -> void:
 # --- Building ---------------------------------------------------------------
 
 ## Adds one kit piece. bears: whether it carries the load of pieces above it.
-func add_piece(kind: String, xform: Transform3D, bears := true) -> int:
+## tint recolours exterior wall faces (alpha 0 keeps the kit colour).
+## held_by: the piece this one hangs in (glass and doors in their wall); it
+## stands while that piece stands.
+func add_piece(kind: String, xform: Transform3D, bears := true, tint := Color(0, 0, 0, 0), held_by := -1) -> int:
 	var id := _next_id
 	_next_id += 1
 	var kit := KitLibrary.get_piece(kind)
@@ -83,6 +97,7 @@ func add_piece(kind: String, xform: Transform3D, bears := true) -> int:
 	body.set_meta("piece_id", id)
 	var mi := MeshInstance3D.new()
 	mi.mesh = kit.mesh
+	KitLibrary.tint(mi, kit.surfaces, tint)
 	body.add_child(mi)
 	for ch in kit.chunks:
 		var cs := CollisionShape3D.new()
@@ -94,30 +109,40 @@ func add_piece(kind: String, xform: Transform3D, bears := true) -> int:
 	pieces[id] = {
 		"id": id, "kind": kind, "node": body, "xform": xform, "aabb": world_aabb,
 		"hp": HP.get(kind, 100.0), "bears": bears, "state": "intact",
-		"anchored": world_aabb.position.y < 0.05, "below": [],
+		"anchored": world_aabb.position.y < ANCHOR_Y and held_by < 0, "below": [],
+		"tint": tint, "held_by": held_by,
 	}
 	return id
 
 
 ## Call once after all pieces are added: works out what rests on what.
 func finalize() -> void:
+	# Bucket pieces by the height of their top (5 cm steps), so each piece
+	# only checks the few that could be right under it.
+	var by_top := {}
+	for b in pieces.values():
+		b.below = []
+		var k := int(roundf(b.aabb.end.y * 20.0))
+		if not by_top.has(k):
+			by_top[k] = []
+		by_top[k].append(b)
 	for a in pieces.values():
-		a.below = []
-	for a in pieces.values():
-		for b in pieces.values():
-			# Non-bearing pieces (shopfronts, facades) hold up walls above
-			# them but never carry a slab.
-			if a == b or (a.kind == "slab" and not b.bears):
-				continue
-			var a_bottom: float = a.aabb.position.y
-			var b_top: float = b.aabb.end.y
-			if absf(a_bottom - b_top) > 0.06:
-				continue
-			var ax := Rect2(a.aabb.position.x, a.aabb.position.z, a.aabb.size.x, a.aabb.size.z)
-			var bx := Rect2(b.aabb.position.x, b.aabb.position.z, b.aabb.size.x, b.aabb.size.z)
-			var inter := ax.intersection(bx)
-			if inter.get_area() > 0.01:
-				a.below.append(b.id)
+		if a.held_by >= 0:
+			continue
+		var a_bottom: float = a.aabb.position.y
+		var kb := int(roundf(a_bottom * 20.0))
+		var ax := Rect2(a.aabb.position.x, a.aabb.position.z, a.aabb.size.x, a.aabb.size.z)
+		for k in [kb - 1, kb, kb + 1]:
+			for b in by_top.get(k, []):
+				# Non-bearing pieces (shopfronts, facades) hold up walls above
+				# them but never carry a slab.
+				if a == b or (a.kind in SLABS and not b.bears) or b.held_by >= 0:
+					continue
+				if absf(a_bottom - b.aabb.end.y) > 0.06:
+					continue
+				var bx := Rect2(b.aabb.position.x, b.aabb.position.z, b.aabb.size.x, b.aabb.size.z)
+				if ax.intersection(bx).get_area() > 0.01:
+					a.below.append(b.id)
 
 
 ## Stable pieces: anchored to the ground, or held up by stable pieces below.
@@ -131,10 +156,14 @@ func compute_stable() -> Dictionary:
 		if p.anchored:
 			stable[p.id] = true
 			continue
+		if p.held_by >= 0:
+			if stable.has(p.held_by):
+				stable[p.id] = true
+			continue
 		var held: Array = p.below.filter(func(i): return stable.has(i))
 		if held.is_empty():
 			continue
-		if p.kind == "slab":
+		if p.kind in SLABS:
 			var c: Vector3 = p.aabb.get_center()
 			var hx: float = p.aabb.size.x * 0.3
 			var hz: float = p.aabb.size.z * 0.3
@@ -320,6 +349,7 @@ func _spawn_chunks(p: Dictionary, xf: Transform3D, lin: Vector3, ang: Vector3, o
 		var big: bool = ch.volume >= BIG_CHUNK_VOLUME
 		var pos: Vector3 = xf * (ch.offset as Vector3)
 		var rb := _make_body(ch.mesh, [[ch.shape, Vector3.ZERO]], ch.volume * DENSITY)
+		KitLibrary.tint(rb.get_child(0), ch.surfaces, p.tint)
 		rb.transform = Transform3D(xf.basis, pos)
 		# Starting velocity: the parent's motion, plus a push away from the
 		# blast that falls off with distance, plus a little seeded noise.
@@ -367,6 +397,7 @@ func _spawn_released(p: Dictionary) -> void:
 		shapes.append([ch.shape, ch.offset])
 		vol += ch.volume
 	var rb := _make_body(kit.mesh, shapes, vol * DENSITY)
+	KitLibrary.tint(rb.get_child(0), kit.surfaces, p.tint)
 	rb.collision_layer = FALLING_LAYER
 	rb.transform = p.xform
 	var nid: int = p.id * 64 + RELEASED_BIT

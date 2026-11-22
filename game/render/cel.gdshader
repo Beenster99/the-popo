@@ -11,15 +11,17 @@ uniform float specular_size : hint_range(0.0, 1.0) = 0.06;
 // Per-object fade for roofs and upper floors (1 visible, 0 hidden). An
 // instance uniform, so pieces can share one material and still fade alone.
 instance uniform float fade = 1.0;
+// See-through surfaces (glass) use the same screen-door dither.
+uniform float opacity : hint_range(0.0, 1.0) = 1.0;
 
 void fragment() {
 	ALBEDO = albedo.rgb * texture(albedo_tex, UV).rgb;
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;
-	if (fade < 0.999) {
+	if (fade * opacity < 0.999) {
 		// Screen-door dither so roofs fade without sorting problems.
 		float d = fract(dot(floor(FRAGCOORD.xy), vec2(0.5, 0.25)) + fract(FRAGCOORD.y * 0.5) * 0.5);
-		if (d > fade) discard;
+		if (d > fade * opacity) discard;
 	}
 }
 

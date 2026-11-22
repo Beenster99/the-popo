@@ -222,13 +222,47 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 						_turn_active = false
 		elif wish.length() > 0.1:
 			rotation.y = lerp_angle(rotation.y, atan2(wish.x, wish.z), 14.0 * delta)
+	var before := global_position
 	move_and_slide()
+	if on_floor and state in [S.MOVE, S.CROUCH, S.COVER]:
+		_step_up(target * delta, global_position - before)
 	_set_capsule()
 
 	if buttons & PlayerInput.FIRE and is_aiming() and _cooldown <= 0.0 and Net.is_host():
 		_cooldown = 0.18
 		var muzzle := muzzle_position()
 		fired.emit(muzzle, shot_direction(muzzle), false)
+
+
+## Stairs and kerbs: when walking is blocked by something no higher than
+## STEP_MAX, lift over it. wanted: the horizontal move asked for this tick;
+## done: how far the body actually got.
+const STEP_MAX := 0.36
+func _step_up(wanted: Vector3, done: Vector3) -> void:
+	var h := Vector3(wanted.x, 0, wanted.z)
+	var got := Vector3(done.x, 0, done.z)
+	var left := h - h.normalized() * clampf(got.dot(h.normalized()), 0.0, h.length())
+	if left.length() < 0.002:
+		return
+	var xf := global_transform
+	var up := Vector3(0, STEP_MAX, 0)
+	if test_move(xf, up):
+		return
+	var raised := xf.translated(up)
+	if test_move(raised, left):
+		return
+	var col := KinematicCollision3D.new()
+	if not test_move(raised.translated(left), -up, col):
+		return
+	var landing := raised.translated(left).origin + col.get_travel()
+	if landing.y - xf.origin.y < 0.02:
+		return
+	# Only real treads: the surface stepped onto must be walkable.
+	if col.get_normal().angle_to(Vector3.UP) > floor_max_angle:
+		return
+	global_position = landing
+	velocity.y = 0.0
+	apply_floor_snap()
 
 
 ## The end of the pistol barrel (falls back to chest height without a model).

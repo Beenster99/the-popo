@@ -11,6 +11,7 @@ const PROTOTYPES := [
 	["0.5 Look spike (cel shading, camera, roofs)", "res://prototypes/p05_look/look.tscn"],
 	["0.6 Movement and animation course", "res://prototypes/p06_movement/movement.tscn"],
 	["0.7 Sound spike", "res://prototypes/p07_sound/sound.tscn"],
+	["1.1 City block (generated, breakable)", "res://prototypes/p08_block/block.tscn"],
 ]
 
 var _name: LineEdit
