@@ -11,7 +11,9 @@ extends CharacterBody3D
 ## from the barrel at the reticle, V punch, B kick, MMB ping (defaults;
 ## players can rebind them, and a controller works too).
 
-enum S { MOVE, CROUCH, PRONE, COVER, AIR, ROLL, SLIDE, VAULT, CLIMB, KICK }
+enum S { MOVE, CROUCH, PRONE, COVER, AIR, ROLL, SLIDE, VAULT, CLIMB, KICK, DOWNED }
+## What a melee strike was (see struck).
+enum Strike { PUNCH, KICK, BARGE }
 
 const RUN := 3.6
 const SPRINT := 5.6
@@ -24,15 +26,46 @@ const AIR_ACCEL := 6.0
 const JUMP_V := 4.6
 const GRAVITY := 16.0
 const SLIDE_TIME := 0.85
-const ROLL_PLAYBACK := 1.25
-const MANTLE_PLAYBACK := 1.35
+const ROLL_PLAYBACK := 1.45
+const MANTLE_PLAYBACK := 1.7
 const CLIMB_PLAYBACK := 1.0
 const CAPSULE_H := 1.8
 const VAULT_MIN := 0.45
-const VAULT_MAX := 1.3
+const VAULT_MAX := 1.45
 const CLIMB_MAX := 2.4
+## Loose bodies lighter than this do not block traversal.
+const DEBRIS_MASS := 25.0
+## Walls, cars and rubble all give cover.
+const COVER_MASK := 1 | 4 | 16
+## How far cover-to-cover looks for the next cover.
+const DASH_RANGE := 10.0
+## Longest a run to cover may take before it gives up.
+const DASH_TIME := 3.0
 
 signal fired(origin: Vector3, dir: Vector3, alt_tool: bool)
+## A punch, kick or shoulder barge lands now (host only): the scene finds what
+## is in front of origin along dir and hurts or shoves it.
+signal struck(origin: Vector3, dir: Vector3, kind: Strike)
+
+const MAX_HP := 100.0
+## Hold interact this long next to a downed teammate to get them up.
+const REVIVE_TIME := 2.0
+const REVIVE_RANGE := 1.6
+## Alone, a downed officer gets up by themselves after this long.
+const SELF_REVIVE := 30.0
+## Landing faster than this hurts.
+const FALL_HURT_V := 11.0
+const KICK_HIT_T := 0.28
+const PUNCH_HIT_T := 0.2   # punch_t counts down from 0.55
+const BARGE_SPEED := 6.5
+
+var hp := MAX_HP
+var revive_t := 0.0
+## Barge rather than punch (sprinting when punch was pressed).
+var barging := false
+var _fall_v := 0.0
+## Knocked back: the push carries on and the legs can't fight it for a moment.
+var stagger_t := 0.0
 
 var peer_id := 1
 var state: S = S.MOVE
@@ -58,11 +91,31 @@ var _prev_buttons := 0
 var _crouch_toggle := false
 var _prone_toggle := false
 var _cooldown := 0.0
+## Where the hands grip on a climb (cosmetic: other machines work it out
+## from the synced start, facing and height).
+var _ledge := Vector3.ZERO
+
+# Weapon handling (synced: prediction replays it the same way everywhere).
+const MAG := 15
+const RELOAD_TIME := 1.7
+const FIRE_GAP := 0.18
+var ammo := MAG
+var reload_t := 0.0       # seconds of reload left
+var holstered := false
+var bloom := 0.0          # grows with rapid fire, widens the spread
+## Cosmetic: chest kick after a shot, and how long the gun stays up after a
+## blind-fire shot from cover.
+var recoil := 0.0
+var blind_t := 0.0
+var _rng := RandomNumberGenerator.new()
+var _torch: SpotLight3D
 # Cover: the wall's outward normal, where the officer tucked in, and whether
 # the wall is low enough to crouch behind and aim over.
 var _cover_n := Vector3.FORWARD
 var _cover_anchor := Vector3.ZERO
 var _cover_low := false
+## Running to the next cover (target face point in _cover_anchor, normal in _cover_n).
+var _dash := false
 const LOW_COVER := 1.35   # walls lower than this are crouched behind
 const BODY_HALF := 0.35   # half the body's width, kept behind the wall
 const PEEK_OUT := 0.6     # how far the officer leans out past a wall's edge
@@ -72,6 +125,7 @@ var _visual: Node3D
 
 func _init() -> void:
 	collision_layer = 2
+	add_to_group("officers")
 	collision_mask = 1 | 4 | 16
 	floor_snap_length = 0.35
 	floor_max_angle = deg_to_rad(50)
@@ -93,7 +147,16 @@ func _ready() -> void:
 
 
 func is_aiming() -> bool:
-	return (buttons & PlayerInput.AIM) != 0 and state in [S.MOVE, S.CROUCH, S.PRONE, S.COVER, S.AIR]
+	return (buttons & PlayerInput.AIM) != 0 and not holstered and state in [S.MOVE, S.CROUCH, S.PRONE, S.COVER, S.AIR]
+
+
+## Firing over or round cover without looking (fire held, aim not).
+func is_blind_firing() -> bool:
+	return state == S.COVER and (buttons & PlayerInput.FIRE) != 0 and (buttons & PlayerInput.AIM) == 0 and not holstered
+
+
+func is_reloading() -> bool:
+	return reload_t > 0.0
 
 
 func _pressed(bit: int) -> bool:
@@ -110,8 +173,22 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 	state_t += delta
 	punch_t = maxf(0.0, punch_t - delta)
 	_cooldown -= delta
+	recoil = maxf(0.0, recoil - delta * 7.0)
+	blind_t = maxf(0.0, blind_t - delta)
+	bloom = maxf(0.0, bloom - delta * 2.5)
+	stagger_t = maxf(0.0, stagger_t - delta)
+	_weapon(delta)
+
+	var punch_before := punch_t + delta
+	if punch_t > 0.0 and punch_before > PUNCH_HIT_T and punch_t <= PUNCH_HIT_T and Net.is_host():
+		struck.emit(global_position + Vector3(0, 1.3, 0), _fwd(), Strike.BARGE if barging else Strike.PUNCH)
+	if punch_t <= 0.0:
+		barging = false
 
 	match state:
+		S.DOWNED:
+			_downed_step(delta)
+			return
 		S.ROLL, S.VAULT, S.CLIMB:
 			_scripted_move(delta)
 			return
@@ -126,6 +203,8 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 				_set_state(S.CROUCH)
 			return
 		S.KICK:
+			if state_t - delta < KICK_HIT_T and state_t >= KICK_HIT_T and Net.is_host():
+				struck.emit(global_position + Vector3(0, 0.75, 0), _fwd(), Strike.KICK)
 			velocity.x = move_toward(velocity.x, 0, ACCEL * delta)
 			velocity.z = move_toward(velocity.z, 0, ACCEL * delta)
 			velocity.y -= GRAVITY * delta
@@ -143,9 +222,13 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 		_set_state(S.MOVE)
 	if _pressed(PlayerInput.COVER):
 		if state == S.COVER:
-			_set_state(S.MOVE)
+			_leave_cover(wish)
+		elif _dash:
+			_dash = false
 		elif state in [S.MOVE, S.CROUCH]:
 			_try_cover()
+	if _dash and (state != S.MOVE or state_t > DASH_TIME or _pressed(PlayerInput.JUMP) or _pressed(PlayerInput.DIVE)):
+		_dash = false
 
 	var on_floor := is_on_floor()
 	# Actions.
@@ -166,8 +249,16 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 		elif _pressed(PlayerInput.KICK):
 			_set_state(S.KICK)
 			return
-	if _pressed(PlayerInput.PUNCH) and state in [S.MOVE, S.CROUCH, S.AIR]:
+	if _pressed(PlayerInput.PUNCH) and state in [S.MOVE, S.CROUCH, S.AIR] and punch_t <= 0.0:
 		punch_t = 0.55
+		# Sprinting: a shoulder barge, a lunge that knocks things over.
+		barging = state == S.MOVE and (buttons & PlayerInput.SPRINT) != 0 and Vector2(velocity.x, velocity.z).length() > RUN
+		if barging:
+			var f := _fwd()
+			velocity.x = f.x * BARGE_SPEED
+			velocity.z = f.z * BARGE_SPEED
+	if is_reviving():
+		wish = Vector3.ZERO
 
 	# Speed for the current stance.
 	var speed := RUN
@@ -182,8 +273,14 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 				speed = SPRINT
 	if state == S.COVER:
 		wish = _cover_wish(wish)
+	elif _dash:
+		wish = _dash_wish()
+		speed = SPRINT
 	var target := wish * speed
 	var accel := ACCEL if on_floor else AIR_ACCEL
+	if stagger_t > 0.0:
+		target = Vector3.ZERO
+		accel = 6.0
 	var h := Vector3(velocity.x, 0, velocity.z).move_toward(target, accel * delta)
 	velocity.x = h.x
 	velocity.z = h.z
@@ -193,6 +290,12 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 			_set_state(S.AIR)
 	elif state == S.AIR and state_t > 0.1:
 		_set_state(S.MOVE)
+		if _fall_v > FALL_HURT_V:
+			take_damage((_fall_v - FALL_HURT_V) * 18.0, Vector3.DOWN)
+	if state == S.AIR:
+		_fall_v = maxf(_fall_v, -velocity.y)
+	else:
+		_fall_v = 0.0
 	# Facing: toward the aim when aiming, else toward travel (not in cover).
 	turning = false
 	if state == S.COVER:
@@ -228,11 +331,118 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 		_step_up(target * delta, global_position - before)
 	_set_capsule()
 
-	if buttons & PlayerInput.FIRE and is_aiming() and _cooldown <= 0.0 and Net.is_host():
-		_cooldown = 0.18
-		var muzzle := muzzle_position()
-		fired.emit(muzzle, shot_direction(muzzle), false)
+	if buttons & PlayerInput.FIRE and (is_aiming() or is_blind_firing()) and _cooldown <= 0.0 and reload_t <= 0.0:
+		_cooldown = FIRE_GAP
+		if ammo <= 0:
+			reload_t = RELOAD_TIME   # dry: reload by itself
+		else:
+			ammo -= 1
+			recoil = 1.0
+			var blind := is_blind_firing()
+			if blind:
+				blind_t = 0.4
+			if Net.is_host():
+				var muzzle := muzzle_position()
+				fired.emit(muzzle, _spread(shot_direction(muzzle), blind), false)
+			bloom = minf(bloom + 0.7, 4.0)
 
+
+func _fwd() -> Vector3:
+	return Vector3(sin(rotation.y), 0, cos(rotation.y))
+
+
+## Host only: bullets, blasts, falls and blows. At 0 hp the officer is downed.
+func take_damage(amount: float, dir := Vector3.ZERO) -> void:
+	if not Net.is_host() or state == S.DOWNED or amount <= 0.0:
+		return
+	hp -= amount
+	if hp <= 0.0:
+		hp = 0.0
+		revive_t = 0.0
+		_dash = false
+		collision_mask = 1 | 4 | 16
+		_set_state(S.DOWNED)
+		if rig:
+			rig.set_downed(true, (dir + Vector3.UP * 0.3) * 30.0)
+	elif rig:
+		rig.hit_reaction(dir, clampf(amount * 0.25, 2.0, 10.0))
+
+
+## Host only: a push from a blow or a barge.
+func shove(v: Vector3) -> void:
+	if Net.is_host():
+		velocity += v
+		stagger_t = 0.35
+		if v.y > 0.5 and state in [S.MOVE, S.CROUCH, S.COVER]:
+			_set_state(S.AIR)
+
+
+## Down: lies still. A teammate holding interact close by gets them up;
+## alone, they get up by themselves after a while.
+func _downed_step(delta: float) -> void:
+	velocity.x = move_toward(velocity.x, 0, ACCEL * 0.3 * delta)
+	velocity.z = move_toward(velocity.z, 0, ACCEL * 0.3 * delta)
+	velocity.y -= GRAVITY * delta
+	move_and_slide()
+	if _reviver() != null:
+		revive_t += delta
+	else:
+		revive_t = maxf(0.0, revive_t - delta)
+	if revive_t >= REVIVE_TIME or state_t >= SELF_REVIVE:
+		hp = 50.0 if revive_t >= REVIVE_TIME else 25.0
+		revive_t = 0.0
+		_set_state(S.CROUCH)
+
+
+## A teammate close by, up, and holding interact.
+func _reviver() -> Officer:
+	for n in get_tree().get_nodes_in_group("officers"):
+		var o := n as Officer
+		if o and o != self and o.state in [S.MOVE, S.CROUCH] and (o.buttons & PlayerInput.INTERACT) != 0 \
+				and o.global_position.distance_to(global_position) < REVIVE_RANGE:
+			return o
+	return null
+
+
+## Kneeling over a downed teammate, holding interact.
+func is_reviving() -> bool:
+	if state not in [S.MOVE, S.CROUCH] or (buttons & PlayerInput.INTERACT) == 0:
+		return false
+	for n in get_tree().get_nodes_in_group("officers"):
+		var o := n as Officer
+		if o and o != self and o.state == S.DOWNED and o.global_position.distance_to(global_position) < REVIVE_RANGE:
+			return true
+	return false
+
+
+## Draw, holster and reload.
+func _weapon(delta: float) -> void:
+	if _pressed(PlayerInput.HOLSTER):
+		holstered = not holstered
+		reload_t = 0.0
+	if holstered and _pressed(PlayerInput.AIM):
+		holstered = false   # aiming draws the gun
+	if _pressed(PlayerInput.RELOAD) and not holstered and ammo < MAG and reload_t <= 0.0:
+		reload_t = RELOAD_TIME
+	if reload_t > 0.0:
+		reload_t -= delta
+		if reload_t <= 0.0:
+			reload_t = 0.0
+			ammo = MAG
+
+
+## Bullets go where you point, give or take: steady aimed shots are tight,
+## rapid fire opens up, blind fire from cover is wild.
+func _spread(dir: Vector3, blind: bool) -> Vector3:
+	var deg := 0.4 + bloom * 1.2 + (9.0 if blind else 0.0)
+	if state == S.PRONE:
+		deg *= 0.5
+	var r := deg_to_rad(deg)
+	var side := dir.cross(Vector3.UP).normalized()
+	if side.length() < 0.1:
+		side = Vector3.RIGHT
+	var up := side.cross(dir).normalized()
+	return (dir + side * tan(_rng.randf_range(-r, r)) + up * tan(_rng.randf_range(-r, r) * 0.6)).normalized()
 
 ## Stairs and kerbs: when walking is blocked by something no higher than
 ## STEP_MAX, lift over it. wanted: the horizontal move asked for this tick;
@@ -299,7 +509,7 @@ func _set_capsule() -> void:
 	var h := CAPSULE_H
 	match state:
 		S.CROUCH, S.SLIDE, S.ROLL: h = 1.1
-		S.PRONE: h = 0.6
+		S.PRONE, S.DOWNED: h = 0.6
 		S.COVER: h = 1.1 if _cover_low and not is_aiming() else CAPSULE_H
 	var cap := _shape.shape as CapsuleShape3D
 	if not is_equal_approx(cap.height, h):
@@ -310,60 +520,120 @@ func _set_capsule() -> void:
 # --- Traversal -----------------------------------------------------------------
 
 ## Looks ahead for something to vault or climb. Returns true if it started one.
+## Scans forward rays upward from knee height: the first open height is the
+## top of the obstacle, and the next blocked height above it (a window head,
+## a ceiling) gives the headroom. That handles walls, sills with the glass
+## gone, car bonnets and rubble heaps the same way.
 func _try_traverse() -> bool:
-	var space := get_world_3d().direct_space_state
 	var fwd := Vector3(sin(rotation.y), 0, cos(rotation.y))
 	var base := global_position
-	var ex := [get_rid()]
-	var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(base + Vector3(0, 0.35, 0), base + Vector3(0, 0.35, 0) + fwd * 1.1, 1 | 16, ex))
+	var mask := 1 | 4 | 16   # walls, cars, rubble
+	var hit := {}
+	for y0 in [0.35, 0.6]:
+		var o := base + Vector3(0, y0, 0)
+		hit = _solid_ray(o, o + fwd * 1.1, mask)
+		if not hit.is_empty() and absf(hit.normal.y) < 0.5:
+			break
+		hit = {}
 	if hit.is_empty():
 		return false
 	var wall: Vector3 = hit.position
-	# Find the top of the obstacle just past its face.
-	var probe := wall + fwd * 0.2
-	var top_hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(probe.x, base.y + CLIMB_MAX + 0.3, probe.z), Vector3(probe.x, base.y + 0.1, probe.z), 1 | 16, ex))
+	var face := (Vector3(wall.x, base.y, wall.z) - base).length()
+	var reach := face + 0.35
+	var _open := func(y: float) -> bool:
+		var o := base + Vector3(0, y, 0)
+		return _solid_ray(o, o + fwd * reach, mask).is_empty()
+	var y: float = maxf(0.45, hit.position.y - base.y + 0.1)
+	while y <= CLIMB_MAX + 0.05 and not _open.call(y):
+		y += 0.1
+	if y > CLIMB_MAX + 0.05:
+		return false
+	# Exact top just past the face.
+	var probe := wall + fwd * 0.15
+	var top_hit := _solid_ray(Vector3(probe.x, base.y + y + 0.02, probe.z), Vector3(probe.x, base.y + 0.1, probe.z), mask)
 	if top_hit.is_empty():
 		return false
-	var height: float = top_hit.position.y - base.y
-	# Room to stand on top?
-	var clear := space.intersect_ray(PhysicsRayQueryParameters3D.create(top_hit.position + Vector3(0, 0.05, 0), top_hit.position + Vector3(0, 1.7, 0), 1 | 16, ex))
-	if not clear.is_empty():
-		return false
-	rotation.y = atan2(fwd.x, fwd.z)
+	var top_y: float = top_hit.position.y
+	var height: float = top_y - base.y
+	# Headroom: how far up the opening stays open.
+	var head := y
+	while head < y + 1.7 and _open.call(head):
+		head += 0.1
+	var headroom: float = minf(head, y + 1.7) - height
 	if height >= VAULT_MIN and height <= VAULT_MAX:
-		# Thin wall with ground behind it: vault over. Otherwise step up onto it.
-		var behind := wall + fwd * 1.3
-		var far := space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(behind.x, top_hit.position.y + 0.2, behind.z), Vector3(behind.x, base.y - 0.5, behind.z), 1 | 16, ex))
-		var lands_low: bool = not far.is_empty() and far.position.y < base.y + 0.3
+		# Thin obstacle with ground behind it: vault over. Otherwise step up onto it.
+		# Low ground behind (1.3 m for a wall, 2.3 m across a car): vault over.
+		var lands_low := false
+		var behind := wall
+		for d in [1.3, 2.3]:
+			behind = wall + fwd * d
+			var far := _solid_ray(Vector3(behind.x, top_y + 0.2, behind.z), Vector3(behind.x, base.y - 0.5, behind.z), mask)
+			if not far.is_empty() and far.position.y < base.y + 0.3:
+				lands_low = true
+				break
+		if lands_low:
+			if headroom < 0.9:
+				return false
+			# The way through must be open (no glass left in the window).
+			var gy: float = top_y + 0.4
+			if not _solid_ray(Vector3(base.x, gy, base.z), Vector3(behind.x, gy, behind.z), mask).is_empty():
+				return false
+		elif headroom < 1.7:
+			return false
+		rotation.y = atan2(fwd.x, fwd.z)
 		_begin_scripted(S.VAULT, 0.0 if lands_low else height)
 		return true
-	if height > VAULT_MAX and height <= CLIMB_MAX:
+	if height > VAULT_MAX and height <= CLIMB_MAX and headroom >= 1.7:
+		rotation.y = atan2(fwd.x, fwd.z)
 		_begin_scripted(S.CLIMB, height)
+		_ledge = Vector3(wall.x, top_y, wall.z)
 		return true
 	return false
 
 
-func _try_cover() -> void:
+## A ray that ignores this officer and small loose debris (glass shards,
+## splinters): those get brushed aside, so they never block a vault.
+func _solid_ray(from: Vector3, to: Vector3, mask: int) -> Dictionary:
 	var space := get_world_3d().direct_space_state
+	var ex: Array[RID] = [get_rid()]
+	for i in 6:
+		var r := space.intersect_ray(PhysicsRayQueryParameters3D.create(from, to, mask, ex))
+		var rb := r.get("collider") as RigidBody3D
+		if r.is_empty() or rb == null or rb.mass >= DEBRIS_MASS or rb is Car:
+			return r
+		ex.append(rb.get_rid())
+	return {}
+
+
+## Snaps into cover against whatever is just ahead: walls, cars, rubble.
+func _try_cover() -> void:
 	var fwd := Vector3(sin(rotation.y), 0, cos(rotation.y))
-	var o := global_position + Vector3(0, 1.0, 0)
-	var hit := {}
-	# Chest height first, then knee height for low walls.
+	var hit := _cover_ray(global_position, fwd, 1.2)
+	if not hit.is_empty():
+		_enter_cover(hit.position, hit.normal)
+
+
+## Chest height first, then knee height for low walls. Returns a hit on an
+## upright face turned toward the officer, or {}.
+func _cover_ray(from: Vector3, dir: Vector3, dist: float) -> Dictionary:
 	for h in [1.0, 0.5]:
-		o = global_position + Vector3(0, h, 0)
-		hit = space.intersect_ray(PhysicsRayQueryParameters3D.create(o, o + fwd * 1.2, 1 | 16, [get_rid()]))
-		if not hit.is_empty() and absf(hit.normal.y) < 0.3:
-			break
-	if hit.is_empty() or absf(hit.normal.y) > 0.3:
-		return
-	var n: Vector3 = Vector3(hit.normal.x, 0, hit.normal.z).normalized()
+		var o := from + Vector3(0, h, 0)
+		var hit := _solid_ray(o, o + dir * dist, COVER_MASK)
+		if not hit.is_empty() and absf(hit.normal.y) < 0.3 and Vector3(hit.normal.x, 0, hit.normal.z).normalized().dot(dir) < -0.4:
+			return hit
+	return {}
+
+
+func _enter_cover(at: Vector3, normal: Vector3) -> void:
+	var n: Vector3 = Vector3(normal.x, 0, normal.z).normalized()
 	_cover_n = n
-	# How tall is the wall here? Low walls are crouched behind.
-	var inside: Vector3 = hit.position - n * 0.15
-	var top := space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(inside.x, global_position.y + 3.0, inside.z), Vector3(inside.x, global_position.y, inside.z), 1 | 16, [get_rid()]))
+	_dash = false
+	# How tall is it here? Low walls and car bodies are crouched behind.
+	var inside: Vector3 = at - n * 0.15
+	var top := _solid_ray(Vector3(inside.x, global_position.y + 3.0, inside.z), Vector3(inside.x, global_position.y, inside.z), COVER_MASK)
 	var height := 3.0 if top.is_empty() else float(top.position.y - global_position.y)
 	_cover_low = height < LOW_COVER
-	var p := Vector3(hit.position.x, global_position.y, hit.position.z) + n * 0.45
+	var p := Vector3(at.x, global_position.y, at.z) + n * 0.45
 	# At the end of a wall, shuffle in so the whole body is behind it.
 	var along := Vector3(-n.z, 0, n.x)
 	for side in [-1.0, 1.0]:
@@ -377,6 +647,49 @@ func _try_cover() -> void:
 	_set_state(S.COVER)
 
 
+## Cover pressed while in cover. With a direction held, run to the next
+## cover that way (or swing round the end of this wall), else step out.
+func _leave_cover(wish: Vector3) -> void:
+	if wish.length() < 0.5 or wish.dot(_cover_n) < -0.5:
+		_set_state(S.MOVE)
+		return
+	var dir := Vector3(wish.x, 0, wish.z).normalized()
+	var along := Vector3(-_cover_n.z, 0, _cover_n.x)
+	var here := global_position
+	var side := signf(dir.dot(along))
+	# Round the corner: at the end of the wall, heading along it.
+	if absf(dir.dot(along)) > 0.7 and _wall_reach(here, along * side) < BODY_HALF + 0.1:
+		var reach := _wall_reach(here, along * side)
+		var o := here + along * side * (reach + 0.75) - _cover_n * 0.6
+		var hit := _cover_ray(o, -along * side, 0.9)
+		if not hit.is_empty():
+			_start_dash(hit.position, hit.normal)
+			return
+	var hit := _cover_ray(here, dir, DASH_RANGE)
+	if not hit.is_empty() and (hit.position - here).length() > 1.2:
+		_start_dash(hit.position, hit.normal)
+		return
+	_set_state(S.MOVE)
+
+
+func _start_dash(at: Vector3, normal: Vector3) -> void:
+	_dash = true
+	_cover_n = Vector3(normal.x, 0, normal.z).normalized()
+	_cover_anchor = Vector3(at.x, global_position.y, at.z)
+	_set_state(S.MOVE)
+
+
+## Steering for a run to cover: straight at the spot in front of the face.
+func _dash_wish() -> Vector3:
+	var spot := _cover_anchor + _cover_n * 0.45
+	var to := spot - global_position
+	to.y = 0.0
+	if to.length() < 0.25:
+		_enter_cover(_cover_anchor, _cover_n)
+		return Vector3.ZERO
+	return to.normalized()
+
+
 ## How far the cover wall carries on from p in direction dir (up to 1 m).
 func _wall_reach(p: Vector3, dir: Vector3) -> float:
 	var space := get_world_3d().direct_space_state
@@ -384,8 +697,7 @@ func _wall_reach(p: Vector3, dir: Vector3) -> float:
 	var d := 0.0
 	while d <= 1.0:
 		var o := p + dir * d + Vector3(0, h, 0)
-		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(o, o - _cover_n * 0.8, 1 | 16, [get_rid()]))
-		if hit.is_empty():
+		if _solid_ray(o, o - _cover_n * 0.8, COVER_MASK).is_empty():
 			return maxf(0.0, d - 0.05)
 		d += 0.05
 	return 1.0
@@ -473,7 +785,8 @@ func _end_scripted() -> void:
 	if was == S.CLIMB:
 		global_position.y = _move_start.y + _move_rise + 0.02
 	_set_state(S.CROUCH if was == S.ROLL and (buttons & PlayerInput.CROUCH) else S.MOVE)
-	velocity = Vector3(sin(_move_yaw), 0, cos(_move_yaw)) * (RUN * 0.6 if was == S.ROLL else 0.5)
+	# Come out of a roll or vault already running, so moves flow together.
+	velocity = Vector3(sin(_move_yaw), 0, cos(_move_yaw)) * (RUN * 0.85 if was in [S.ROLL, S.VAULT] else 0.5)
 
 
 # --- Network state --------------------------------------------------------------
@@ -501,7 +814,15 @@ func encode_state(b: StreamPeerBuffer) -> void:
 	b.put_float(_cover_anchor.x)
 	b.put_float(_cover_anchor.y)
 	b.put_float(_cover_anchor.z)
-	b.put_u8(1 if _cover_low else 0)
+	b.put_u8((1 if _cover_low else 0) | (2 if _dash else 0))
+	b.put_u8(ammo | (128 if holstered else 0))
+	b.put_half(reload_t)
+	b.put_half(_cooldown)
+	b.put_half(bloom)
+	b.put_u8(int(hp))
+	b.put_half(revive_t)
+	b.put_u8(1 if barging else 0)
+	b.put_half(stagger_t)
 
 
 func decode_state(b: StreamPeerBuffer) -> Dictionary:
@@ -512,7 +833,9 @@ func decode_state(b: StreamPeerBuffer) -> Dictionary:
 		"buttons": b.get_u16(), "punch": b.get_half(),
 		"ms": Vector3(b.get_float(), b.get_float(), b.get_float()), "my": b.get_half(), "mr": b.get_half(),
 		"cn": Vector3(b.get_half(), 0.0, b.get_half()), "ca": Vector3(b.get_float(), b.get_float(), b.get_float()),
-		"cl": b.get_u8() == 1,
+		"cl": b.get_u8(),
+		"ammo": b.get_u8(), "rl": b.get_half(), "cd": b.get_half(), "bl": b.get_half(),
+		"hp": b.get_u8(), "rv": b.get_half(), "bg": b.get_u8() == 1, "sg": b.get_half(),
 	}
 
 
@@ -533,7 +856,17 @@ func apply_state(s: Dictionary) -> void:
 	_move_rise = s.mr
 	_cover_n = s.cn
 	_cover_anchor = s.ca
-	_cover_low = s.cl
+	_cover_low = (s.cl & 1) != 0
+	_dash = (s.cl & 2) != 0
+	ammo = s.ammo & 127
+	holstered = (s.ammo & 128) != 0
+	reload_t = s.rl
+	_cooldown = s.cd
+	bloom = s.bl
+	hp = s.hp
+	revive_t = s.rv
+	barging = s.bg
+	stagger_t = s.sg
 	collision_mask = 0 if state in [S.VAULT, S.CLIMB] else (1 | 4 | 16)
 
 
@@ -553,6 +886,32 @@ func set_visual_offset(v: Vector3) -> void:
 
 func _process(delta: float) -> void:
 	if rig and rig.tree:
+		if rig.downed != (state == S.DOWNED):
+			rig.set_downed(state == S.DOWNED)
 		rig.update_from(self, delta)
 		for g in rig.model.find_children("gun_*", "", true, false):
-			g.visible = is_aiming() or state in [S.COVER, S.CROUCH, S.PRONE]
+			g.visible = not holstered and state not in [S.ROLL, S.VAULT, S.CLIMB, S.SLIDE, S.KICK, S.DOWNED]
+		_update_torch()
+
+
+## The torch: a beam from the chest along the aim, on while the player has it
+## switched on (a synced button), so everyone sees it.
+func _update_torch() -> void:
+	var on := (buttons & PlayerInput.TORCH) != 0 and not holstered
+	if on and _torch == null:
+		_torch = SpotLight3D.new()
+		_torch.light_color = Color("fff4d6")
+		_torch.light_energy = 6.0
+		_torch.spot_range = 16.0
+		_torch.spot_angle = 18.0
+		_torch.spot_attenuation = 0.6
+		_torch.shadow_enabled = true
+		add_child(_torch)
+	if _torch:
+		_torch.visible = on
+		if on:
+			var chest := Vector3(0, 1.0 if state == S.CROUCH else (0.35 if state == S.PRONE else 1.35), 0)
+			_torch.global_position = global_position + chest
+			var target := aim_point if aim_point != Vector3.ZERO else global_position + chest + Vector3(sin(aim_yaw), -0.15, cos(aim_yaw)) * 5.0
+			if target.distance_to(_torch.global_position) > 0.3:
+				_torch.look_at(target, Vector3.UP)

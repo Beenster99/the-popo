@@ -27,3 +27,31 @@ city block. It is built phase by phase; each phase ends with a build.
 
 ![Block overview](img/block_overview.png)
 ![Inside an enterable shop](img/block_inside.png)
+
+## Phase 1.2: movement and gunplay (v0.2.1)
+
+- Climb, roll and mantle polish: hands stay on the ledge through a climb,
+  rolls and vaults finish at running pace instead of stopping dead.
+- Gun handling: 15-round magazine, reload (R), holster and draw (H), recoil
+  kick and spread bloom, blind fire from cover (fire without aiming), torch
+  (T) that everyone sees.
+- Traversal: one forward scan finds the top of whatever is ahead, so the
+  officer vaults low walls, car bonnets and window sills once the glass is
+  gone (glass shards and splinters never block), and climbs ledges up to
+  2.4 m.
+- Cover: walls, cars and rubble all give cover. In cover, a direction plus
+  the cover key runs to the next cover that way (up to 10 m), or swings round
+  the end of the wall to its side face.
+- Melee: punch (shoves and hurts), kick (bursts doors in off their hinges,
+  breaks other pieces), and a shoulder barge when sprinting. All hits are
+  worked out on the host (`game/actors/melee.gd`).
+- Health: 100 hp. Shots (friendly fire is on), blasts and falls of more than
+  about 4 m hurt. At zero the officer goes down (full ragdoll); a teammate
+  holding interact next to them for 2 s gets them up with 50 hp, or they get
+  up alone after 30 s with 25 hp. Health, revive progress and stagger are in
+  the synced officer state.
+- Playable as "1.2 Training yard" in the launcher; the City block also has
+  melee, kickable doors and friendly fire.
+- Ladders are left for later: none of the kit pieces needs one yet.
+
+![Training yard](img/yard.png)

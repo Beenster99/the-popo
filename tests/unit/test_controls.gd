@@ -4,11 +4,12 @@ var t
 
 func test_every_action_is_bound() -> void:
 	for a in Controls.KEYS.keys() + Controls.MOUSE.keys():
-		t.check(InputMap.has_action(a) and InputMap.action_get_events(a).size() > 0, a)
+		var unbound_by_default: bool = Controls.KEYS.get(a, [0]).is_empty()
+		t.check(InputMap.has_action(a) and (unbound_by_default or InputMap.action_get_events(a).size() > 0), a)
 
 
 func test_controller_is_bound() -> void:
-	for a in ["move_forward", "aim_left", "aim", "fire", "jump", "crouch", "dive", "cover", "interact", "horn"]:
+	for a in ["move_forward", "aim_left", "aim", "fire", "jump", "stance", "reload", "holster", "cover", "interact", "horn"]:
 		var pad := InputMap.action_get_events(a).any(func(e): return e is InputEventJoypadButton or e is InputEventJoypadMotion)
 		t.check(pad, "controller binding for " + a)
 

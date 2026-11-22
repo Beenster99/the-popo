@@ -167,8 +167,22 @@ func update_from(o: Officer, delta: float) -> void:
 			procedural.slide_rel = (sl.get_parent() as Node3D).global_transform.affine_inverse() * sl.global_transform
 			procedural.have_slide = true
 	procedural.feet_enabled = o.state in [Officer.S.MOVE, Officer.S.CROUCH, Officer.S.COVER]
-	procedural.hand_lock = o.is_aiming()
+	procedural.hand_lock = o.is_aiming() and not o.is_reloading()
+	procedural.recoil = o.recoil
+	procedural.reload_k = 1.0 - o.reload_t / Officer.RELOAD_TIME if o.is_reloading() else 0.0
 	procedural.ground_y = o.global_position.y
+	# Climbing: hands on the real ledge until the body is up over it.
+	if o.state == Officer.S.CLIMB:
+		var fwd := Vector3(sin(o._move_yaw), 0, cos(o._move_yaw))
+		var k := clampf(o.state_t * Officer.CLIMB_PLAYBACK / OfficerClips.move_length("climb"), 0.0, 1.0)
+		var ledge: Vector3 = o._ledge
+		if ledge == Vector3.ZERO or ledge.distance_to(o._move_start) > 3.5:
+			ledge = o._move_start + fwd * 0.45 + Vector3(0, o._move_rise, 0)
+		procedural.ledge_point = ledge
+		procedural.ledge_right = fwd.cross(Vector3.UP).normalized()
+		procedural.ledge_weight = 1.0 - smoothstep(0.7, 0.95, k)
+	else:
+		procedural.ledge_weight = 0.0
 	if _hit_t > 0.0:
 		_hit_t -= delta
 		physics.influence = clampf(_hit_t / 0.5, 0.0, 1.0) * 0.55
@@ -188,28 +202,35 @@ func _lower_state(o: Officer) -> String:
 		Officer.S.AIR: return "jump" if o.velocity.y > 0.5 else "fall"
 		Officer.S.PRONE: return "crawl" if hs > 0.1 else "prone_idle"
 		Officer.S.CROUCH: return "crouch_walk" if hs > 0.2 else "crouch_idle"
+		Officer.S.DOWNED: return "prone_idle"
 		Officer.S.COVER:
 			if o.is_aiming():
 				return "walk" if hs > 0.2 else "idle"
 			if o._cover_low:
 				return "crouch_walk" if hs > 0.2 else "crouch_idle"
 			return "crouch_walk" if hs > 0.2 else "cover_idle"
+	if o.is_reviving():
+		return "crouch_idle"
 	if hs < 0.2:
 		return "walk" if o.turning else "idle"
 	return "walk" if hs < 2.2 else "run"
 
 
 func _upper_state(o: Officer) -> String:
-	if o.state in [Officer.S.ROLL, Officer.S.SLIDE, Officer.S.VAULT, Officer.S.CLIMB, Officer.S.PRONE, Officer.S.KICK]:
+	if o.state in [Officer.S.ROLL, Officer.S.SLIDE, Officer.S.VAULT, Officer.S.CLIMB, Officer.S.PRONE, Officer.S.KICK, Officer.S.DOWNED] or o.is_reviving():
 		return "none"
-	if o.state == Officer.S.COVER and not o.is_aiming():
+	if o.state == Officer.S.COVER and not o.is_aiming() and o.blind_t <= 0.0:
 		return "none"
 	if o.punch_t > 0.0:
 		return "punch"
-	if o.is_aiming():
+	if o.is_aiming() or o.blind_t > 0.0:
 		return "aim_hold"
-	if o.state == Officer.S.CROUCH:
+	if o.holstered:
 		return "none"
+	# Gun drawn but not aimed: low ready (and while reloading); sprinting
+	# carries it down at the side.
+	if o.is_reloading() or (o.buttons & PlayerInput.SPRINT) == 0:
+		return "ready_hold"
 	return "none"
 
 

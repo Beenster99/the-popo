@@ -196,6 +196,29 @@ func damage_piece(id: int, amount: float, from_point: Vector3, strength: float) 
 		_host_break(id, BREAK_SHATTER, from_point, strength)
 
 
+## A kick or barge: doors burst off their hinges and fly in whole,
+## everything else takes the damage as usual.
+func strike_piece(id: int, amount: float, point: Vector3, dir: Vector3) -> void:
+	if not Net.is_host() or not pieces.has(id) or pieces[id].state != "intact":
+		return
+	var p: Dictionary = pieces[id]
+	if not String(p.kind).begins_with("door"):
+		damage_piece(id, amount, point - dir * 0.3, 2.0)
+		return
+	p.hp -= amount
+	if p.hp > 0.0:
+		return
+	_host_break(id, BREAK_RELEASE, point, 0.0)
+	var rb: RigidBody3D = bodies.get(id * 64 + RELEASED_BIT)
+	if rb:
+		# Off its hinges: free of the frame, pushed high so it topples in.
+		var frame: Dictionary = pieces.get(p.held_by, {})
+		if frame.get("state", "") == "intact" and is_instance_valid(frame.node):
+			rb.add_collision_exception_with(frame.node)
+		var high := Vector3(point.x, rb.global_position.y + 1.7, point.z)
+		rb.apply_impulse(dir * rb.mass * 3.0, high - rb.global_position)
+
+
 ## Explosion: damages pieces in range and pushes every rigid body nearby.
 func explode(at: Vector3, radius: float, damage: float, strength: float) -> void:
 	if not Net.is_host():

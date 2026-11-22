@@ -12,10 +12,13 @@ const KEYS := {
 	"sprint": [KEY_SHIFT],
 	"jump": [KEY_SPACE],          # jump, mantle, vault, climb
 	"stance": [KEY_CTRL],         # tap crouch / stand, hold prone, hold while running roll
-	"crouch": [KEY_C],
+	"crouch": [],
 	"prone": [KEY_Z],
 	"dive": [KEY_X],              # roll when moving, slide when sprinting
-	"cover": [KEY_R],
+	"cover": [KEY_C],
+	"reload": [KEY_R],
+	"holster": [KEY_H],
+	"torch": [KEY_T],
 	"punch": [KEY_V],
 	"kick": [KEY_B],
 	"interact": [KEY_F],
@@ -40,10 +43,11 @@ const MOUSE := {
 const PAD_BUTTONS := {
 	"jump": [JOY_BUTTON_A],                 # A (Cross)
 	"handbrake": [JOY_BUTTON_A],
-	"crouch": [JOY_BUTTON_B],               # B (Circle)
-	"dive": [JOY_BUTTON_X],                 # X (Square)
-	"prone": [JOY_BUTTON_Y],                # Y (Triangle)
+	"stance": [JOY_BUTTON_B],               # B (Circle): tap crouch, hold prone, hold running roll
+	"reload": [JOY_BUTTON_X],               # X (Square)
+	"holster": [JOY_BUTTON_Y],              # Y (Triangle)
 	"horn": [JOY_BUTTON_Y],
+	"torch": [JOY_BUTTON_DPAD_DOWN],
 	"cover": [JOY_BUTTON_LEFT_SHOULDER],    # LB (L1)
 	"punch": [JOY_BUTTON_RIGHT_SHOULDER],   # RB (R1)
 	"kick": [JOY_BUTTON_RIGHT_STICK],       # R3
@@ -53,7 +57,7 @@ const PAD_BUTTONS := {
 	"cam_rotate_left": [JOY_BUTTON_DPAD_LEFT],
 	"cam_rotate_right": [JOY_BUTTON_DPAD_RIGHT],
 	"cam_zoom_in": [JOY_BUTTON_DPAD_UP],
-	"cam_zoom_out": [JOY_BUTTON_DPAD_DOWN],
+	"cam_zoom_out": [JOY_BUTTON_MISC1],
 	"back_to_launcher": [JOY_BUTTON_START],
 }
 ## Game controller sticks and triggers: [axis, direction].
@@ -75,14 +79,16 @@ const REBINDABLE := [
 	["move_right", "Move right"], ["sprint", "Sprint"], ["jump", "Jump / vault / climb"],
 	["stance", "Tap crouch / stand, hold prone, hold while running roll"],
 	["crouch", "Crouch"], ["prone", "Lie prone"], ["dive", "Roll (slide when sprinting)"],
-	["cover", "Take cover"], ["punch", "Punch"], ["kick", "Kick"], ["interact", "Use / enter car"],
+	["cover", "Take cover (with a direction: run to the next cover)"], ["reload", "Reload"],
+	["holster", "Holster / draw"], ["torch", "Torch on / off"], ["punch", "Punch"], ["kick", "Kick"], ["interact", "Use / revive (hold)"],
 	["aim", "Aim / peek from cover"], ["fire", "Fire"], ["ping", "Ping a spot for everyone"], ["horn", "Car horn"], ["handbrake", "Handbrake"],
 	["cam_rotate_left", "Rotate camera left"], ["cam_rotate_right", "Rotate camera right"],
 ]
 const SAVE_PATH := "user://controls.cfg"
 ## Bumped when the defaults change in a way that clashes with old saved
-## changes (v0.1.2 moved roll off Ctrl), so old files are ignored.
-const SAVE_VERSION := 2
+## changes (v0.1.2 moved roll off Ctrl, v0.2.1 moved cover to C for reload
+## on R), so old files are ignored.
+const SAVE_VERSION := 3
 
 
 func _enter_tree() -> void:

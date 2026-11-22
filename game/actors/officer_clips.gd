@@ -17,6 +17,9 @@ static var mocap_clips: Array = []
 ## instead, so blending out of them never leaves the model hanging high.
 const LIFT_CLIPS := ["climb"]
 static var _lifts := {}        # clip -> {points: PackedFloat32Array at 30 Hz, done: seconds}
+## Clips that end in play once their travel is (nearly) done, so the officer
+## flows straight on instead of waiting out the clip's settling tail.
+const TRAVEL_TRIM := ["roll", "mantle"]
 
 
 ## Returns the merged library (cached). skeleton_path is the track prefix.
@@ -120,6 +123,12 @@ static func move_length(clip: String) -> float:
 		_ensure_loaded()
 	if _lifts.has(clip):
 		return _lifts[clip].done
+	if clip in TRAVEL_TRIM:
+		var total := root_offset(clip, 999.0).length()
+		var n := int(clip_length(clip) * 30.0)
+		for k in n + 1:
+			if root_offset(clip, k / 30.0).length() >= total * 0.97:
+				return minf(clip_length(clip), k / 30.0 + 0.08)
 	return clip_length(clip)
 
 
