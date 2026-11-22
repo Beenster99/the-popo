@@ -89,12 +89,14 @@ func test_inside_view_shows_the_whole_floor() -> void:
 	fader.watch = spot
 	for i in 40:
 		await get_tree().process_frame
-	# Every visible piece that stands taller than 1 m above this floor must
-	# not hide any of it, apart from interior walls, stairs and columns.
+	# Every solid piece that stands taller than 1 m above this floor must
+	# not hide any of it, apart from interior walls, stairs and columns
+	# (walls on this floor go see-through instead).
 	var view := -cam.global_basis.z
 	var foot := Rect2(bb.position.x, bb.position.z, bb.size.x, bb.size.z).grow(-0.6)
 	var blocking := 0
 	var hidden := 0
+	var ghosted := 0
 	for m in fader._all:
 		if not is_instance_valid(m):
 			continue
@@ -102,10 +104,15 @@ func test_inside_view_shows_the_whole_floor() -> void:
 		if not mi.visible:
 			hidden += 1
 			continue
+		var f: float = fader._state.get(mi, 1.0)
+		if f <= RoofFader.GHOST + 0.01:
+			ghosted += 1
+			continue   # walls on this floor stay as see-through ghosts
 		var kind: String = mi.get_meta("kind")
 		if kind.begins_with("int_") or kind == "stairs" or kind.begins_with("column") or kind.begins_with("slab"):
 			continue
 		if fader._in_the_way(mi, spot.global_position.y, foot, view, false):
 			blocking += 1
 	t.check(hidden > 10, "pieces cut away: %d" % hidden)
+	t.check(ghosted > 3, "camera-side walls see-through, not gone: %d" % ghosted)
 	t.check(blocking == 0, "nothing left hiding the floor (%d pieces in the way)" % blocking)

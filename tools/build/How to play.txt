@@ -4,6 +4,9 @@ Double-click ThePopo-vVERSION.exe. If Windows warns about an unknown app,
 choose More info, then Run anyway.
 
 PLAYING
+You start with the gun holstered: H, or holding right mouse, draws it.
+Inside a building, the walls between you and the camera turn see-through
+and the floors above fade out, so you can see the doorways.
 The opening menu has Single Player (straight into the city), Online (host or
 join friends, then the host presses Start the game), Settings and Quit. The
 old test scenes are still there under Settings > Debug > Open a test scene. Esc in a game opens the menu: Resume,
@@ -29,20 +32,22 @@ If the launcher warns about CGNAT or a second router, your internet provider
 shares one address between customers; ask them for a public IP address.
 
 KEYBOARD AND MOUSE (defaults)
-WASD move, Shift sprint, Space jump / vault / climb (vault low walls, car
+WASD move, Shift sprint, Alt walk / run (toggle; a light tilt of the
+controller stick walks too), Space jump / vault / climb (vault low walls, car
 bonnets, and windows once the glass is smashed).
 Ctrl: tap to crouch, tap again to stand; hold to lie prone; hold while
 running to roll (slide when sprinting). Z prone and X roll also work.
 C take cover at the nearest wall, car or ledge (back to it; low cover:
 duck behind; at a wall's end the officer tucks in). Move away from it, or
 press C, to leave. In cover, hold a direction and press C to run to the
-next cover that way, or round the corner at the end of a wall. Hold right mouse to aim, and in cover to peek out;
+next cover that way, or round the corner at the end of a wall. Hold right mouse to aim, and in cover to peek out (at a wall's end the
+officer leans out round it);
 fire without aiming in cover to blind fire.
 Left mouse fire (at the reticle), R reload (15 rounds), H holster / draw,
 T torch, middle mouse ping a spot for everyone.
 V punch (while sprinting: shoulder barge), B kick (kicks doors in).
 F use; hold F next to a downed teammate for 2 seconds to get them up.
-Q/E rotate camera, mouse wheel zoom, F3 network overlay, Esc menu.
+Q/E rotate camera (or hold the middle mouse and drag; a click pings), mouse wheel zoom, F3 network overlay, Esc menu.
 Ammo: bottom right shows rounds in the gun and spare rounds.
 Health: shots (friendly fire, can be turned off in Settings), blasts and long falls hurt. At zero
 you go down; a teammate gets you up, or you get up by yourself after 30 s.

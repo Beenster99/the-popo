@@ -51,7 +51,8 @@ func _build_body() -> void:
 	_wheel_proto = model.find_child("wheel", true, false)
 	if _wheel_proto:
 		_wheel_proto.get_parent().remove_child(_wheel_proto)
-		_wheel_proto.transform = Transform3D.IDENTITY
+		# Keep the turn that stands the tyre up (axle along x); only centre it.
+		_wheel_proto.position = Vector3.ZERO
 	for n in ["body", "door_fl", "door_fr", "door_rl", "door_rr", "bonnet", "boot", "roof"]:
 		var mi := _mesh(model, n)
 		if mi:

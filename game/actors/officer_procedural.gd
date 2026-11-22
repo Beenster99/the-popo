@@ -8,6 +8,11 @@ extends SkeletonModifier3D
 ##  - gun hand lock: the left hand stays on the grip under recoil and twist.
 
 var aim_yaw_offset := 0.0     # radians, aim direction minus body facing
+## Leaning out round cover: a world direction, its length 0..1 how far.
+var lean := Vector3.ZERO
+const LEAN_HIPS := 0.14       # m the hips shift toward the lean
+const LEAN_SPINE := 0.26      # rad the spine tilts
+const LEAN_CHEST := 0.20      # rad the chest tilts on top of that
 var feet_enabled := true
 var hand_lock := false
 var ground_y := 0.0           # the character's floor height (world)
@@ -46,6 +51,7 @@ func _process_modification() -> void:
 	var sk := get_skeleton()
 	if sk == null or _idx.is_empty():
 		return
+	_lean(sk)
 	_aim(sk)
 	_line_up_barrel(sk)
 	_kick(sk)
@@ -62,6 +68,23 @@ func _rotate_global(sk: Skeleton3D, bone: int, q: Quaternion) -> void:
 	var g := sk.get_bone_global_pose(bone)
 	g.basis = Basis(q) * g.basis
 	sk.set_bone_global_pose(bone, g)
+
+
+## Hips over toward the lean and the upper body tilted out with them, so the
+## head, arms and gun come round the corner while the feet stay put.
+func _lean(sk: Skeleton3D) -> void:
+	var k := lean.length()
+	if k < 0.01:
+		return
+	var d := Vector3(lean.x, 0, lean.z).normalized()
+	var inv := sk.global_basis.inverse()
+	var h := sk.get_bone_global_pose(_idx["hips"])
+	h.origin += inv * (d * LEAN_HIPS * k)
+	sk.set_bone_global_pose(_idx["hips"], h)
+	var axis := (inv * Vector3.UP.cross(d)).normalized()
+	_rotate_global(sk, _idx["spine"], Quaternion(axis, LEAN_SPINE * k))
+	_rotate_global(sk, _idx["chest_2"], Quaternion(axis, LEAN_CHEST * k))
+	_rotate_global(sk, _idx["head_2"], Quaternion(axis, -0.15 * k))
 
 
 func _aim(sk: Skeleton3D) -> void:

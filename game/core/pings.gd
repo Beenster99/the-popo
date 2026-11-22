@@ -17,7 +17,8 @@ func _ready() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("ping"):
+	# On release, so holding the middle mouse to turn the camera does not ping.
+	if event.is_action_released("ping") and IsoCamera.drag_px < IsoCamera.DRAG_START_PX:
 		var p = _point_under_cursor()
 		if p != null:
 			request(p)

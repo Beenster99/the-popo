@@ -342,7 +342,8 @@ def aim_hold(rig, A):
     K.gun_visible(rig, True)
     for s in 'LR':
         A.ik('arm.' + s, 1, 1)
-    for f, b in ((1, 0.0), (21, 1.0), (41, 0.0)):
+    # Barely any breathing: a steady sight picture (more read as a wobble).
+    for f, b in ((1, 0.0), (21, 0.25), (41, 0.0)):
         K.aim_pose(A, f, breathe=b)
         K.stance_feet(A, f)
     return (1, 41)

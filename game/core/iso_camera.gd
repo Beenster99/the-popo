@@ -1,7 +1,8 @@
 class_name IsoCamera
 extends Node3D
 ## Isometric camera rig. Follows a target, rotates with Q/E (hold for smooth
-## turn, tap to snap to the next 45 degrees) and zooms with the mouse wheel.
+## turn, tap to snap to the next 45 degrees) or by holding the middle mouse
+## and dragging, and zooms with the mouse wheel.
 ## Orthographic by default for a true isometric read.
 
 @export var target: Node3D
@@ -17,6 +18,11 @@ var camera: Camera3D
 var _yaw := 45.0
 var _yaw_target := 45.0
 var _hold_t := 0.0
+## Middle mouse held and dragged turns the camera (a click still pings).
+const DRAG_DEG_PER_PX := 0.35
+const DRAG_START_PX := 6.0
+static var drag_px := 0.0      # how far the mouse moved since the middle button went down
+var _dragging := false
 
 
 func _ready() -> void:
@@ -57,11 +63,36 @@ func mouse_on_world(chest_height: float, exclude: Array[RID] = []) -> Dictionary
 	var mp := get_viewport().get_mouse_position()
 	var from := camera.project_ray_origin(mp)
 	var dir := camera.project_ray_normal(mp)
-	var q := PhysicsRayQueryParameters3D.create(from, from + dir * 500.0, 1 | 4 | 16, exclude)
-	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	var ex := exclude.duplicate()
+	var hit := {}
+	# Look through ceilings, roofs and walls the cutaway has hidden.
+	for i in 12:
+		var q := PhysicsRayQueryParameters3D.create(from, from + dir * 500.0, 1 | 4 | 16, ex)
+		hit = get_world_3d().direct_space_state.intersect_ray(q)
+		if hit.is_empty() or not (hit.collider as Object).get_meta("see_through", false):
+			break
+		ex.append(hit.rid)
+		hit = {}
 	if hit:
 		return {"point": hit.position, "normal": hit.normal, "hit": true}
 	return {"point": mouse_on_plane(chest_height), "normal": Vector3.UP, "hit": false}
+
+
+func _input(event: InputEvent) -> void:
+	var mb := event as InputEventMouseButton
+	if mb and mb.button_index == MOUSE_BUTTON_MIDDLE:
+		_dragging = mb.pressed
+		if mb.pressed:
+			drag_px = 0.0
+		else:
+			# Settle on the turned angle rather than snapping back.
+			_yaw_target = _yaw
+	var mm := event as InputEventMouseMotion
+	if mm and _dragging and not PlayerInput.blocked:
+		drag_px += absf(mm.relative.x) + absf(mm.relative.y)
+		if drag_px >= DRAG_START_PX:
+			_yaw -= mm.relative.x * DRAG_DEG_PER_PX
+			_yaw_target = _yaw
 
 
 func _unhandled_input(event: InputEvent) -> void:
