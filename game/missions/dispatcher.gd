@@ -14,16 +14,21 @@ extends Node
 ## put in a police car and driven to the custody bay) or down. Calls left too
 ## long are lost: the suspects get away.
 ##
+## Phase 1.5 adds a fourth: Shots fired, a gang of three or four fighting it
+## out with the police from cover, who call in backup once the shooting
+## starts. Guns that suspects drop lie on the floor for officers to take.
+##
 ## The crime level (0 to 100) creeps up all the time, faster for every open
 ## call, and drops for each suspect dealt with and each call closed. Arrests
 ## and suspects shot count the same: there is no conduct score.
 
-enum Kind { ROBBERY, ARMED, TRAFFIC }
+enum Kind { ROBBERY, ARMED, TRAFFIC, GANG }
 enum CallState { ACTIVE, CLOSED, LOST }
 
 const MSG_STATE := 80        # host -> all: crime, calls, suspects (10 a second)
 const MSG_RADIO := 81        # host -> all: a line of radio chatter
 const MSG_SHOT := 82         # host -> all: a suspect fired (origin, end)
+const BACKUP_DELAY := 9.0    # s after the first fighter takes cover
 
 const FIRST_CALL := 20.0     # s after the block loads
 const CALL_GAP := Vector2(25.0, 50.0)
@@ -42,7 +47,7 @@ const BAY_RADIUS := 4.5
 const BOOK_TIME := 1.2
 ## The speeding car's lap: the middle of the ring road.
 const LAP := [Vector3(-6, 0, -6), Vector3(54, 0, -6), Vector3(54, 0, 54), Vector3(-6, 0, 54)]
-const KIND_NAMES := ["Robbery in progress", "Armed suspect", "Traffic stop"]
+const KIND_NAMES := ["Robbery in progress", "Armed suspect", "Traffic stop", "Shots fired"]
 
 signal radio(text: String)
 
@@ -71,9 +76,13 @@ var _markers := {}           # call id -> Node3D
 var _bay_node: Node3D
 var _traffic := {}           # host: {call, phase, t, near_t}
 var _look_counter := 0
+var guns := {}               # net id -> DroppedGun (everyone)
+var _next_gun_id := 1
+var _backup := []            # host: [{call, t, at}]
 
 
 func _ready() -> void:
+	add_to_group("dispatcher")
 	_rng.randomize()
 	Net.register(MSG_STATE, _on_state)
 	Net.register(MSG_RADIO, _on_radio)
@@ -121,6 +130,7 @@ func _physics_process(delta: float) -> void:
 	# Crime creeps up.
 	crime = clampf(crime + (CRIME_DRIFT + CRIME_PER_CALL * _active_count()) * delta, 0.0, 100.0)
 	_traffic_step(delta)
+	_backup_step(delta)
 	_booking(delta)
 	_check_calls()
 	_update_markers()
@@ -137,7 +147,7 @@ func _active_count() -> int:
 
 
 func _pick_kind() -> Kind:
-	var kinds := [Kind.ROBBERY, Kind.ARMED, Kind.TRAFFIC]
+	var kinds := [Kind.ROBBERY, Kind.ARMED, Kind.TRAFFIC, Kind.GANG]
 	for c in calls.values():
 		if c.state == CallState.ACTIVE:
 			kinds.erase(c.kind)
@@ -167,7 +177,26 @@ func start_call(kind: Kind) -> int:
 			var p := _street_spot()
 			c.pos = p
 			c.text = "Armed suspect seen on the street, %s. Approach with care." % _side_name(p)
-			c.suspects.append(spawn_suspect(p, Suspect.S.LOITER, true, c.id).net_id)
+			var a := spawn_suspect(p, Suspect.S.LOITER, true, c.id)
+			a.fighter = true
+			if _rng.randf() < 0.3:
+				a.weapon = EnemyGuns.SHOTGUN
+				a.mag = EnemyGuns.MAG[a.weapon]
+			c.suspects.append(a.net_id)
+		Kind.GANG:
+			var p := _gang_spot()
+			c.pos = p
+			var n := 3 + (1 if _rng.randf() < 0.4 else 0)
+			c.text = "Shots fired, %s. %d armed, they're dug in. Use cover." % [_side_name(p), n]
+			for i in n:
+				var q := nav.closest(p + Vector3(cos(i * 2.1) * 2.0, 0, sin(i * 2.1) * 2.0))
+				var g := spawn_suspect(q, Suspect.S.LOITER, i < 3, c.id)
+				g.fighter = true
+				g.role = Suspect.ROLE_PIN if i == 0 else (Suspect.ROLE_FLANK if i == 1 else _rng.randi_range(0, 1))
+				if i == 2:
+					g.weapon = EnemyGuns.SHOTGUN
+					g.mag = EnemyGuns.MAG[g.weapon]
+				c.suspects.append(g.net_id)
 		Kind.TRAFFIC:
 			if civ_car == null or not _traffic.is_empty():
 				return -1
@@ -201,6 +230,118 @@ func spawn_suspect(p: Vector3, st: Suspect.S, armed: bool, call_id := -1) -> Sus
 	s.set_state(st)
 	suspects[s.net_id] = s
 	return s
+
+
+## Where a gang hangs about: a yard or alley spot away from the officers, or
+## the street if there is none.
+func _gang_spot() -> Vector3:
+	var best := Vector3.INF
+	var best_d := -1.0
+	for sp in hide_spots:
+		var p: Vector3 = sp
+		if p.y > BlockGenerator.BASE_Y + 1.0:
+			continue   # not upstairs
+		var inside := false
+		for b in gen.buildings:
+			if (b.bounds as AABB).has_point(p + Vector3(0, 0.5, 0)):
+				inside = true
+		if inside:
+			continue
+		var d := INF
+		for o in get_tree().get_nodes_in_group("officers"):
+			d = minf(d, (o as Node3D).global_position.distance_to(p))
+		d += _rng.randf() * 8.0
+		if d > best_d:
+			best_d = d
+			best = p
+	return best if best != Vector3.INF else _street_spot()
+
+
+## Host: a fighter has started shooting; friends turn up a little later
+## (once per call), from out of sight.
+func call_backup(s: Suspect) -> void:
+	if s.call_id < 0 or not calls.has(s.call_id):
+		return
+	var c: Dictionary = calls[s.call_id]
+	if c.get("backup", false) or c.kind not in [Kind.GANG, Kind.ARMED]:
+		return
+	c.backup = true
+	_backup.append({"call": s.call_id, "t": BACKUP_DELAY, "at": s.global_position})
+	say("DISPATCH: they're on the phone to friends. Expect more of them.")
+
+
+func _backup_step(delta: float) -> void:
+	for b in _backup.duplicate():
+		b.t -= delta
+		if b.t > 0.0:
+			continue
+		_backup.erase(b)
+		var c: Dictionary = calls.get(b.call, {})
+		if c.is_empty() or c.state != CallState.ACTIVE:
+			continue
+		var from := _backup_spot(b.at)
+		if from == Vector3.INF:
+			continue
+		for i in 2:
+			var q := nav.closest(from + Vector3(i * 1.2, 0, 0))
+			var g := spawn_suspect(q, Suspect.S.LOITER, true, c.id)
+			g.fighter = true
+			g.role = Suspect.ROLE_FLANK if i == 0 else Suspect.ROLE_PIN
+			g._last_seen = b.at
+			c.suspects.append(g.net_id)
+			g._engage({"o": null, "d": INF, "los": false})
+		say("DISPATCH: backup's arrived for them. Two more, armed.")
+
+
+## Somewhere 18 to 35 m from the fight that no officer can see.
+func _backup_spot(at: Vector3) -> Vector3:
+	var space: PhysicsDirectSpaceState3D = get_viewport().find_world_3d().direct_space_state
+	for sp in hide_spots:
+		var p: Vector3 = sp
+		var d := Vector2(p.x - at.x, p.z - at.z).length()
+		if d < 18.0 or d > 35.0 or p.y > BlockGenerator.BASE_Y + 1.0:
+			continue
+		var seen := false
+		for o in get_tree().get_nodes_in_group("officers"):
+			var e := (o as Node3D).global_position + Vector3(0, 1.5, 0)
+			if e.distance_to(p) < 12.0:
+				seen = true
+				break
+			var q := PhysicsRayQueryParameters3D.create(e, p + Vector3(0, 1.2, 0), 1)
+			if space.intersect_ray(q).is_empty():
+				seen = true
+				break
+		if not seen and nav.reaches(p, at):
+			return p
+	return Vector3.INF
+
+
+# --- guns on the floor -----------------------------------------------------------------
+
+## Host: a suspect dropped their gun here with rounds still in it.
+func drop_gun(p: Vector3, kind: int, rounds: int) -> void:
+	if kind == EnemyGuns.NONE:
+		return
+	var g := _make_gun(_next_gun_id, kind, rounds)
+	_next_gun_id += 1
+	g.settle(get_viewport().find_world_3d().direct_space_state, p)
+
+
+func _make_gun(id: int, kind: int, rounds: int) -> DroppedGun:
+	var g := DroppedGun.new()
+	g.net_id = id
+	g.kind = kind
+	g.rounds = rounds
+	g.name = "Gun%d" % id
+	get_parent().add_child(g)
+	guns[id] = g
+	return g
+
+
+## Host: an officer picks up the gun (they get only its loaded rounds).
+func take_gun(g: DroppedGun) -> void:
+	guns.erase(g.net_id)
+	g.queue_free()
 
 
 ## An enterable shop if there is one, else any enterable building.
@@ -277,9 +418,9 @@ func _find_hide_spots() -> void:
 # --- host: shots ---------------------------------------------------------------------
 
 ## A suspect fires: hits officers, cars and the world, and everyone hears it.
-func suspect_shot(s: Suspect, origin: Vector3, dir: Vector3) -> void:
+func suspect_shot(s: Suspect, origin: Vector3, dir: Vector3, damage := SHOT_DAMAGE, loud := true) -> void:
 	var space := s.get_world_3d().direct_space_state
-	var q := PhysicsRayQueryParameters3D.create(origin, origin + dir * 60.0, 1 | 2 | 16, [s.get_rid()])
+	var q := PhysicsRayQueryParameters3D.create(origin, origin + dir * 60.0, 1 | 2 | 4 | 16, [s.get_rid()])
 	var hit := space.intersect_ray(q)
 	var end: Vector3 = hit.position if hit else origin + dir * 60.0
 	var what := 2 if not hit else (1 if (hit.collider is Officer or hit.collider is Suspect) else 0)
@@ -288,14 +429,19 @@ func suspect_shot(s: Suspect, origin: Vector3, dir: Vector3) -> void:
 		surface = "metal"
 	if hit and hit.collider is Officer:
 		var o := hit.collider as Officer
-		o.take_damage(SHOT_DAMAGE, dir, o.body_part_at(hit.position))
+		o.take_damage(damage, dir, o.body_part_at(hit.position))
 	elif hit and hit.collider is Car and cars:
 		surface = cars.bullet_hit(hit.collider, hit.position, dir)
+		if world:
+			world.bullet_hit(null, hit.position, hit.normal, dir)
 	elif hit and hit.collider is Suspect:
-		(hit.collider as Suspect).take_damage(SHOT_DAMAGE, dir)
+		(hit.collider as Suspect).take_damage(damage, dir)
 	elif hit and world:
 		world.bullet_hit(hit.collider, hit.position, hit.normal, dir)
+	Gunfire.whizz(get_tree(), origin, end, s)
 	var b := StreamPeerBuffer.new()
+	var gk := 0 if not loud else (Sfx.SHOTGUN if s.weapon == EnemyGuns.SHOTGUN else 1)
+	b.put_u8(gk)
 	for v in [origin, end]:
 		b.put_float(v.x)
 		b.put_float(v.y)
@@ -304,7 +450,7 @@ func suspect_shot(s: Suspect, origin: Vector3, dir: Vector3) -> void:
 	b.put_u8(what)
 	if Net.is_online():
 		Net.broadcast(MSG_SHOT, b.data_array, Net.UNRELIABLE)
-	_shot_fx(origin, end, surface, what)
+	_shot_fx(origin, end, surface, what, gk)
 
 
 func _on_shot(_from: int, data: PackedByteArray) -> void:
@@ -312,29 +458,39 @@ func _on_shot(_from: int, data: PackedByteArray) -> void:
 		return
 	var b := StreamPeerBuffer.new()
 	b.data_array = data
+	var gk := b.get_u8()
 	var a := Vector3(b.get_float(), b.get_float(), b.get_float())
 	var e := Vector3(b.get_float(), b.get_float(), b.get_float())
 	var surface: String = Sfx.SURFACES[mini(b.get_u8(), Sfx.SURFACES.size() - 1)]
-	_shot_fx(a, e, surface, b.get_u8())
+	_shot_fx(a, e, surface, b.get_u8(), gk)
 
 
-## A bang, a muzzle flash and a short-lived tracer; where it hit, the brass.
-func _shot_fx(a: Vector3, e: Vector3, surface := "concrete", what := 0) -> void:
+## A bang (gun kind gk: 0 quiet pellet, 1 pistol, 2 shotgun), a muzzle flash,
+## the brass and the bullet's hit; always a short-lived tracer.
+func _shot_fx(a: Vector3, e: Vector3, surface := "concrete", what := 0, gk := 1) -> void:
 	var parent := get_parent()
 	if parent == null:
 		return
-	Sfx.shot(parent, a, 1)
+	var tree := get_tree()
+	if gk > 0:
+		Sfx.shot(parent, a, gk)
+		if GameSounds.current:
+			var d := (e - a)
+			d.y = 0.0
+			GameSounds.current.eject_casing(null, a, Vector3(-d.z, 0, d.x).normalized() if d.length() > 0.01 else Vector3.RIGHT)
+		var flash := OmniLight3D.new()
+		flash.light_color = Color("ffcf7a")
+		flash.light_energy = 4.0
+		flash.omni_range = 5.0
+		parent.add_child(flash)
+		flash.global_position = a
+		tree.create_timer(0.06).timeout.connect(flash.queue_free)
 	Sfx.bullet(parent, a, e, surface, what)
-	if GameSounds.current:
-		var d := (e - a)
-		d.y = 0.0
-		GameSounds.current.eject_casing(null, a, Vector3(-d.z, 0, d.x).normalized() if d.length() > 0.01 else Vector3.RIGHT)
-	var flash := OmniLight3D.new()
-	flash.light_color = Color("ffcf7a")
-	flash.light_energy = 4.0
-	flash.omni_range = 5.0
-	parent.add_child(flash)
-	flash.global_position = a
+	_tracer(parent, a, e)
+
+
+func _tracer(parent: Node, a: Vector3, e: Vector3) -> void:
+	var tree := get_tree()
 	var line := MeshInstance3D.new()
 	var im := ImmediateMesh.new()
 	im.surface_begin(Mesh.PRIMITIVE_LINES)
@@ -348,8 +504,6 @@ func _shot_fx(a: Vector3, e: Vector3, surface := "concrete", what := 0) -> void:
 	line.material_override = mat
 	line.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(line)
-	var tree := get_tree()
-	tree.create_timer(0.06).timeout.connect(flash.queue_free)
 	tree.create_timer(0.08).timeout.connect(line.queue_free)
 
 
@@ -610,6 +764,15 @@ func _encode_state() -> PackedByteArray:
 	b.put_u16(live.size())
 	for s in live:
 		(s as Suspect).encode(b)
+	b.put_u16(guns.size())
+	for g in guns.values():
+		var dg := g as DroppedGun
+		b.put_u16(dg.net_id)
+		b.put_u8(dg.kind)
+		b.put_u8(dg.rounds)
+		b.put_float(dg.global_position.x)
+		b.put_float(dg.global_position.y)
+		b.put_float(dg.global_position.z)
 	return b.data_array
 
 
@@ -661,6 +824,23 @@ func _on_state(_from: int, data: PackedByteArray) -> void:
 			s.queue_free()
 			suspects.erase(id)
 			_buffers.erase(id)
+	var gn := b.get_u16()
+	var have := {}
+	for i in gn:
+		var id := b.get_u16()
+		var kind := b.get_u8()
+		var rounds := b.get_u8()
+		var p := Vector3(b.get_float(), b.get_float(), b.get_float())
+		have[id] = true
+		var g: DroppedGun = guns.get(id)
+		if g == null:
+			g = _make_gun(id, kind, rounds)
+		g.rounds = rounds
+		g.global_position = p
+	for id in guns.keys():
+		if not have.has(id):
+			(guns[id] as DroppedGun).queue_free()
+			guns.erase(id)
 	if _clock < t - 0.5 or _clock > t + 0.5:
 		_clock = t
 

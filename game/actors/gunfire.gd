@@ -32,10 +32,10 @@ static func resolve(world: DestructionWorld, cars: CarSync, origin: Vector3, dir
 					cars._local_dent_host(c, lp, ld, clampf(0.3 * (1.0 - lp.length() / 5.0), 0.05, 0.3))
 	elif hit and hit.collider is Officer:
 		var o := hit.collider as Officer
-		o.take_damage(BULLET_DAMAGE, dir, o.body_part_at(hit.position))
+		o.take_damage(shooter.shot_damage(), dir, o.body_part_at(hit.position))
 	elif hit and hit.collider is Suspect:
 		var sp := hit.collider as Suspect
-		sp.take_damage(BULLET_DAMAGE, dir)
+		sp.take_damage(shooter.shot_damage(), dir)
 	elif hit and hit.collider is Car and cars:
 		var surface := cars.bullet_hit(hit.collider, hit.position, dir)
 		if world:
@@ -47,7 +47,21 @@ static func resolve(world: DestructionWorld, cars: CarSync, origin: Vector3, dir
 	if not alt and not (hit and hit.collider is Car):
 		var what := 2 if not hit else (1 if (hit.collider is Officer or hit.collider is Suspect) else 0)
 		_sound(origin, end, Sfx.surface_of(hit.collider) if hit else "concrete", what, shooter)
+	if not alt:
+		whizz(shooter.get_tree(), origin, end, shooter)
 	return end
+
+
+## Bullets passing close keep suspects' heads down (Phase 1.5).
+static func whizz(tree: SceneTree, a: Vector3, b: Vector3, shooter: Node) -> void:
+	for n in tree.get_nodes_in_group("suspects"):
+		var s := n as Suspect
+		if s == shooter or not s.is_free():
+			continue
+		var c := s.global_position + Vector3(0, 1.0, 0)
+		var p := Geometry3D.get_closest_point_to_segment(c, a, b)
+		if p.distance_to(c) < 1.8 and p.distance_to(a) > 1.0:
+			s.suppress()
 
 
 ## Everyone hears where the bullet went (Phase 1.6).
