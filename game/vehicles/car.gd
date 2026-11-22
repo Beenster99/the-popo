@@ -21,7 +21,11 @@ const ENGINE_BRAKE := 900.0  # N per driven wheel when off the throttle
 const ROLLING := 0.015       # tyre rolling resistance, fraction of wheel load
 const GRIP := 9.0           # lateral stiffness per unit load
 const MU := 1.25            # tyre friction coefficient
-const HANDBRAKE_REAR_GRIP := 0.25
+const HANDBRAKE_REAR_GRIP := 0.1
+const YAW_ASSIST := 0.55
+const HANDBRAKE_YAW := 1.9
+const REAR_GRIP := 0.75         # rear tyres grip less than the fronts: the tail steps out
+const HANDBRAKE_LOCK := 0.9     # share of BRAKE the handbrake puts on each rear wheel
 const STEER_MAX := 0.6      # rad at low speed
 const STEER_MIN := 0.12     # rad at top speed
 
@@ -31,6 +35,8 @@ var throttle := 0.0
 var steer := 0.0
 var brake := 0.0
 var handbrake := false
+var horn := false
+var _horn_player: AudioStreamPlayer3D
 
 var net_id := 0
 var bumper_attached := true
@@ -60,6 +66,17 @@ func _init() -> void:
 
 
 func _ready() -> void:
+	_horn_player = AudioStreamPlayer3D.new()
+	var horn_wav: AudioStreamWAV = load("res://assets/audio/sfx/car_horn_1.wav")
+	horn_wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	horn_wav.loop_begin = 0
+	horn_wav.loop_end = horn_wav.data.size() / 2  # 16-bit mono frames
+	_horn_player.stream = horn_wav
+	_horn_player.position = Vector3(0, 0.6, SIZE.z * 0.45)
+	_horn_player.unit_size = 8.0
+	_horn_player.max_distance = 120.0
+	_horn_player.bus = "SFX"
+	add_child(_horn_player)
 	var cs := CollisionShape3D.new()
 	var bs := BoxShape3D.new()
 	bs.size = SIZE
@@ -221,6 +238,11 @@ func speed_kmh() -> float:
 
 
 func _physics_process(delta: float) -> void:
+	if horn != _horn_player.playing:
+		if horn:
+			_horn_player.play()
+		else:
+			_horn_player.stop()
 	_dent_cooldown -= delta
 	if freeze:
 		_update_wheel_visuals(delta, false)
@@ -268,8 +290,10 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		var lat_v := pv.dot(wright)
 		var lon_v := pv.dot(wfwd)
 		var grip := GRIP
-		if not w.front and handbrake:
-			grip *= HANDBRAKE_REAR_GRIP
+		if not w.front:
+			grip *= REAR_GRIP
+			if handbrake:
+				grip *= HANDBRAKE_REAR_GRIP
 		var lat_f := -lat_v * grip * load / 9.81 * 0.5
 		var lon_f := 0.0
 		if not w.front:
@@ -278,7 +302,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 				drive = throttle * ENGINE * 0.35 * (1.0 if fwd_speed > -9.0 else 0.0)
 			lon_f += drive
 		if brake > 0.0 or (handbrake and not w.front):
-			var b := (BRAKE * 0.25 * brake) + (BRAKE * 0.5 if handbrake and not w.front else 0.0)
+			var b := (BRAKE * 0.25 * brake) + (BRAKE * HANDBRAKE_LOCK if handbrake and not w.front else 0.0)
 			lon_f -= sign(lon_v) * min(b, absf(lon_v) * mass * 2.0)
 		# Off the throttle the engine drags the driven wheels, and every tyre
 		# has a little rolling resistance, so a coasting car comes to rest
@@ -290,7 +314,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		lon_f -= sign(lon_v) * minf(drag, absf(lon_v) * mass * 0.5)
 		lon_f -= lon_v * 25.0  # air and bearing drag
 		# Friction circle.
-		var limit: float = MU * load * (0.7 if handbrake and not w.front else 1.0)
+		var limit: float = MU * load * (0.5 if handbrake and not w.front else 1.0)
 		var f := Vector2(lat_f, lon_f)
 		if f.length() > limit:
 			f = f.normalized() * limit
@@ -300,8 +324,10 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		# Assists: a little downforce and yaw damping so it reads well from above.
 		state.apply_central_force(-up * vel.length_squared() * 2.5)
 		var yaw_rate := state.angular_velocity.dot(up)
-		var wanted_yaw := _steer_smooth * fwd_speed * 0.35 * (1.0 if not handbrake else 1.6)
-		state.apply_torque(up * (wanted_yaw - yaw_rate) * mass * 0.9 * (0.4 if handbrake else 1.0))
+		# It asks for more rotation than the tyres can follow, so the tail
+		# steps out (oversteer); the handbrake asks for much more again.
+		var wanted_yaw := _steer_smooth * fwd_speed * YAW_ASSIST * (HANDBRAKE_YAW if handbrake else 1.0)
+		state.apply_torque(up * (wanted_yaw - yaw_rate) * mass * 0.9)
 	_detect_impacts(state)
 	_update_wheel_visuals(dt, true, steer_angle)
 
@@ -345,6 +371,7 @@ func encode_state(b: StreamPeerBuffer) -> void:
 	b.put_float(q.z)
 	b.put_float(q.w)
 	b.put_half(steer)
+	b.put_u8(1 if horn else 0)
 
 
 static func decode_state(b: StreamPeerBuffer) -> Dictionary:
@@ -352,4 +379,4 @@ static func decode_state(b: StreamPeerBuffer) -> Dictionary:
 	var lv := Vector3(b.get_float(), b.get_float(), b.get_float())
 	var av := Vector3(b.get_float(), b.get_float(), b.get_float())
 	var q := Quaternion(b.get_float(), b.get_float(), b.get_float(), b.get_float())
-	return {"pos": o, "lv": lv, "av": av, "rot": q, "steer": b.get_half()}
+	return {"pos": o, "lv": lv, "av": av, "rot": q, "steer": b.get_half(), "horn": b.get_u8() == 1}

@@ -1,24 +1,35 @@
 file,source,licence,notes
-sfx/gun_mech_1.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Pistol layer 1: mechanism
-sfx/gun_mech_2.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Pistol layer 1: mechanism
-sfx/gun_mech_3.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Pistol layer 1: mechanism
-sfx/gun_crack_1.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Pistol layer 2: crack
-sfx/gun_crack_2.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Pistol layer 2: crack
-sfx/gun_crack_3.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Pistol layer 2: crack
-sfx/gun_body_1.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Pistol layer 3: body
-sfx/gun_body_2.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Pistol layer 3: body
-sfx/gun_body_3.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Pistol layer 3: body
-sfx/gun_tail_outdoor_1.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Pistol layer 4: outdoor tail (indoors the reverb bus does the tail)
-sfx/gun_tail_outdoor_2.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Pistol layer 4: outdoor tail (indoors the reverb bus does the tail)
-sfx/impact_wood_1.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Bullet impact on wood
-sfx/impact_wood_2.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Bullet impact on wood
-sfx/impact_wood_3.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Bullet impact on wood
-sfx/impact_glass_1.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Bullet impact on glass
-sfx/impact_glass_2.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Bullet impact on glass
-sfx/impact_glass_3.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Bullet impact on glass
-sfx/impact_concrete_1.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Bullet impact on concrete and brick
-sfx/impact_concrete_2.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Bullet impact on concrete and brick
-sfx/impact_concrete_3.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Bullet impact on concrete and brick
-sfx/impact_metal_1.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Bullet impact on metal
-sfx/impact_metal_2.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Bullet impact on metal
-sfx/impact_metal_3.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Bullet impact on metal
+sfx/gun_near_1.wav,firearm/Prepared SFX Library/Walther PPQ/X_39P.wav (https://opengameart.org/content/the-free-firearm-sound-library),CC0 1.0 (public domain),"Walther PPQ 9mm, near, shot 1, outdoor tail"
+sfx/gun_dry_1.wav,firearm/Prepared SFX Library/Walther PPQ/X_39P.wav (https://opengameart.org/content/the-free-firearm-sound-library),CC0 1.0 (public domain),"Walther PPQ 9mm, near, shot 1, tail cut for indoors"
+sfx/gun_near_2.wav,firearm/Prepared SFX Library/Walther PPQ/X_39P.wav (https://opengameart.org/content/the-free-firearm-sound-library),CC0 1.0 (public domain),"Walther PPQ 9mm, near, shot 2, outdoor tail"
+sfx/gun_dry_2.wav,firearm/Prepared SFX Library/Walther PPQ/X_39P.wav (https://opengameart.org/content/the-free-firearm-sound-library),CC0 1.0 (public domain),"Walther PPQ 9mm, near, shot 2, tail cut for indoors"
+sfx/gun_near_3.wav,firearm/Prepared SFX Library/Walther PPQ/X_39P.wav (https://opengameart.org/content/the-free-firearm-sound-library),CC0 1.0 (public domain),"Walther PPQ 9mm, near, shot 3, outdoor tail"
+sfx/gun_dry_3.wav,firearm/Prepared SFX Library/Walther PPQ/X_39P.wav (https://opengameart.org/content/the-free-firearm-sound-library),CC0 1.0 (public domain),"Walther PPQ 9mm, near, shot 3, tail cut for indoors"
+sfx/gun_near_4.wav,firearm/Prepared SFX Library/1911/A_42P.wav (https://opengameart.org/content/the-free-firearm-sound-library),CC0 1.0 (public domain),"1911 .45, near, shot 1, outdoor tail"
+sfx/gun_dry_4.wav,firearm/Prepared SFX Library/1911/A_42P.wav (https://opengameart.org/content/the-free-firearm-sound-library),CC0 1.0 (public domain),"1911 .45, near, shot 1, tail cut for indoors"
+sfx/gun_near_5.wav,firearm/Prepared SFX Library/1911/A_42P.wav (https://opengameart.org/content/the-free-firearm-sound-library),CC0 1.0 (public domain),"1911 .45, near, shot 2, outdoor tail"
+sfx/gun_dry_5.wav,firearm/Prepared SFX Library/1911/A_42P.wav (https://opengameart.org/content/the-free-firearm-sound-library),CC0 1.0 (public domain),"1911 .45, near, shot 2, tail cut for indoors"
+sfx/gun_far_1.wav,firearm/Prepared SFX Library/Walther PPQ/X_31P.wav (https://opengameart.org/content/the-free-firearm-sound-library),CC0 1.0 (public domain),"Walther PPQ 9mm, mid distance, shot 1"
+sfx/gun_far_2.wav,firearm/Prepared SFX Library/Walther PPQ/X_31P.wav (https://opengameart.org/content/the-free-firearm-sound-library),CC0 1.0 (public domain),"Walther PPQ 9mm, mid distance, shot 2"
+sfx/gun_far_3.wav,firearm/Prepared SFX Library/1911/A_34P.wav (https://opengameart.org/content/the-free-firearm-sound-library),CC0 1.0 (public domain),"1911 .45, mid distance, shot 1"
+sfx/gun_far_4.wav,firearm/Prepared SFX Library/1911/A_34P.wav (https://opengameart.org/content/the-free-firearm-sound-library),CC0 1.0 (public domain),"1911 .45, mid distance, shot 2"
+sfx/impact_wood_1.wav,breaking/bfh1_wood_hit_01.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),impact wood
+sfx/impact_wood_2.wav,breaking/bfh1_wood_hit_02.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),impact wood
+sfx/impact_wood_3.wav,breaking/bfh1_wood_hit_03.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),impact wood
+sfx/impact_wood_4.wav,wood/wood_impact/impactwood07.mp3.flac (https://opengameart.org/content/35-wooden-crackshitsdestructions),CC0 1.0 (public domain),impact wood
+sfx/impact_glass_1.wav,breaking/bfh1_glass_hit_01.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),impact glass
+sfx/impact_glass_2.wav,breaking/bfh1_glass_hit_02.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),impact glass
+sfx/impact_glass_3.wav,breaking/bfh1_glass_breaking_02.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),impact glass
+sfx/impact_metal_1.wav,breaking/bfh1_metal_hit_01.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),impact metal
+sfx/impact_metal_2.wav,breaking/bfh1_metal_hit_05.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),impact metal
+sfx/impact_metal_3.wav,raw/clink1_0.wav (https://opengameart.org/content/metal-impact-sounds),CC0 1.0 (public domain),impact metal
+sfx/impact_metal_4.wav,raw/clink2.wav (https://opengameart.org/content/metal-impact-sounds),CC0 1.0 (public domain),impact metal
+sfx/impact_metal_5.wav,raw/clink3.wav (https://opengameart.org/content/metal-impact-sounds),CC0 1.0 (public domain),impact metal
+sfx/impact_concrete_1.wav,breaking/bfh1_rock_hit_01.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),impact concrete
+sfx/impact_concrete_2.wav,breaking/bfh1_hit_05.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),impact concrete
+sfx/impact_concrete_3.wav,breaking/bfh1_hit_09.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),impact concrete
+sfx/impact_concrete_4.wav,breaking/bfh1_hit_10.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),impact concrete
+sfx/glass_break_1.wav,breaking/bfh1_glass_breaking_01.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),glass break
+sfx/glass_break_2.wav,breaking/bfh1_glass_breaking_03.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),glass break
+sfx/glass_break_3.wav,raw/glass_breaking.wav (https://opengameart.org/content/glass-break),CC0 1.0 (public domain),glass break
+sfx/car_horn_1.wav,Made by tools/audio/make_horn.py,Project's own (no third-party audio),"two-tone car horn, loops"

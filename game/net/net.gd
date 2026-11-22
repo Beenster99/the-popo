@@ -59,7 +59,12 @@ var _ping_t := 0.0
 var _counters := {}  # name -> [count this window, rate last window]
 
 
+## Opens the game port on the router while hosting (see PortOpener).
+var port_opener := PortOpener.new()
+
+
 func _ready() -> void:
+	add_child(port_opener)
 	multiplayer.peer_connected.connect(_on_peer_connected)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	multiplayer.connected_to_server.connect(_on_connected_to_server)
@@ -108,6 +113,8 @@ func leave() -> void:
 	_in_queue.clear()
 	ping_ms.clear()
 	_reset_offline_slots()
+	if port_opener and port_opener.state != "idle":
+		port_opener.close()
 	if was_online:
 		left.emit()
 

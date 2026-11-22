@@ -130,6 +130,10 @@ static func encode_cmd(b: StreamPeerBuffer, c: Dictionary) -> void:
 	b.put_half(m.y)
 	b.put_u16(c.get("buttons", 0))
 	b.put_half(c.get("aim_yaw", 0.0))
+	var ap: Vector3 = c.get("aim_point", Vector3.ZERO)
+	b.put_float(ap.x)
+	b.put_float(ap.y)
+	b.put_float(ap.z)
 
 
 static func decode_cmd(b: StreamPeerBuffer) -> Dictionary:
@@ -138,6 +142,7 @@ static func decode_cmd(b: StreamPeerBuffer) -> Dictionary:
 	c.move = Vector2(b.get_half(), b.get_half())
 	c.buttons = b.get_u16()
 	c.aim_yaw = b.get_half()
+	c.aim_point = Vector3(b.get_float(), b.get_float(), b.get_float())
 	return c
 
 

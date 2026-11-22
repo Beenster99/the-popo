@@ -4,13 +4,17 @@ extends RefCounted
 ## indoor/outdoor reverb by zone and muffling through walls.
 ##
 ## Buses (made once by ensure_buses):
-##   SFX      dry 3D sound outdoors, feeds Master
-##   Outdoor  gunshot tails outdoors: a slapback echo off the street plus a
-##            short, wide reverb. Feeds SFX.
+##   SFX      dry 3D sound, feeds Master
+##   Outdoor  outdoor gunshots: the recordings already carry their natural
+##            outdoor tail, so this only adds one faint slapback off the
+##            buildings and a little air. Feeds SFX.
 ##   Indoor   anything fired or hit inside a SoundZone: a tight room reverb.
 ##            Feeds SFX.
-## Occlusion: a ray from the sound to the listener counts the walls between.
-## Each wall lowers the cutoff of the player's low-pass filter and the volume.
+##   <bus>_Muffled1 / _Muffled2: copies of each bus behind a low-pass filter,
+##            used when one wall, or two or more, stand between the sound and
+##            the listener. Each feeds its own bus, so muffled sounds keep
+##            their room.
+## Sounds are CC0 recordings imported by tools/audio/import_cc0.py.
 
 const BUS_SFX := "SFX"
 const BUS_INDOOR := "Indoor"
@@ -19,14 +23,10 @@ const SFX_DIR := "res://assets/audio/sfx/"
 const OCCLUDE_MASK := 1 | 16  # world and chunks
 const MAX_WALLS := 3
 const SURFACES := ["wood", "glass", "concrete", "metal"]
-
-## Layers of one handgun shot: [file stem, variants, dB, max distance, pitch spread]
-const GUN_LAYERS := [
-	["gun_mech", 3, -8.0, 18.0, 0.06],   # slide and hammer, only heard close up
-	["gun_crack", 3, 2.0, 120.0, 0.05],  # the sharp supersonic crack
-	["gun_body", 3, 0.0, 90.0, 0.08],    # the low thump of the charge
-]
-const GUN_TAIL := ["gun_tail_outdoor", 2, -4.0, 160.0, 0.04]
+const MUFFLE_CUTOFF := [1200.0, 500.0]
+const NEAR_RANGE := 30.0     # beyond this the distant recording is used
+const COUNTS := {"gun_near": 5, "gun_dry": 5, "gun_far": 4, "impact_wood": 4, "impact_glass": 3,
+	"impact_metal": 5, "impact_concrete": 4, "glass_break": 3, "car_horn": 1}
 
 static var _cache := {}
 static var _rng := RandomNumberGenerator.new()
@@ -42,34 +42,43 @@ static func ensure_buses() -> void:
 	var slap := AudioEffectDelay.new()
 	slap.dry = 1.0
 	slap.tap1_active = true
-	slap.tap1_delay_ms = 110.0  # the facade across the street, about 19 m away
-	slap.tap1_level_db = -9.0
-	slap.tap1_pan = -0.3
-	slap.tap2_active = true
-	slap.tap2_delay_ms = 260.0
-	slap.tap2_level_db = -15.0
-	slap.tap2_pan = 0.35
+	slap.tap1_delay_ms = 95.0
+	slap.tap1_level_db = -16.0
+	slap.tap1_pan = -0.2
+	slap.tap2_active = false
 	slap.feedback_active = false
 	AudioServer.add_bus_effect(outdoor, slap)
-	var wide := AudioEffectReverb.new()
-	wide.room_size = 0.9
-	wide.damping = 0.65
-	wide.spread = 1.0
-	wide.dry = 1.0
-	wide.wet = 0.12
-	wide.predelay_msec = 40.0
-	AudioServer.add_bus_effect(outdoor, wide)
+	var air := AudioEffectReverb.new()
+	air.room_size = 0.7
+	air.damping = 0.8
+	air.spread = 1.0
+	air.dry = 1.0
+	air.wet = 0.05
+	air.predelay_msec = 30.0
+	AudioServer.add_bus_effect(outdoor, air)
 	var indoor := _add_bus(BUS_INDOOR, BUS_SFX)
 	var room := AudioEffectReverb.new()
-	room.room_size = 0.45
-	room.damping = 0.35  # hard walls: bright reflections
+	room.room_size = 0.35
+	room.damping = 0.4
 	room.spread = 0.8
-	room.dry = 0.85
-	room.wet = 0.42
-	room.predelay_msec = 8.0
+	room.dry = 0.9
+	room.wet = 0.35
+	room.predelay_msec = 6.0
 	AudioServer.add_bus_effect(indoor, room)
-	var limit := AudioEffectHardLimiter.new()
-	AudioServer.add_bus_effect(AudioServer.get_bus_index(BUS_SFX), limit)
+	for base in [BUS_SFX, BUS_OUTDOOR, BUS_INDOOR]:
+		for level in 2:
+			var i := _add_bus(muffled_bus(base, level + 1), base)
+			var lp := AudioEffectLowPassFilter.new()
+			lp.cutoff_hz = MUFFLE_CUTOFF[level]
+			lp.resonance = 0.5
+			AudioServer.add_bus_effect(i, lp)
+	AudioServer.add_bus_effect(AudioServer.get_bus_index(BUS_SFX), AudioEffectHardLimiter.new())
+
+
+static func muffled_bus(base: String, walls: int) -> String:
+	if walls <= 0:
+		return base
+	return "%s_Muffled%d" % [base, mini(walls, 2)]
 
 
 static func _add_bus(bus_name: String, send: String) -> int:
@@ -122,11 +131,11 @@ static func occlusion(walls: int) -> Dictionary:
 		0:
 			return {"cutoff": 20500.0, "db": 0.0}
 		1:
-			return {"cutoff": 1400.0, "db": -7.0}
+			return {"cutoff": MUFFLE_CUTOFF[0], "db": -6.0}
 		2:
-			return {"cutoff": 650.0, "db": -13.0}
+			return {"cutoff": MUFFLE_CUTOFF[1], "db": -11.0}
 		_:
-			return {"cutoff": 380.0, "db": -19.0}
+			return {"cutoff": MUFFLE_CUTOFF[1], "db": -16.0}
 
 
 static func surface_of(collider: Object) -> String:
@@ -142,13 +151,13 @@ static func surface_of(collider: Object) -> String:
 # --- Playing -----------------------------------------------------------------
 
 ## Plays one positional sound. Returns the player (already playing).
-static func play(parent: Node, stem: String, variants: int, pos: Vector3, db := 0.0, max_dist := 60.0, pitch_spread := 0.05, bus := "") -> AudioStreamPlayer3D:
+static func play(parent: Node, stem: String, pos: Vector3, db := 0.0, max_dist := 60.0, pitch_spread := 0.05, bus := "") -> AudioStreamPlayer3D:
 	ensure_buses()
 	var tree := parent.get_tree()
 	if bus == "":
 		bus = BUS_SFX if zone_at(tree, pos) == null else BUS_INDOOR
 	var p := AudioStreamPlayer3D.new()
-	p.stream = stream(stem, _rng.randi_range(1, variants))
+	p.stream = stream(stem, _rng.randi_range(1, COUNTS.get(stem, 1)))
 	p.bus = bus
 	p.volume_db = db
 	p.max_distance = max_dist
@@ -163,33 +172,43 @@ static func play(parent: Node, stem: String, variants: int, pos: Vector3, db := 
 	if lis != null:
 		walls = walls_between(parent.get_viewport().world_3d.direct_space_state, pos, lis)
 	var occ := occlusion(walls)
-	p.attenuation_filter_cutoff_hz = occ.cutoff
-	p.attenuation_filter_db = -24.0
+	# Godot's per-player filter scales with distance, so a shot just behind
+	# a wall would barely change; route through a muffled bus instead.
+	p.attenuation_filter_db = 0.0
+	p.bus = muffled_bus(bus, walls)
 	p.volume_db += occ.db
 	p.finished.connect(p.queue_free)
 	p.play()
-	history.append({"stem": stem, "pos": pos, "bus": bus, "walls": walls, "cutoff": occ.cutoff})
+	history.append({"stem": stem, "pos": pos, "bus": bus, "walls": walls, "cutoff": occ.cutoff, "played_on": p.bus})
 	if history.size() > 32:
 		history.pop_front()
 	return p
 
 
-## A handgun shot, layered: mechanism, crack, body, and outdoors an echoing tail.
+## A handgun shot. Outdoors: the near recording with its natural tail, or
+## the distant one when the listener is far away. Indoors: the shot with its
+## tail cut, through the room reverb.
 static func gunshot(parent: Node, pos: Vector3) -> void:
 	var indoor := zone_at(parent.get_tree(), pos) != null
-	for l in GUN_LAYERS:
-		play(parent, l[0], l[1], pos, l[2], l[3], l[4], BUS_INDOOR if indoor else BUS_SFX)
-	if not indoor:
-		var t: Array = GUN_TAIL
-		play(parent, t[0], t[1], pos, t[2], t[3], t[4], BUS_OUTDOOR)
+	if indoor:
+		play(parent, "gun_dry", pos, 0.0, 120.0, 0.04, BUS_INDOOR)
+		return
+	var lis: Variant = listener_position(parent)
+	var far: bool = lis != null and (lis as Vector3).distance_to(pos) > NEAR_RANGE
+	play(parent, "gun_far" if far else "gun_near", pos, 0.0, 160.0, 0.04, BUS_OUTDOOR)
 
 
 ## A bullet or debris hit on a surface (wood, glass, concrete, metal).
 static func impact(parent: Node, pos: Vector3, surface: String, strength := 1.0) -> void:
 	if not surface in SURFACES:
 		surface = "concrete"
-	var db := linear_to_db(clampf(strength, 0.05, 1.5)) - 2.0
-	play(parent, "impact_" + surface, 3, pos, db, 45.0, 0.1)
+	var db := linear_to_db(clampf(strength, 0.05, 1.5)) + 3.0
+	play(parent, "impact_" + surface, pos, db, 50.0, 0.08)
+
+
+## A pane of glass breaking.
+static func glass_break(parent: Node, pos: Vector3) -> void:
+	play(parent, "glass_break", pos, 2.0, 60.0, 0.05)
 
 
 ## Where the ears are: the current AudioListener3D, else the camera.

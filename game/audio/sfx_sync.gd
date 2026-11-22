@@ -5,7 +5,7 @@ extends Node
 ## their own ears (so each player hears their own walls and rooms).
 
 const MSG_SOUND := 40
-enum Kind { GUNSHOT, IMPACT }
+enum Kind { GUNSHOT, IMPACT, GLASS_BREAK }
 
 
 func _ready() -> void:
@@ -23,6 +23,10 @@ func gunshot(pos: Vector3) -> void:
 
 func impact(pos: Vector3, surface: String, strength := 1.0) -> void:
 	_send(Kind.IMPACT, pos, maxi(Sfx.SURFACES.find(surface), 0), strength)
+
+
+func glass_break(pos: Vector3) -> void:
+	_send(Kind.GLASS_BREAK, pos, 0, 1.0)
 
 
 func _send(kind: int, pos: Vector3, surface: int, strength: float) -> void:
@@ -54,5 +58,7 @@ func _play(b: StreamPeerBuffer) -> void:
 	var strength := b.get_u8() / 100.0
 	if kind == Kind.GUNSHOT:
 		Sfx.gunshot(self, pos)
+	elif kind == Kind.GLASS_BREAK:
+		Sfx.glass_break(self, pos)
 	else:
 		Sfx.impact(self, pos, surface, strength)

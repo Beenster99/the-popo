@@ -94,3 +94,38 @@ func test_state_round_trips_for_the_network() -> void:
 	b.seek(0)
 	var s := o.decode_state(b)
 	t.check(s.pos.distance_to(o.global_position) < 0.001 and s.state == o.state, "decode matches")
+
+
+func test_fires_from_the_barrel_at_the_aim_point() -> void:
+	var o := _officer()
+	var shots: Array = []
+	o.fired.connect(func(origin, dir, _alt): shots.append([origin, dir]))
+	var target := Vector3(1.0, 0.4, 6.0)  # low and a little to the side
+	var cmd := {"move": Vector2.ZERO, "buttons": PlayerInput.AIM, "aim_yaw": atan2(target.x, target.z), "aim_point": target}
+	await _run(o, cmd, 40)
+	cmd.buttons = PlayerInput.AIM | PlayerInput.FIRE
+	await _run(o, cmd, 2)
+	t.check(shots.size() >= 1, "fired")
+	if shots.is_empty():
+		return
+	var origin: Vector3 = shots[0][0]
+	var dir: Vector3 = shots[0][1]
+	var hand := o.rig.skeleton.global_transform * o.rig.skeleton.get_bone_global_pose(o.rig.skeleton.find_bone("hand.R")).origin
+	print("    muzzle %s, hand %s, dir %s" % [origin, hand, dir])
+	t.check(origin.distance_to(hand) < 0.35, "shot starts at the gun in the hand")
+	t.check(origin.y > 0.9 and origin.y < 1.7, "muzzle at arm height: %f" % origin.y)
+	t.check(dir.dot((target - origin).normalized()) > 0.99, "shot heads for the aim point")
+
+
+func test_feet_step_round_instead_of_twisting() -> void:
+	var o := _officer()
+	var cmd := {"move": Vector2.ZERO, "buttons": PlayerInput.AIM, "aim_yaw": 0.3, "aim_point": Vector3(sin(0.3), 1.3, cos(0.3)) * 5.0}
+	await _run(o, cmd, 20)
+	t.check(not o.turning and absf(o.rotation.y) < 0.05, "small aim change: upper body only")
+	cmd.aim_yaw = 2.0
+	await _run(o, cmd, 3)
+	t.check(o.turning, "big aim change: turning on the spot")
+	t.check(o.rig._lower_state(o) == "walk", "legs step while turning")
+	await _run(o, cmd, 40)
+	t.check(absf(angle_difference(o.rotation.y, 2.0)) < 0.15, "ends facing the aim: %f" % o.rotation.y)
+	t.check(not o.turning, "stops turning")

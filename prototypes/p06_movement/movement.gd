@@ -67,13 +67,18 @@ func _ready() -> void:
 	sync.input_source = func(): return PlayerInput.sample(cam, sync.my_pawn())
 	sync.pawn_spawned.connect(func(id, p): if id == Net.my_id(): cam.target = p)
 	add_child(sync)
+	var reticle := Reticle.new()
+	reticle.pawn_getter = func(): return sync.my_pawn()
+	add_child(reticle)
 	var overlay := NetOverlay.new()
 	overlay.extra_lines = func():
 		var o: Officer = sync.my_pawn()
 		if o == null:
 			return ""
-		return "state %s  speed %.1f m/s  clips: mocap %s\nShift sprint  Space vault/climb/jump  C crouch  Z prone  Ctrl roll/slide  V cover  RMB aim  LMB fire  G punch  H kick  J hit  K down" % [
-			Officer.S.keys()[o.state], Vector2(o.velocity.x, o.velocity.z).length(), ", ".join(OfficerClips.mocap_clips)]
+		return "state %s  speed %.1f m/s\n%s\n%s   J take a hit   K go down / get up   (controller works too)" % [
+			Officer.S.keys()[o.state], Vector2(o.velocity.x, o.velocity.z).length(),
+			Controls.help(["sprint", "jump", "crouch", "prone", "dive"]),
+			Controls.help(["cover", "aim", "fire", "punch", "kick"])]
 	add_child(overlay)
 
 

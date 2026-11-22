@@ -1,0 +1,40 @@
+THE POPO - test build vVERSION
+
+Double-click ThePopo-vVERSION.exe. If Windows warns about an unknown app,
+choose More info, then Run anyway.
+
+PLAYING
+In the launcher press Host (alone or with friends), then pick a test scene.
+Esc goes back to the launcher. "Controls..." in the launcher lets you change keys.
+
+PLAYING OVER THE INTERNET
+1. Press Host. The game asks your router to open port 27015 by itself and
+   shows the address to give friends, with a button to copy it.
+2. Friends type that address and port 27015 and press Join.
+3. If Windows Firewall asks, allow The Popo on private and public networks.
+
+If the launcher says your router did not open the port, forward it yourself:
+  a. Find this PC's local address: open Command Prompt, type ipconfig, and
+     note the IPv4 Address (like 192.168.1.23).
+  b. Open your router's page in a browser (often http://192.168.1.1 or
+     http://192.168.0.1; the address and password are usually on a sticker
+     on the router).
+  c. Find "Port forwarding" (sometimes under Advanced, NAT or Virtual servers).
+  d. Add a rule: protocol UDP, external port 27015, internal port 27015,
+     to this PC's local address. Save.
+If the launcher warns about CGNAT or a second router, your internet provider
+shares one address between customers; ask them for a public IP address.
+
+KEYBOARD AND MOUSE (defaults)
+WASD move, Shift sprint, Space jump / vault / climb, C crouch, Z prone,
+Ctrl roll (slide when sprinting), R cover, V punch, B kick, F use,
+right mouse aim, left mouse fire (at the reticle), Q/E rotate camera,
+mouse wheel zoom, F3 network overlay.
+Car: WASD drive, Space handbrake, H horn, T switches who simulates the car.
+Look scene: N day / night. Sound scene: 5, 6, 7 fire the test guns, F4 auto-fire.
+
+GAME CONTROLLER (Xbox names, PlayStation in brackets)
+Left stick move, right stick aim, LT (L2) aim, RT (R2) fire,
+A (Cross) jump / handbrake, B (Circle) crouch, X (Square) roll,
+Y (Triangle) prone / horn, LB (L1) cover, RB (R1) punch, R3 kick, L3 sprint,
+D-pad rotate and zoom the camera, Start back to the launcher.

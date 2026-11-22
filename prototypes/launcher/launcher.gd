@@ -19,6 +19,8 @@ var _port: SpinBox
 var _status: Label
 var _lobby: ItemList
 var _list: VBoxContainer
+var _internet: Label
+var _copy: Button
 
 
 func _ready() -> void:
@@ -68,6 +70,22 @@ func _ready() -> void:
 	_status = _label("Offline: you can still run every prototype on your own.")
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD
 	left.add_child(_status)
+	_internet = _label("")
+	_internet.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_internet.add_theme_color_override("font_color", Color("ffd479"))
+	left.add_child(_internet)
+	_copy = _button("Copy address for friends", func():
+		if Net.port_opener.public_ip != "":
+			DisplayServer.clipboard_set("%s:%d" % [Net.port_opener.public_ip, int(_port.value)]))
+	_copy.visible = false
+	left.add_child(_copy)
+	var po: PortOpener = Net.port_opener
+	if po.state != "idle":
+		_internet.text = PortOpener.describe(po.state, po.port, po.public_ip, po.router_ip)
+		_copy.visible = po.public_ip != ""
+	Net.port_opener.status_changed.connect(func(t):
+		_internet.text = t
+		_copy.visible = Net.port_opener.public_ip != "")
 	left.add_child(_label("Players (max 3)"))
 	_lobby = ItemList.new()
 	_lobby.custom_minimum_size.y = 110
@@ -83,7 +101,8 @@ func _ready() -> void:
 		var b := _button(p[0], func(): _start(p[1]))
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		_list.add_child(b)
-	right.add_child(_label("\nEsc returns here. F3 toggles the network overlay. Q/E rotate the camera, mouse wheel zooms."))
+	right.add_child(_label("\nEsc returns here. F3 toggles the network overlay. Q/E rotate the camera, mouse wheel zooms.\nA game controller works too."))
+	right.add_child(_button("Controls...", func(): add_child(load("res://prototypes/launcher/controls_screen.gd").new())))
 
 	Net.lobby_changed.connect(_refresh)
 	Net.joined.connect(func(): _status.text = "Joined. Waiting for the host to pick a prototype."; _refresh())
@@ -117,7 +136,9 @@ func _save() -> void:
 func _on_host() -> void:
 	_save()
 	var err := Net.host(int(_port.value))
-	_status.text = "Hosting on port %d. Friends join with your address and this port." % int(_port.value) if err == OK else "Could not host (error %d). Is the port in use?" % err
+	_status.text = "Hosting on port %d. Friends on your home network join with this PC's local address." % int(_port.value) if err == OK else "Could not host (error %d). Is the port in use?" % err
+	if err == OK:
+		Net.port_opener.open(int(_port.value))
 	_refresh()
 
 

@@ -151,7 +151,7 @@ func update_from(o: Officer, delta: float) -> void:
 	tree.set("parameters/split/blend_amount", 0.0 if upper == "none" else 1.0)
 	var hs := Vector2(o.velocity.x, o.velocity.z).length()
 	tree.set("parameters/ts_run/scale", clampf(hs / RUN_CLIP_SPEED, 0.6, 1.7))
-	tree.set("parameters/ts_walk/scale", clampf(hs / WALK_CLIP_SPEED, 0.5, 1.6))
+	tree.set("parameters/ts_walk/scale", 0.9 if o.turning and hs < 0.2 else clampf(hs / WALK_CLIP_SPEED, 0.5, 1.6))
 	tree.set("parameters/ts_crouch_walk/scale", clampf(hs / CROUCH_CLIP_SPEED, 0.5, 1.8))
 	tree.set("parameters/ts_crawl/scale", clampf(hs / CRAWL_CLIP_SPEED, 0.5, 2.0))
 	tree.set("parameters/ts_roll/scale", Officer.ROLL_PLAYBACK)
@@ -183,7 +183,7 @@ func _lower_state(o: Officer) -> String:
 		Officer.S.CROUCH: return "crouch_walk" if hs > 0.2 else "crouch_idle"
 		Officer.S.COVER: return "peek" if o.is_aiming() else ("crouch_walk" if hs > 0.2 else "cover_idle")
 	if hs < 0.2:
-		return "idle"
+		return "walk" if o.turning else "idle"
 	return "walk" if hs < 2.2 else "run"
 
 

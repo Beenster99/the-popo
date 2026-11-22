@@ -101,6 +101,7 @@ func _physics_process(delta: float) -> void:
 			"throttle": Input.get_axis("move_back", "move_forward"),
 			"steer": Input.get_axis("move_right", "move_left"),
 			"handbrake": Input.is_action_pressed("handbrake"),
+			"horn": Input.is_action_pressed("horn"),
 		}
 		if simulates_locally(mine):
 			_apply_input(cars[mine], inp)
@@ -109,7 +110,7 @@ func _physics_process(delta: float) -> void:
 			b.put_u8(mine)
 			b.put_half(inp.throttle)
 			b.put_half(inp.steer)
-			b.put_u8(1 if inp.handbrake else 0)
+			b.put_u8((1 if inp.handbrake else 0) | (2 if inp.horn else 0))
 			Net.send(1, MSG_CAR_INPUT, b.data_array, Net.UNRELIABLE, 2)
 	if Net.is_host():
 		for i in _inputs:
@@ -143,6 +144,7 @@ func _apply_input(car: Car, inp: Dictionary) -> void:
 		car.brake = 0.0
 	car.steer = inp.steer
 	car.handbrake = inp.handbrake
+	car.horn = inp.get("horn", false)
 
 
 func _on_input(from: int, data: PackedByteArray) -> void:
@@ -153,7 +155,10 @@ func _on_input(from: int, data: PackedByteArray) -> void:
 	var idx := b.get_u8()
 	if driver_of(idx) != from:
 		return
-	_inputs[idx] = {"throttle": b.get_half(), "steer": b.get_half(), "handbrake": b.get_u8() == 1}
+	var th := b.get_half()
+	var st := b.get_half()
+	var flags := b.get_u8()
+	_inputs[idx] = {"throttle": th, "steer": st, "handbrake": (flags & 1) != 0, "horn": (flags & 2) != 0}
 
 
 func _push(idx: int, t: float, s: Dictionary) -> void:
@@ -207,13 +212,14 @@ func _interpolate() -> void:
 			var a: Dictionary = buf[0][1]
 			var c: Dictionary = buf[1][1]
 			var k: float = clamp((rt - buf[0][0]) / max(buf[1][0] - buf[0][0], 0.0001), 0.0, 1.0)
-			s = {"pos": a.pos.lerp(c.pos, k), "rot": (a.rot as Quaternion).slerp(c.rot, k), "lv": a.lv.lerp(c.lv, k), "av": a.av.lerp(c.av, k), "steer": lerpf(a.steer, c.steer, k)}
+			s = {"pos": a.pos.lerp(c.pos, k), "rot": (a.rot as Quaternion).slerp(c.rot, k), "lv": a.lv.lerp(c.lv, k), "av": a.av.lerp(c.av, k), "steer": lerpf(a.steer, c.steer, k), "horn": c.horn}
 		else:
 			s = buf[0][1]
 		car.global_transform = Transform3D(Basis(s.rot), s.pos)
 		car.linear_velocity = s.lv
 		car.angular_velocity = s.av
 		car.steer = s.steer
+		car.horn = s.get("horn", false)
 
 
 func _local_dent(idx: int, p: Vector3, d: Vector3, a: float) -> void:
