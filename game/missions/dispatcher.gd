@@ -282,12 +282,15 @@ func suspect_shot(s: Suspect, origin: Vector3, dir: Vector3) -> void:
 	var q := PhysicsRayQueryParameters3D.create(origin, origin + dir * 60.0, 1 | 2 | 16, [s.get_rid()])
 	var hit := space.intersect_ray(q)
 	var end: Vector3 = hit.position if hit else origin + dir * 60.0
+	var what := 2 if not hit else (1 if (hit.collider is Officer or hit.collider is Suspect) else 0)
+	var surface := Sfx.surface_of(hit.collider) if hit else "concrete"
+	if hit and hit.collider is Car:
+		surface = "metal"
 	if hit and hit.collider is Officer:
 		var o := hit.collider as Officer
 		o.take_damage(SHOT_DAMAGE, dir, o.body_part_at(hit.position))
 	elif hit and hit.collider is Car and cars:
-		var surface := cars.bullet_hit(hit.collider, hit.position, dir)
-		Sfx.impact(get_parent(), hit.position, surface, 0.8)
+		surface = cars.bullet_hit(hit.collider, hit.position, dir)
 	elif hit and hit.collider is Suspect:
 		(hit.collider as Suspect).take_damage(SHOT_DAMAGE, dir)
 	elif hit and world:
@@ -297,9 +300,11 @@ func suspect_shot(s: Suspect, origin: Vector3, dir: Vector3) -> void:
 		b.put_float(v.x)
 		b.put_float(v.y)
 		b.put_float(v.z)
+	b.put_u8(maxi(Sfx.SURFACES.find(surface), 0))
+	b.put_u8(what)
 	if Net.is_online():
 		Net.broadcast(MSG_SHOT, b.data_array, Net.UNRELIABLE)
-	_shot_fx(origin, end)
+	_shot_fx(origin, end, surface, what)
 
 
 func _on_shot(_from: int, data: PackedByteArray) -> void:
@@ -309,15 +314,21 @@ func _on_shot(_from: int, data: PackedByteArray) -> void:
 	b.data_array = data
 	var a := Vector3(b.get_float(), b.get_float(), b.get_float())
 	var e := Vector3(b.get_float(), b.get_float(), b.get_float())
-	_shot_fx(a, e)
+	var surface: String = Sfx.SURFACES[mini(b.get_u8(), Sfx.SURFACES.size() - 1)]
+	_shot_fx(a, e, surface, b.get_u8())
 
 
-## A bang, a muzzle flash and a short-lived tracer.
-func _shot_fx(a: Vector3, e: Vector3) -> void:
+## A bang, a muzzle flash and a short-lived tracer; where it hit, the brass.
+func _shot_fx(a: Vector3, e: Vector3, surface := "concrete", what := 0) -> void:
 	var parent := get_parent()
 	if parent == null:
 		return
-	Sfx.gunshot(parent, a)
+	Sfx.shot(parent, a, 1)
+	Sfx.bullet(parent, a, e, surface, what)
+	if GameSounds.current:
+		var d := (e - a)
+		d.y = 0.0
+		GameSounds.current.eject_casing(null, a, Vector3(-d.z, 0, d.x).normalized() if d.length() > 0.01 else Vector3.RIGHT)
 	var flash := OmniLight3D.new()
 	flash.light_color = Color("ffcf7a")
 	flash.light_energy = 4.0

@@ -14,7 +14,15 @@ extends RefCounted
 ##            used when one wall, or two or more, stand between the sound and
 ##            the listener. Each feeds its own bus, so muffled sounds keep
 ##            their room.
-## Sounds are CC0 recordings imported by tools/audio/import_cc0.py.
+##   Ambience  the city and room background (Phase 1.6); AmbienceOut, the
+##            street, feeds it through a low-pass that closes when you go
+##            indoors. Vehicles: engines and tyres. Both duck for a moment
+##            under a close gunshot so the shot dominates.
+##   Master carries a low-pass that is switched on for the ear ring after a
+##            very close shot or blast.
+## Sounds are CC0 recordings imported by tools/audio/import_cc0.py and
+## import_phase16.py, plus the project's own layers from make_layers.py
+## (all listed in assets/audio/manifest.csv).
 
 const BUS_SFX := "SFX"
 const BUS_INDOOR := "Indoor"
@@ -25,8 +33,23 @@ const MAX_WALLS := 3
 const SURFACES := ["wood", "glass", "concrete", "metal"]
 const MUFFLE_CUTOFF := [1200.0, 500.0]
 const NEAR_RANGE := 30.0     # beyond this the distant recording is used
-const COUNTS := {"gun_near": 5, "gun_dry": 5, "gun_far": 4, "impact_wood": 4, "impact_glass": 3,
-	"impact_metal": 5, "impact_concrete": 4, "glass_break": 3, "car_horn": 1, "ping": 1, "siren_wail": 1, "siren_yelp": 1}
+const COUNTS := {"amb_air": 1, "amb_far_traffic": 1, "amb_street": 1, "body_hit": 6, "break_concrete": 4,
+	"break_metal": 5, "break_wood": 7, "bullet_crack": 3, "bullet_whizz": 3, "car_crash": 3,
+	"car_door_close": 1, "car_door_open": 1, "car_engine": 1, "car_horn": 1, "car_start": 1,
+	"casing_concrete": 3, "casing_metal": 3, "casing_wood": 3, "cloth": 4, "door_close": 4, "door_open": 2,
+	"dry_fire": 1, "ear_ring": 1, "explosion": 1, "explosion_body": 2, "gear": 4, "glass_big": 3, "glass_break": 3,
+	"glass_settle": 4, "gun_dry": 5, "gun_far": 4, "gun_mech": 1, "gun_near": 5, "gun_shotgun_body": 3,
+	"gun_thump": 3, "holster": 2, "impact_concrete": 4, "impact_glass": 3, "impact_metal": 5, "impact_wood": 4,
+	"mag_drop_concrete": 2, "mag_drop_metal": 2, "mag_drop_wood": 2, "mag_in": 1, "mag_out": 1, "ping": 1,
+	"punch": 5, "ricochet": 4, "room_tone": 1, "rubble": 6, "shotgun_pump": 1, "siren_wail": 1, "siren_yelp": 1,
+	"slide_rack": 1, "step_concrete": 6, "step_dirt": 6, "step_wood": 4, "tyre_skid": 1, "whoosh": 3}
+const BUS_AMBIENCE := "Ambience"
+const BUS_AMBIENCE_OUT := "AmbienceOut"
+const BUS_VEHICLES := "Vehicles"
+const FAR_RANGE := 90.0      # beyond this a shot is a distant pop through the air
+const SPEED_OF_SOUND := 343.0
+## Gun kinds (as EnemyGuns: 0 and 1 are handguns, 2 a shotgun).
+const SHOTGUN := 2
 
 static var _cache := {}
 static var _rng := RandomNumberGenerator.new()
@@ -39,11 +62,13 @@ static func ensure_buses() -> void:
 		return
 	_add_bus(BUS_SFX, "Master")
 	var outdoor := _add_bus(BUS_OUTDOOR, BUS_SFX)
+	# Slapback off the buildings is played as real reflections (shot_echoes);
+	# this only keeps a faint short echo for open ground.
 	var slap := AudioEffectDelay.new()
 	slap.dry = 1.0
 	slap.tap1_active = true
 	slap.tap1_delay_ms = 95.0
-	slap.tap1_level_db = -16.0
+	slap.tap1_level_db = -24.0
 	slap.tap1_pan = -0.2
 	slap.tap2_active = false
 	slap.feedback_active = false
@@ -73,6 +98,20 @@ static func ensure_buses() -> void:
 			lp.resonance = 0.5
 			AudioServer.add_bus_effect(i, lp)
 	AudioServer.add_bus_effect(AudioServer.get_bus_index(BUS_SFX), AudioEffectHardLimiter.new())
+	# Background and engines, which duck under close shots.
+	var amb := _add_bus(BUS_AMBIENCE, BUS_SFX)
+	AudioServer.add_bus_effect(amb, AudioEffectAmplify.new())
+	var amb_out := _add_bus(BUS_AMBIENCE_OUT, BUS_AMBIENCE)
+	var lp_out := AudioEffectLowPassFilter.new()
+	lp_out.cutoff_hz = 20000.0
+	AudioServer.add_bus_effect(amb_out, lp_out)
+	var veh := _add_bus(BUS_VEHICLES, BUS_SFX)
+	AudioServer.add_bus_effect(veh, AudioEffectAmplify.new())
+	# The ear ring: a low-pass on everything, off until needed.
+	var ring := AudioEffectLowPassFilter.new()
+	ring.cutoff_hz = 20000.0
+	AudioServer.add_bus_effect(0, ring)
+	AudioServer.set_bus_effect_enabled(0, AudioServer.get_bus_effect_count(0) - 1, false)
 
 
 static func muffled_bus(base: String, walls: int) -> String:
@@ -94,6 +133,22 @@ static func stream(stem: String, variant: int) -> AudioStream:
 	if not _cache.has(path):
 		_cache[path] = load(path)
 	return _cache[path]
+
+
+## A sound that loops forever (ambience, engines, tyres).
+static func loop_stream(stem: String) -> AudioStreamWAV:
+	var key := "loop:" + stem
+	if not _cache.has(key):
+		var w := (stream(stem, 1) as AudioStreamWAV).duplicate() as AudioStreamWAV
+		w.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		w.loop_begin = 0
+		w.loop_end = int(w.get_length() * w.mix_rate)
+		_cache[key] = w
+	return _cache[key]
+
+
+static func variants(stem: String) -> int:
+	return COUNTS.get(stem, 1)
 
 
 # --- Zones and occlusion -----------------------------------------------------
@@ -157,7 +212,7 @@ static func play(parent: Node, stem: String, pos: Vector3, db := 0.0, max_dist :
 	if bus == "":
 		bus = BUS_SFX if zone_at(tree, pos) == null else BUS_INDOOR
 	var p := AudioStreamPlayer3D.new()
-	p.stream = stream(stem, _rng.randi_range(1, COUNTS.get(stem, 1)))
+	p.stream = stream(stem, _rng.randi_range(1, variants(stem)))
 	p.bus = bus
 	p.volume_db = db
 	p.max_distance = max_dist
@@ -196,6 +251,133 @@ static func gunshot(parent: Node, pos: Vector3) -> void:
 	var lis: Variant = listener_position(parent)
 	var far: bool = lis != null and (lis as Vector3).distance_to(pos) > NEAR_RANGE
 	play(parent, "gun_far" if far else "gun_near", pos, 0.0, 160.0, 0.04, BUS_OUTDOOR)
+
+
+## Phase 1.6: a gunshot built from layers, as heard from where you are.
+##   crack/body  the recording: close with its tail outdoors, cut dry
+##               indoors (through the room reverb, louder: rooms are
+##               painfully loud), the distant one past NEAR_RANGE, and past
+##               FAR_RANGE a thin pop.
+##   thump       the low-end punch, only up close (bigger for a shotgun).
+##   mechanics   the slide cycling, only right next to the gun.
+##   slapback    outdoors: echoes off the nearest building walls, each from
+##               the wall, delayed by the extra distance the sound travels.
+## Close shots also duck the background, and a shot (or blast) right by
+## your head that is not your own leaves your ears ringing.
+## kind: 0/1 handgun, 2 shotgun. own: fired by the player listening.
+static func shot(parent: Node, pos: Vector3, kind := 0, own := false) -> void:
+	var tree := parent.get_tree()
+	var indoor := zone_at(tree, pos) != null
+	var lis: Variant = listener_position(parent)
+	var d: float = (lis as Vector3).distance_to(pos) if lis != null else 10.0
+	var sg := kind == SHOTGUN
+	var pitch := 0.82 if sg else 1.0
+	var p: AudioStreamPlayer3D
+	if indoor:
+		p = play(parent, "gun_dry", pos, 3.0, 140.0, 0.04, BUS_INDOOR)
+	elif d > FAR_RANGE:
+		p = play(parent, "gun_far", pos, -4.0, 260.0, 0.06, BUS_OUTDOOR)
+	elif d > NEAR_RANGE:
+		p = play(parent, "gun_far", pos, 0.0, 200.0, 0.05, BUS_OUTDOOR)
+	else:
+		p = play(parent, "gun_near", pos, 0.0, 160.0, 0.04, BUS_OUTDOOR)
+	if p:
+		p.pitch_scale *= pitch
+	if d < 28.0:
+		var thump_db := (4.0 if indoor else 1.0) + (3.0 if sg else 0.0)
+		play(parent, "gun_shotgun_body" if sg else "gun_thump", pos, thump_db, 45.0, 0.08, BUS_INDOOR if indoor else BUS_OUTDOOR)
+	if d < 7.0:
+		play(parent, "gun_mech", pos, -14.0, 10.0, 0.08)
+	if not indoor and d < 160.0:
+		shot_echoes(parent, pos, lis, sg)
+	if GameSounds.current:
+		GameSounds.current.duck(clampf(1.0 - d / (45.0 if indoor else 30.0), 0.0, 1.0))
+		if not own and d < (3.5 if indoor else 2.6):
+			GameSounds.current.ear_ring(0.8 if d < 1.6 else 0.5)
+
+
+## Outdoors: the shot slapping back off the buildings round it.
+static func shot_echoes(parent: Node, pos: Vector3, lis: Variant, shotgun := false) -> void:
+	if lis == null:
+		return
+	var space := parent.get_viewport().world_3d.direct_space_state
+	var l: Vector3 = lis
+	var direct := pos.distance_to(l)
+	var from := pos + Vector3(0, 1.2, 0)
+	var hits := []
+	for k in 8:
+		var a := TAU * k / 8.0
+		var to := from + Vector3(cos(a), 0, sin(a)) * 60.0
+		var h := space.intersect_ray(PhysicsRayQueryParameters3D.create(from, to, 1))
+		if h:
+			hits.append(h.position)
+	hits.sort_custom(func(a, b): return from.distance_to(a) < from.distance_to(b))
+	var played := 0
+	for w in hits:
+		var wp: Vector3 = w
+		var path := from.distance_to(wp) + wp.distance_to(l)
+		var extra := path - direct
+		if extra < 6.0:
+			continue   # too close to tell apart from the shot itself
+		var delay := extra / SPEED_OF_SOUND
+		var db := -9.0 - 20.0 * log(path / 12.0) / log(10.0) + (2.0 if shotgun else 0.0)
+		later(parent, delay, "gun_far", wp, db, 200.0, 0.06, BUS_OUTDOOR, 0.93)
+		played += 1
+		if played >= 3:
+			break
+
+
+## Phase 1.6: what a bullet did, heard from where you are: the hit on the
+## surface it struck (or a body), sometimes a ricochet whine off metal or
+## concrete, and if it went past your head, the crack (close) or whizz.
+## what: 0 world, 1 a person, 2 nothing (it flew off). own: your bullet.
+static func bullet(parent: Node, a: Vector3, b: Vector3, surface: String, what := 0, own := false) -> void:
+	if what == 1:
+		play(parent, "body_hit", b, 0.0, 40.0, 0.08)
+	elif what == 0:
+		impact(parent, b, surface, 0.9)
+		var roll := absf(sin(b.x * 12.9898 + b.z * 78.233 + b.y * 3.71))   # same on every machine
+		if surface in ["metal", "concrete"] and roll < (0.4 if surface == "metal" else 0.2):
+			play(parent, "ricochet", b, -4.0, 60.0, 0.1)
+	if own:
+		return
+	var lis: Variant = listener_position(parent)
+	if lis == null:
+		return
+	var l: Vector3 = lis
+	var c := Geometry3D.get_closest_point_to_segment(l, a, b)
+	var miss := c.distance_to(l)
+	if miss < 2.4 and c.distance_to(a) > 2.0 and c.distance_to(b) > 0.6:
+		play(parent, "bullet_crack" if miss < 1.3 else "bullet_whizz", c, 2.0 if miss < 1.3 else -2.0, 12.0, 0.1)
+
+
+## Plays a sound after t seconds (through the scene's GameSounds, which
+## owns the queue; without one it plays now).
+static func later(parent: Node, t: float, stem: String, pos: Vector3, db := 0.0, dist := 60.0, spread := 0.05, bus := "", pitch := 1.0) -> void:
+	if GameSounds.current:
+		GameSounds.current.later(t, stem, pos, db, dist, spread, bus, pitch)
+	else:
+		var p := play(parent, stem, pos, db, dist, spread, bus)
+		if p:
+			p.pitch_scale *= pitch
+
+
+## A blast: the bang, a rumble under it, and the ring if you were close.
+static func explosion(parent: Node, pos: Vector3, size := 1.0) -> void:
+	var tree := parent.get_tree()
+	var bus := BUS_INDOOR if zone_at(tree, pos) != null else BUS_OUTDOOR
+	play(parent, "explosion", pos, 4.0 * size, 300.0, 0.05, bus)
+	play(parent, "explosion_body", pos, 6.0 * size, 400.0, 0.05, bus)
+	play(parent, "gun_shotgun_body", pos, 4.0, 80.0, 0.1, bus)
+	later(parent, 0.35, "rubble", pos, -2.0, 60.0, 0.1)
+	var lis: Variant = listener_position(parent)
+	if GameSounds.current and lis != null:
+		var d := (lis as Vector3).distance_to(pos)
+		GameSounds.current.duck(clampf(1.0 - d / 60.0, 0.0, 1.0))
+		if d < 12.0:
+			GameSounds.current.ear_ring(clampf(1.2 - d / 12.0, 0.3, 1.0))
+		if bus == BUS_OUTDOOR and d < 200.0:
+			shot_echoes(parent, pos, lis, true)
 
 
 ## A bullet or debris hit on a surface (wood, glass, concrete, metal).

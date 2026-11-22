@@ -24,6 +24,7 @@ var cars: CarSync
 var nav: BlockNav
 var dispatch: Dispatcher
 var civ_car: Car
+var sounds: GameSounds
 var seed_value := 0
 
 
@@ -34,6 +35,7 @@ func _ready() -> void:
 	# Grass round the block, just below the road surface (no z-fighting).
 	var grass := ProtoWorld.block(self, Vector3(400, 1, 400), Vector3(24, -0.56, 24), Color("4b5a45"), "Ground", false)
 	grass.get_child(0).material_override = Cel.material(Color("4b5a45"), false, 0.025, null, 1.0, true)
+	grass.set_meta("surface", "dirt")
 	cam = IsoCamera.new()
 	cam.zoom = 16.0
 	add_child(cam)
@@ -128,6 +130,14 @@ func _build(s: int) -> void:
 	if Net.is_host():
 		nav.bake_from(self)
 	dispatch.setup(gen, world, cars, nav, civ_car)
+	# Phase 1.6: the sound of the block.
+	sounds = GameSounds.new()
+	sounds.name = "GameSounds"
+	sounds.world = world
+	sounds.cars = cars
+	sounds.pawn_getter = func(): return sync.my_pawn()
+	add_child(sounds)
+	sounds.add_building_zones(gen)
 	# Camera starts over the first enterable building's door.
 	cam.global_position = _spawn_point(0)
 

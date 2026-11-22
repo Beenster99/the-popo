@@ -45,6 +45,10 @@ static func resolve(attacker: Officer, world: DestructionWorld, origin: Vector3,
 		if hit.is_empty():
 			continue
 		var c: Object = hit.collider
+		if GameSounds.current and GameSounds.current.sync:
+			var body := c is Officer or c is Suspect
+			var what := 0 if body else Sfx.SURFACES.find(Sfx.surface_of(c)) + 1
+			GameSounds.current.sync.melee_hit(hit.position, maxi(what, 0), kind != Officer.Strike.PUNCH)
 		if c is Officer:
 			var o := c as Officer
 			o.take_damage(OFFICER_DAMAGE[kind], d, "melee")

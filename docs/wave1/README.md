@@ -194,3 +194,55 @@ city block. It is built phase by phase; each phase ends with a build.
 ![A call](img/dispatch_call.png)
 ![Cuffed suspect following](img/dispatch_arrest.png)
 ![Custody bay](img/dispatch_bay.png)
+
+## Phase 1.6: sound that hits hard (v0.2.7, pulled forward)
+
+beenster heard nothing in v0.2.5: the officers' own gunshots and bullet
+hits had never been hooked up in the city (only the Phase 0.7 sound spike
+played them). beenster chose to do all of Phase 1.6 before finishing 1.5.
+
+- `game/audio/game_sounds.gd` (GameSounds), one per playing scene (city,
+  patrol, yard, listening room). Each machine works sounds out from what it
+  sees; the host only sends where bullets went and what blows landed
+  (`SfxSync.bullet`, `SfxSync.melee_hit`).
+  - Ears on your officer's head, facing the camera's way.
+  - Background: busy street, air, distant traffic; a quiet room tone
+    indoors, with the street muffled (one sound zone per building).
+  - Footsteps by surface (pavement, grass, boards upstairs and on stairs),
+    louder running; kit rattle when officers run.
+  - Officers' guns: shot detection from synced ammo, dry click, reload
+    (mag out, empty mag hitting the floor by surface, mag in, slide from
+    empty), holster, punches and kicks swish, car doors.
+  - Brass: each case is a small physics body that plays a bounce on
+    concrete, wood or metal where it lands.
+  - Cars: engine pitch climbing through the gears, tyre squeal when the car
+    slides (handbrake too), crunch on hard knocks.
+  - Destruction: glass (panes, shop fronts) with shards settling after,
+    doors splintering, walls crumbling with rubble, metal posts; loose
+    chunks and props landing hard play their material, with a budget of 10
+    a second and close ones merged, so a collapse stays readable.
+- `Sfx.shot`: layered gunshot as heard from where you are: the recording
+  (near, distant, or a pop past 90 m; dry and louder through the room
+  reverb indoors), a low thump up close (a deeper boom for shotguns), the
+  slide right next to the gun, and real slapback: echoes from the nearest
+  building walls, delayed by the extra distance. Close shots duck the
+  background and engines; a shot right by your head (not your own) or a
+  close blast rings your ears and muffles everything for a moment.
+- `Sfx.bullet`: the hit by surface (or a body), ricochet whines off metal
+  and concrete, and the crack (under 1.3 m) or whizz (under 2.4 m) of a
+  bullet passing your head.
+- `Sfx.explosion`: bang, rumble, rubble, echoes, ear ring.
+- Sounds: 89 CC0 recordings from OpenGameArt (`tools/audio/import_phase16.py`)
+  and 39 made for the game (`tools/audio/make_layers.py`: thump, shotgun
+  boom, crack, whizz, ricochet, casings, mag drops, ear ring, swish, tyre
+  squeal, room tone, blast rumble). Every file is in
+  `assets/audio/manifest.csv` with its source and licence.
+- Settings > Sound gains Background and Engines sliders.
+- Listening room (Settings > Debug > Open a test scene > 1.6 Listening
+  room): test guns in the street, shop and behind a wall (5, 6, 7), a
+  shotgun by your ears (8), bullets past your head (9), a blast (0),
+  auto-fire (F4), and a breakable shop, a car and crates to shoot.
+  `tools/capture/listen_room.tscn` records a scripted run with the movie
+  maker for checking levels.
+- Not yet: footsteps for metal stairs (no metal floors in the kit yet),
+  gun sounds for the enemy shotgun model (Phase 1.5 brings the gun).

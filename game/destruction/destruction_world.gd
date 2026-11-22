@@ -95,6 +95,7 @@ func add_piece(kind: String, xform: Transform3D, bears := true, tint := Color(0,
 	body.transform = xform
 	body.collision_layer = 1
 	body.set_meta("piece_id", id)
+	body.set_meta("surface", surface_for(kind))
 	var mi := MeshInstance3D.new()
 	mi.mesh = kit.mesh
 	KitLibrary.tint(mi, kit.surfaces, tint)
@@ -113,6 +114,17 @@ func add_piece(kind: String, xform: Transform3D, bears := true, tint := Color(0,
 		"tint": tint, "held_by": held_by,
 	}
 	return id
+
+
+## What a kit piece sounds like when hit (Sfx surfaces).
+static func surface_for(kind: String) -> String:
+	if kind.begins_with("glass"):
+		return "glass"
+	if kind in ["door_closed", "garage_door", "stairs"]:
+		return "wood"
+	if kind in ["lamp_post", "bollard"]:
+		return "metal"
+	return "concrete"
 
 
 ## Call once after all pieces are added: works out what rests on what.
@@ -373,6 +385,7 @@ func _spawn_chunks(p: Dictionary, xf: Transform3D, lin: Vector3, ang: Vector3, o
 		var pos: Vector3 = xf * (ch.offset as Vector3)
 		var rb := _make_body(ch.mesh, [[ch.shape, Vector3.ZERO]], ch.volume * DENSITY)
 		KitLibrary.tint(rb.get_child(0), ch.surfaces, p.tint)
+		rb.set_meta("surface", surface_for(p.kind))
 		rb.transform = Transform3D(xf.basis, pos)
 		# Starting velocity: the parent's motion, plus a push away from the
 		# blast that falls off with distance, plus a little seeded noise.
@@ -421,6 +434,7 @@ func _spawn_released(p: Dictionary) -> void:
 		vol += ch.volume
 	var rb := _make_body(kit.mesh, shapes, vol * DENSITY)
 	KitLibrary.tint(rb.get_child(0), kit.surfaces, p.tint)
+	rb.set_meta("surface", surface_for(p.kind))
 	rb.collision_layer = FALLING_LAYER
 	rb.transform = p.xform
 	var nid: int = p.id * 64 + RELEASED_BIT

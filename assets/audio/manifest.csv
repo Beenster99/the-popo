@@ -34,3 +34,131 @@ sfx/glass_break_2.wav,breaking/bfh1_glass_breaking_03.ogg (https://opengameart.o
 sfx/glass_break_3.wav,raw/glass_breaking.wav (https://opengameart.org/content/glass-break),CC0 1.0 (public domain),glass break
 sfx/car_horn_1.wav,Made by tools/audio/make_horn.py,Project's own (no third-party audio),"two-tone car horn, loops"
 sfx/ping_1.wav,Made by tools/audio/make_ping.py,Project's own (no third-party audio),ping chime
+sfx/step_concrete_1.wav,Fantozzi-footsteps/Fantozzi-footsteps/ogg/Fantozzi-StoneL1.ogg (https://opengameart.org/content/fantozzis-footsteps-grasssand-stone),CC0 1.0 (public domain),"footstep, stone"
+sfx/step_concrete_2.wav,Fantozzi-footsteps/Fantozzi-footsteps/ogg/Fantozzi-StoneL2.ogg (https://opengameart.org/content/fantozzis-footsteps-grasssand-stone),CC0 1.0 (public domain),"footstep, stone"
+sfx/step_concrete_3.wav,Fantozzi-footsteps/Fantozzi-footsteps/ogg/Fantozzi-StoneL3.ogg (https://opengameart.org/content/fantozzis-footsteps-grasssand-stone),CC0 1.0 (public domain),"footstep, stone"
+sfx/step_concrete_4.wav,Fantozzi-footsteps/Fantozzi-footsteps/ogg/Fantozzi-StoneR1.ogg (https://opengameart.org/content/fantozzis-footsteps-grasssand-stone),CC0 1.0 (public domain),"footstep, stone"
+sfx/step_concrete_5.wav,Fantozzi-footsteps/Fantozzi-footsteps/ogg/Fantozzi-StoneR2.ogg (https://opengameart.org/content/fantozzis-footsteps-grasssand-stone),CC0 1.0 (public domain),"footstep, stone"
+sfx/step_concrete_6.wav,Fantozzi-footsteps/Fantozzi-footsteps/ogg/Fantozzi-StoneR3.ogg (https://opengameart.org/content/fantozzis-footsteps-grasssand-stone),CC0 1.0 (public domain),"footstep, stone"
+sfx/step_wood_1.wav,sfx_100_v2/sfx100v2_footstep_wood_01.ogg (https://opengameart.org/content/100-cc0-sfx-2),CC0 1.0 (public domain),"footstep, wood"
+sfx/step_wood_2.wav,sfx_100_v2/sfx100v2_footstep_wood_02.ogg (https://opengameart.org/content/100-cc0-sfx-2),CC0 1.0 (public domain),"footstep, wood"
+sfx/step_wood_3.wav,sfx_100_v2/sfx100v2_footstep_wood_03.ogg (https://opengameart.org/content/100-cc0-sfx-2),CC0 1.0 (public domain),"footstep, wood"
+sfx/step_wood_4.wav,sfx_100_v2/sfx100v2_footstep_wood_04.ogg (https://opengameart.org/content/100-cc0-sfx-2),CC0 1.0 (public domain),"footstep, wood"
+sfx/step_dirt_1.wav,Fantozzi-footsteps/Fantozzi-footsteps/ogg/Fantozzi-SandL1.ogg (https://opengameart.org/content/fantozzis-footsteps-grasssand-stone),CC0 1.0 (public domain),"footstep, sand/grass"
+sfx/step_dirt_2.wav,Fantozzi-footsteps/Fantozzi-footsteps/ogg/Fantozzi-SandL2.ogg (https://opengameart.org/content/fantozzis-footsteps-grasssand-stone),CC0 1.0 (public domain),"footstep, sand/grass"
+sfx/step_dirt_3.wav,Fantozzi-footsteps/Fantozzi-footsteps/ogg/Fantozzi-SandL3.ogg (https://opengameart.org/content/fantozzis-footsteps-grasssand-stone),CC0 1.0 (public domain),"footstep, sand/grass"
+sfx/step_dirt_4.wav,Fantozzi-footsteps/Fantozzi-footsteps/ogg/Fantozzi-SandR1.ogg (https://opengameart.org/content/fantozzis-footsteps-grasssand-stone),CC0 1.0 (public domain),"footstep, sand/grass"
+sfx/step_dirt_5.wav,Fantozzi-footsteps/Fantozzi-footsteps/ogg/Fantozzi-SandR2.ogg (https://opengameart.org/content/fantozzis-footsteps-grasssand-stone),CC0 1.0 (public domain),"footstep, sand/grass"
+sfx/step_dirt_6.wav,Fantozzi-footsteps/Fantozzi-footsteps/ogg/Fantozzi-SandR3.ogg (https://opengameart.org/content/fantozzis-footsteps-grasssand-stone),CC0 1.0 (public domain),"footstep, sand/grass"
+sfx/gear_1.wav,RPGsounds_Kenney/OGG/beltHandle1.ogg (https://opengameart.org/content/50-rpg-sound-effects),CC0 1.0 (public domain),belt and kit rattle (Kenney)
+sfx/gear_2.wav,RPGsounds_Kenney/OGG/beltHandle2.ogg (https://opengameart.org/content/50-rpg-sound-effects),CC0 1.0 (public domain),belt and kit rattle (Kenney)
+sfx/gear_3.wav,RPGsounds_Kenney/OGG/clothBelt.ogg (https://opengameart.org/content/50-rpg-sound-effects),CC0 1.0 (public domain),belt and kit rattle (Kenney)
+sfx/gear_4.wav,RPGsounds_Kenney/OGG/clothBelt2.ogg (https://opengameart.org/content/50-rpg-sound-effects),CC0 1.0 (public domain),belt and kit rattle (Kenney)
+sfx/cloth_1.wav,RPGsounds_Kenney/OGG/cloth1.ogg (https://opengameart.org/content/50-rpg-sound-effects),CC0 1.0 (public domain),cloth movement (Kenney)
+sfx/cloth_2.wav,RPGsounds_Kenney/OGG/cloth2.ogg (https://opengameart.org/content/50-rpg-sound-effects),CC0 1.0 (public domain),cloth movement (Kenney)
+sfx/cloth_3.wav,RPGsounds_Kenney/OGG/cloth3.ogg (https://opengameart.org/content/50-rpg-sound-effects),CC0 1.0 (public domain),cloth movement (Kenney)
+sfx/cloth_4.wav,RPGsounds_Kenney/OGG/cloth4.ogg (https://opengameart.org/content/50-rpg-sound-effects),CC0 1.0 (public domain),cloth movement (Kenney)
+sfx/holster_1.wav,RPGsounds_Kenney/OGG/handleSmallLeather.ogg (https://opengameart.org/content/50-rpg-sound-effects),CC0 1.0 (public domain),leather holster (Kenney)
+sfx/holster_2.wav,RPGsounds_Kenney/OGG/handleSmallLeather2.ogg (https://opengameart.org/content/50-rpg-sound-effects),CC0 1.0 (public domain),leather holster (Kenney)
+sfx/dry_fire_1.wav,RPGsounds_Kenney/OGG/metalClick.ogg (https://opengameart.org/content/50-rpg-sound-effects),CC0 1.0 (public domain),trigger click on empty (Kenney)
+sfx/gun_mech_1.wav,RPGsounds_Kenney/OGG/metalLatch.ogg (https://opengameart.org/content/50-rpg-sound-effects),CC0 1.0 (public domain),slide cycling (Kenney)
+sfx/door_open_1.wav,RPGsounds_Kenney/OGG/doorOpen_1.ogg (https://opengameart.org/content/50-rpg-sound-effects),CC0 1.0 (public domain),door opening (Kenney)
+sfx/door_open_2.wav,RPGsounds_Kenney/OGG/doorOpen_2.ogg (https://opengameart.org/content/50-rpg-sound-effects),CC0 1.0 (public domain),door opening (Kenney)
+sfx/door_close_1.wav,RPGsounds_Kenney/OGG/doorClose_1.ogg (https://opengameart.org/content/50-rpg-sound-effects),CC0 1.0 (public domain),door closing (Kenney)
+sfx/door_close_2.wav,RPGsounds_Kenney/OGG/doorClose_2.ogg (https://opengameart.org/content/50-rpg-sound-effects),CC0 1.0 (public domain),door closing (Kenney)
+sfx/door_close_3.wav,RPGsounds_Kenney/OGG/doorClose_3.ogg (https://opengameart.org/content/50-rpg-sound-effects),CC0 1.0 (public domain),door closing (Kenney)
+sfx/door_close_4.wav,RPGsounds_Kenney/OGG/doorClose_4.ogg (https://opengameart.org/content/50-rpg-sound-effects),CC0 1.0 (public domain),door closing (Kenney)
+sfx/punch_1.wav,qubodupPunch/qubodupPunch/qubodupPunch01.ogg (https://opengameart.org/content/punch),CC0 1.0 (public domain),punch
+sfx/punch_2.wav,qubodupPunch/qubodupPunch/qubodupPunch02.ogg (https://opengameart.org/content/punch),CC0 1.0 (public domain),punch
+sfx/punch_3.wav,qubodupPunch/qubodupPunch/qubodupPunch03.ogg (https://opengameart.org/content/punch),CC0 1.0 (public domain),punch
+sfx/punch_4.wav,qubodupPunch/qubodupPunch/qubodupPunch04.ogg (https://opengameart.org/content/punch),CC0 1.0 (public domain),punch
+sfx/punch_5.wav,qubodupPunch/qubodupPunch/qubodupPunch05.ogg (https://opengameart.org/content/punch),CC0 1.0 (public domain),punch
+sfx/body_hit_1.wav,independent_nu_ljudbank-hits_and_punches/hits/hit01.mp3.flac (https://opengameart.org/content/37-hitspunches),CC0 1.0 (public domain),hit on a body
+sfx/body_hit_2.wav,independent_nu_ljudbank-hits_and_punches/hits/hit04.mp3.flac (https://opengameart.org/content/37-hitspunches),CC0 1.0 (public domain),hit on a body
+sfx/body_hit_3.wav,independent_nu_ljudbank-hits_and_punches/hits/hit08.mp3.flac (https://opengameart.org/content/37-hitspunches),CC0 1.0 (public domain),hit on a body
+sfx/body_hit_4.wav,independent_nu_ljudbank-hits_and_punches/hits/hit12.mp3.flac (https://opengameart.org/content/37-hitspunches),CC0 1.0 (public domain),hit on a body
+sfx/body_hit_5.wav,independent_nu_ljudbank-hits_and_punches/hits/hit16.mp3.flac (https://opengameart.org/content/37-hitspunches),CC0 1.0 (public domain),hit on a body
+sfx/body_hit_6.wav,independent_nu_ljudbank-hits_and_punches/hits/hit20.mp3.flac (https://opengameart.org/content/37-hitspunches),CC0 1.0 (public domain),hit on a body
+sfx/mag_out_1.wav,reload.wav (https://opengameart.org/content/handgun-reload-sound-effect),CC0 1.0 (public domain),magazine release
+sfx/mag_in_1.wav,reload.wav (https://opengameart.org/content/handgun-reload-sound-effect),CC0 1.0 (public domain),magazine seated
+sfx/slide_rack_1.wav,reload.wav (https://opengameart.org/content/handgun-reload-sound-effect),CC0 1.0 (public domain),slide racked
+sfx/shotgun_pump_1.wav,shotguncock_0.wav (https://opengameart.org/content/gun-reload-sounds),CC0 1.0 (public domain),pump shotgun racked
+sfx/break_wood_1.wav,woodcrack/wood_impact/crack01.mp3.flac (https://opengameart.org/content/35-wooden-crackshitsdestructions),CC0 1.0 (public domain),wood cracking
+sfx/break_wood_2.wav,woodcrack/wood_impact/crack02.mp3.flac (https://opengameart.org/content/35-wooden-crackshitsdestructions),CC0 1.0 (public domain),wood cracking
+sfx/break_wood_3.wav,woodcrack/wood_impact/crack03.mp3.flac (https://opengameart.org/content/35-wooden-crackshitsdestructions),CC0 1.0 (public domain),wood cracking
+sfx/break_wood_4.wav,sfx_breaking_and_falling/bfh1_wood_breaking_01.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),wood breaking
+sfx/break_wood_5.wav,sfx_breaking_and_falling/bfh1_wood_breaking_02.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),wood breaking
+sfx/break_wood_6.wav,sfx_breaking_and_falling/bfh1_wood_breaking_03.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),wood breaking
+sfx/break_wood_7.wav,sfx_breaking_and_falling/bfh1_wood_breaking_04.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),wood breaking
+sfx/break_concrete_1.wav,sfx_breaking_and_falling/bfh1_rock_breaking_01.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),concrete breaking
+sfx/break_concrete_2.wav,sfx_breaking_and_falling/bfh1_rock_breaking_02.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),concrete breaking
+sfx/break_concrete_3.wav,sfx_breaking_and_falling/bfh1_rock_breaking_03.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),concrete breaking
+sfx/break_concrete_4.wav,sfx_breaking_and_falling/bfh1_breaking_01.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),breaking
+sfx/rubble_1.wav,sfx_breaking_and_falling/bfh1_rock_falling_01.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),rubble falling
+sfx/rubble_2.wav,sfx_breaking_and_falling/bfh1_rock_falling_02.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),rubble falling
+sfx/rubble_3.wav,sfx_breaking_and_falling/bfh1_rock_falling_03.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),rubble falling
+sfx/rubble_4.wav,sfx_breaking_and_falling/bfh1_rock_falling_04.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),rubble falling
+sfx/rubble_5.wav,sfx_breaking_and_falling/bfh1_rock_falling_05.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),rubble falling
+sfx/rubble_6.wav,sfx_breaking_and_falling/bfh1_rock_falling_06.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),rubble falling
+sfx/break_metal_1.wav,sfx_breaking_and_falling/bfh1_metal_falling_01.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),metal falling
+sfx/break_metal_2.wav,sfx_breaking_and_falling/bfh1_metal_falling_02.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),metal falling
+sfx/break_metal_3.wav,sfx_breaking_and_falling/bfh1_metal_falling_03.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),metal falling
+sfx/break_metal_4.wav,sfx_breaking_and_falling/bfh1_metal_falling_04.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),metal falling
+sfx/break_metal_5.wav,100-CC0-wood-metal-SFX/metal_slam_01.ogg (https://opengameart.org/content/100-cc0-metal-and-wood-sfx),CC0 1.0 (public domain),metal slam
+sfx/glass_settle_1.wav,sfx_breaking_and_falling/bfh1_glass_falling_01.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),glass shards falling
+sfx/glass_settle_2.wav,sfx_breaking_and_falling/bfh1_glass_falling_02.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),glass shards falling
+sfx/glass_settle_3.wav,sfx_breaking_and_falling/bfh1_glass_falling_03.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),glass shards falling
+sfx/glass_settle_4.wav,sfx_breaking_and_falling/bfh1_glass_falling_04.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),glass shards falling
+sfx/glass_big_1.wav,sfx_breaking_and_falling/bfh1_glass_breaking_04.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),big pane breaking
+sfx/glass_big_2.wav,sfx_breaking_and_falling/bfh1_glass_breaking_05.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),big pane breaking
+sfx/glass_big_3.wav,sfx_breaking_and_falling/bfh1_glass_breaking_06.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),big pane breaking
+sfx/car_crash_1.wav,qubodup-crash.ogg (https://opengameart.org/content/crash-collision),CC0 1.0 (public domain),car crash
+sfx/car_crash_2.wav,sfx_breaking_and_falling/bfh1_metal_hit_06.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),metal crunch
+sfx/car_crash_3.wav,100-CC0-wood-metal-SFX/metal_sheet_01.ogg (https://opengameart.org/content/100-cc0-metal-and-wood-sfx),CC0 1.0 (public domain),sheet metal
+sfx/car_door_open_1.wav,car_sound_effects_pack/Car_Door_Open.ogg (https://opengameart.org/content/car-sound-effects-pack-low-quality),CC0 1.0 (public domain),car door opening
+sfx/car_door_close_1.wav,car_sound_effects_pack/Car_Door_Close.ogg (https://opengameart.org/content/car-sound-effects-pack-low-quality),CC0 1.0 (public domain),car door shutting
+sfx/car_start_1.wav,car_sound_effects_pack/Car_Engine_Start_Up.ogg (https://opengameart.org/content/car-sound-effects-pack-low-quality),CC0 1.0 (public domain),engine starting
+sfx/car_engine_1.wav,car_sound_effects_pack/Car_Engine_Loop.ogg (https://opengameart.org/content/car-sound-effects-pack-low-quality),CC0 1.0 (public domain),"engine idle loop, loops"
+sfx/amb_street_1.wav,gatve Varniu_2.ogg (https://opengameart.org/content/high-traffic-road-sounds),CC0 1.0 (public domain),"busy street loop, loops"
+sfx/amb_air_1.wav,amb_outdoor1_loop.ogg (https://opengameart.org/content/amb-outside-1),CC0 1.0 (public domain),"outdoor air, birds, loops"
+sfx/amb_far_traffic_1.wav,sfx_100_v2/sfx100v2_loop_highway.ogg (https://opengameart.org/content/100-cc0-sfx-2),CC0 1.0 (public domain),"distant highway, loops"
+sfx/gun_thump_1.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),low-end punch under a close shot
+sfx/gun_shotgun_body_1.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),shotgun boom layer
+sfx/bullet_crack_1.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),supersonic crack of a near miss
+sfx/bullet_whizz_1.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),bullet whizzing past
+sfx/whoosh_1.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),swing through the air
+sfx/gun_thump_2.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),low-end punch under a close shot
+sfx/gun_shotgun_body_2.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),shotgun boom layer
+sfx/bullet_crack_2.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),supersonic crack of a near miss
+sfx/bullet_whizz_2.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),bullet whizzing past
+sfx/whoosh_2.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),swing through the air
+sfx/gun_thump_3.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),low-end punch under a close shot
+sfx/gun_shotgun_body_3.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),shotgun boom layer
+sfx/bullet_crack_3.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),supersonic crack of a near miss
+sfx/bullet_whizz_3.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),bullet whizzing past
+sfx/whoosh_3.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),swing through the air
+sfx/ricochet_1.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),ricochet whine
+sfx/ricochet_2.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),ricochet whine
+sfx/ricochet_3.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),ricochet whine
+sfx/ricochet_4.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),ricochet whine
+sfx/casing_concrete_1.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),pistol case bouncing on concrete
+sfx/casing_concrete_2.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),pistol case bouncing on concrete
+sfx/casing_concrete_3.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),pistol case bouncing on concrete
+sfx/mag_drop_concrete_1.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),empty magazine dropping on concrete
+sfx/mag_drop_concrete_2.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),empty magazine dropping on concrete
+sfx/casing_wood_1.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),pistol case bouncing on wood
+sfx/casing_wood_2.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),pistol case bouncing on wood
+sfx/casing_wood_3.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),pistol case bouncing on wood
+sfx/mag_drop_wood_1.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),empty magazine dropping on wood
+sfx/mag_drop_wood_2.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),empty magazine dropping on wood
+sfx/casing_metal_1.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),pistol case bouncing on metal
+sfx/casing_metal_2.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),pistol case bouncing on metal
+sfx/casing_metal_3.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),pistol case bouncing on metal
+sfx/mag_drop_metal_1.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),empty magazine dropping on metal
+sfx/mag_drop_metal_2.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),empty magazine dropping on metal
+sfx/ear_ring_1.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),ear ring after a very close shot
+sfx/tyre_skid_1.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),"tyres squealing, loops"
+sfx/room_tone_1.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),"indoor room hush, loops"
+sfx/explosion_1.wav,100-CC0-SFX_0/explosion.ogg (https://opengameart.org/content/100-cc0-sfx),CC0 1.0 (public domain),explosion
+sfx/explosion_body_1.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),explosion rumble layer
+sfx/explosion_body_2.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),explosion rumble layer
