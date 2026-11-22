@@ -261,3 +261,24 @@ func test_downed_officer_can_respawn() -> void:
 	t.check(Vector2(o.global_position.x - start.x, o.global_position.z - start.z).length() < 0.5, "back where you started: %s" % o.global_position)
 	t.check(o.hp == Officer.MAX_HP and o.injuries == 0, "healed and patched up")
 	t.check(o.ammo == Officer.MAG and o.reserve == Officer.RESERVE_MAX, "with full ammo")
+
+
+## beenster (v0.2.10): heal your friends.
+func test_first_aid_heals_a_teammate() -> void:
+	ProtoWorld.ground(self, 100.0)
+	var me := _officer(Vector3(0, 0.05, 0), 1)
+	var mate := _officer(Vector3(0.8, 0.05, 0), 2)
+	await _run(me, _cmd(), 3)
+	mate.hp = 40.0
+	t.check(me.treat_target() == mate, "a hurt teammate next to you can be healed, even without a wound")
+	var pouch := me.pouch
+	await _run(me, _cmd(PlayerInput.INTERACT), int(Officer.TREAT_MATE * 60.0) + 5)
+	t.check(mate.hp >= 40.0 + Officer.HEAL_MATE - 0.5, "their health comes back: %.0f" % mate.hp)
+	t.check(me.pouch == pouch - 1, "for one first aid")
+	mate.hp = 90.0
+	mate.injuries = Officer.BLEED
+	await _run(me, _cmd(), 2)
+	await _run(me, _cmd(PlayerInput.INTERACT), int(Officer.TREAT_MATE * 60.0) + 5)
+	t.check(mate.injuries == 0 and mate.hp == Officer.MAX_HP, "a wound is patched and topped up")
+	await _run(me, _cmd(), 2)
+	t.check(me.treat_target() == null, "nobody needs it now")

@@ -157,7 +157,7 @@ func _prompt(o: Officer) -> String:
 	if o.pouch > 0:
 		var tt := o.treat_target()
 		if tt == o:
-			return "Hold %s: treat your wound" % use
+			return "Hold %s: first aid on yourself (%d left)" % [use, o.pouch]
 		elif tt:
-			return "Hold %s: treat your teammate" % use
+			return "Hold %s: heal your teammate (%d%% health, %d first aid left)" % [use, roundi(tt.hp), o.pouch]
 	return ""

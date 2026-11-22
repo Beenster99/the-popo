@@ -97,6 +97,9 @@ var _wander_t := 0.0
 var _alone_t := 0.0
 var _check_t := 0.0
 var _last_spot := Vector3.INF
+var _stuck_t := 0.0             # running but going nowhere
+var _stuck_p := Vector3.ZERO
+var _stuck_n := 0
 var _rng := RandomNumberGenerator.new()
 var _ct := 0.0                  # time left in this cover phase
 var _burst := 0
@@ -319,6 +322,14 @@ func _physics_process(delta: float) -> void:
 				_fire(t.o)
 			if wish == Vector3.ZERO and _arrived():
 				set_state(S.HIDE)
+			elif _flee_stuck(delta):
+				# Wedged on a step or a corner: try somewhere else, and after
+				# a couple of goes just hide where they are.
+				_stuck_n += 1
+				if _stuck_n >= 2:
+					set_state(S.HIDE)
+				else:
+					_run_to_hide(t)
 		S.HIDE:
 			_check_t -= delta
 			if fighter and t.o and t.los and t.d < 16.0 and (armed or _throwable_near() != null):
@@ -386,7 +397,7 @@ func _physics_process(delta: float) -> void:
 	elif aim_at != Vector3.ZERO:
 		_face(aim_at)
 	move_and_slide()
-	_step_up()
+	_step_up(target)
 
 
 ## The nearest officer on their feet: {o, d, los}.
@@ -461,9 +472,23 @@ func _bolt(t: Dictionary) -> void:
 
 
 func _run_to_hide(t: Dictionary) -> void:
+	if state != S.FLEE:
+		_stuck_n = 0
 	set_state(S.FLEE)
+	_stuck_t = 0.0
+	_stuck_p = global_position
 	_goal = _pick_hide(t)
 	_last_spot = _goal
+
+
+## True once a run has made under half a metre in two seconds.
+func _flee_stuck(delta: float) -> bool:
+	if global_position.distance_to(_stuck_p) > 0.5:
+		_stuck_p = global_position
+		_stuck_t = 0.0
+		return false
+	_stuck_t += delta
+	return _stuck_t > 2.0
 
 
 ## Somewhere far from the officers that can be reached: rooms upstairs and
@@ -1008,10 +1033,12 @@ func _drop_held(v: Vector3) -> void:
 
 
 ## Kerbs and stair treads: hop up small steps the capsule catches on.
-func _step_up() -> void:
-	if not is_on_wall() or Vector2(velocity.x, velocity.z).length() < 0.3:
+## want: where they are trying to go (their velocity is zero once a step
+## stops them dead, so it can't be used for this).
+func _step_up(want: Vector3) -> void:
+	if not is_on_wall() or Vector2(want.x, want.z).length() < 0.3:
 		return
-	var fwd := Vector3(velocity.x, 0, velocity.z).normalized()
+	var fwd := Vector3(want.x, 0, want.z).normalized()
 	var space := get_world_3d().direct_space_state
 	var from := global_position + fwd * 0.4 + Vector3(0, 0.45, 0)
 	var q := PhysicsRayQueryParameters3D.create(from, from - Vector3(0, 0.5, 0), 1 | 16, [get_rid()])
