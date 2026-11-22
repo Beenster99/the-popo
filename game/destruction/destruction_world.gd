@@ -21,6 +21,9 @@ const MSG_SETTLE := 21
 const MSG_FX := 22
 
 const BIG_CHUNK_VOLUME := 0.12   # m^3; at or above this a chunk is synced
+## With finer debris (KitLibrary.detail) smaller pieces are still solid and
+## synced, so a broken wall still leaves rubble you bump into.
+const SYNC_VOLUME := [0.12, 0.07, 0.035, 0.018]
 const DENSITY := 1400.0          # kg/m^3, lighter than concrete for game feel
 const RELEASED_BIT := 63         # net id suffix for a whole falling piece
 const DEBRIS_LIFETIME := 25.0
@@ -32,6 +35,8 @@ const FALLING_LAYER := 32
 ## broken wall made.
 const CRUSH_TIME := 0.6
 const MAX_LOCAL_DEBRIS := 700
+## Finer debris (KitLibrary.detail) keeps more small pieces about.
+const DEBRIS_CAP := [700, 1000, 1600, 2200]
 
 const HP := {"wall": 120.0, "wall_window": 80.0, "wall_door": 90.0, "slab": 220.0, "column": 160.0,
 	"wall_half": 80.0, "wall_half_window": 60.0, "wall_shopfront": 70.0, "wall_shopdoor": 70.0, "wall_garage": 70.0,
@@ -100,7 +105,7 @@ func add_piece(kind: String, xform: Transform3D, bears := true, tint := Color(0,
 	mi.mesh = kit.mesh
 	KitLibrary.tint(mi, kit.surfaces, tint)
 	body.add_child(mi)
-	for ch in kit.chunks:
+	for ch in kit.solid:
 		var cs := CollisionShape3D.new()
 		cs.shape = ch.shape
 		cs.position = ch.offset
@@ -348,7 +353,7 @@ func _physics_process(delta: float) -> void:
 		_interpolate()
 	# Retire old cosmetic debris.
 	var now := Time.get_ticks_msec() / 1000.0
-	while not _debris.is_empty() and (now - _debris[0][1] > DEBRIS_LIFETIME or _debris.size() > MAX_LOCAL_DEBRIS):
+	while not _debris.is_empty() and (now - _debris[0][1] > DEBRIS_LIFETIME or _debris.size() > DEBRIS_CAP[clampi(KitLibrary.detail, 0, 3)]):
 		var d: Array = _debris.pop_front()
 		if is_instance_valid(d[0]):
 			d[0].queue_free()
@@ -383,7 +388,7 @@ func _spawn_chunks(p: Dictionary, xf: Transform3D, lin: Vector3, ang: Vector3, o
 	var now := Time.get_ticks_msec() / 1000.0
 	for k in kit.chunks.size():
 		var ch: Dictionary = kit.chunks[k]
-		var big: bool = ch.volume >= BIG_CHUNK_VOLUME
+		var big: bool = ch.volume >= SYNC_VOLUME[clampi(KitLibrary.detail, 0, 3)]
 		var pos: Vector3 = xf * (ch.offset as Vector3)
 		var rb := _make_body(ch.mesh, [[ch.shape, Vector3.ZERO]], ch.volume * DENSITY)
 		KitLibrary.tint(rb.get_child(0), ch.surfaces, p.tint)
@@ -431,7 +436,7 @@ func _spawn_released(p: Dictionary) -> void:
 	var kit := KitLibrary.get_piece(p.kind)
 	var shapes: Array = []
 	var vol := 0.0
-	for ch in kit.chunks:
+	for ch in kit.solid:
 		shapes.append([ch.shape, ch.offset])
 		vol += ch.volume
 	var rb := _make_body(kit.mesh, shapes, vol * DENSITY)
@@ -656,7 +661,7 @@ func _restore_body(p: Dictionary, k: int, xf: Transform3D) -> void:
 	if k == RELEASED_BIT:
 		var shapes: Array = []
 		var vol := 0.0
-		for ch in kit.chunks:
+		for ch in kit.solid:
 			shapes.append([ch.shape, ch.offset])
 			vol += ch.volume
 		rb = _make_body(kit.mesh, shapes, vol * DENSITY)

@@ -2,7 +2,7 @@ class_name Block
 extends Node3D
 ## The game for now (Single Player and Online start here): a generated city
 ## block with two police cars parked on the north road, and (Phase 1.4) the
-## dispatcher: calls, suspects, the custody bay and the crime level.
+## dispatcher: calls, suspects and the custody bay.
 ## Phase 1.1: a generated city block. Roads, pavements and 4 to 6 buildings
 ## from the Wave 1 kit, laid out from a seed; two of them can be entered
 ## (rooms, stairs, upper floor). Everything is breakable: 1 pistol,
@@ -66,7 +66,7 @@ func _ready() -> void:
 	add_child(world)
 	fader = RoofFader.new()
 	add_child(fader)
-	# Phase 1.4: calls, suspects and the crime level (before the block is built,
+	# Phase 1.4: calls and suspects (before the block is built,
 	# which hands it the layout).
 	dispatch = Dispatcher.new()
 	dispatch.name = "Dispatcher"
@@ -81,8 +81,10 @@ func _ready() -> void:
 	if Net.is_host():
 		var s := next_seed
 		var saved := BlockState.peek()
+		KitLibrary.detail = int(Settings.values.get("debris_detail", 2))
 		if resume and not saved.is_empty():
 			s = saved.seed
+			KitLibrary.detail = int(saved.get("detail", KitLibrary.detail))
 		if s == 0:
 			s = randi_range(1, 999999)
 		next_seed = 0
@@ -224,13 +226,17 @@ func _on_seed_ask(from: int, _data: PackedByteArray) -> void:
 	if Net.is_host() and seed_value != 0:
 		var b := StreamPeerBuffer.new()
 		b.put_u32(seed_value)
+		b.put_u8(KitLibrary.detail)   # every machine breaks things the same way
 		Net.send(from, MSG_SEED, b.data_array)
 
 
 func _on_seed(_from: int, data: PackedByteArray) -> void:
 	var b := StreamPeerBuffer.new()
 	b.data_array = data
-	_build(b.get_u32())
+	var sv := b.get_u32()
+	if b.get_available_bytes() > 0:
+		KitLibrary.detail = b.get_u8()
+	_build(sv)
 
 
 func _on_fired(origin: Vector3, dir: Vector3, alt: bool, shooter: Officer) -> void:

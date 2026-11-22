@@ -179,6 +179,11 @@ func _physics_process(delta: float) -> void:
 					"lights": cars[i].get("lights") == true, "siren": int(cars[i].get("siren")) if cars[i].get("siren") != null else 0}
 	if Net.is_host():
 		for i in _inputs:
+			# Our own car took the live keys above. (Its parked input, the
+			# handbrake on, used to be applied over them every frame: the
+			# host's car would not move, v0.2.10.)
+			if i == mine:
+				continue
 			if i < cars.size() and simulates_locally(i):
 				_apply_input(cars[i], _inputs[i])
 		if _tick % 3 == 0 and Net.is_online():

@@ -28,7 +28,6 @@ const KEYS := {
 	"weapon_2": [KEY_2],
 	"cam_rotate_left": [KEY_Q],
 	"cam_rotate_right": [KEY_E],
-	"toggle_view": [KEY_TAB],     # isometric / third-person test view
 	"handbrake": [KEY_SPACE],
 	"toggle_net_overlay": [KEY_F3],
 	"toggle_day_night": [KEY_N],
@@ -85,7 +84,6 @@ const REBINDABLE := [
 	["holster", "Holster / draw"], ["torch", "Torch on / off"], ["punch", "Punch"], ["kick", "Kick"], ["interact", "Use / revive (hold)"],
 	["aim", "Aim / peek from cover"], ["fire", "Fire"], ["ping", "Ping a spot for everyone"], ["horn", "Car horn"], ["handbrake", "Handbrake"],
 	["cam_rotate_left", "Rotate camera left"], ["cam_rotate_right", "Rotate camera right"],
-	["toggle_view", "Switch isometric / third-person view"],
 ]
 const SAVE_PATH := "user://controls.cfg"
 ## Bumped when the defaults change in a way that clashes with old saved

@@ -395,10 +395,12 @@ func _apply_break(id: int, at: Vector3, dir: Vector3) -> void:
 		"glass":
 			Sfx.glass_break(parent, at)
 		"wood":
-			Sfx.play(parent, "break_wood", at, 0.0 if d.mass < 15.0 else 3.0, 50.0, 0.08)
+			Sfx.play(parent, "break_wood", at, 3.0 if d.mass < 15.0 else 6.0, 70.0, 0.08)
+			if d.mass >= 15.0:
+				Sfx.play(parent, "gun_thump", at, -4.0, 40.0, 0.15)
 		_:
 			if not d.get("explosive", false):
-				Sfx.play(parent, "break_metal", at, -2.0, 50.0, 0.08)
+				Sfx.play(parent, "break_metal", at, 3.0, 70.0, 0.08)
 	if d.get("puffs", false):
 		Sfx.play(parent, "gas_hiss", at, 2.0, 40.0, 0.06)
 		Feel.cloud(parent, at, FireSystem.PUFF_RADIUS)

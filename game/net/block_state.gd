@@ -15,7 +15,7 @@ const MSG_ASK := 95      # client -> host: send me the block as it is
 const MSG_STATE := 96    # host -> client: here it is
 const SAVE_PATH := "user://saves/block.save"
 const MAGIC := 0x504F504F   # "POPO"
-const VERSION := 1
+const VERSION := 3
 const SAVE_EVERY := 20.0
 
 signal caught_up
@@ -113,8 +113,8 @@ func save() -> bool:
 	b.put_u16(VERSION)
 	b.put_utf8_string(str(ProjectSettings.get_setting("application/config/version", "dev")))
 	b.put_u32(seed_value)
+	b.put_u8(KitLibrary.detail)
 	b.put_64(int(Time.get_unix_time_from_system()))
-	b.put_float(dispatch.crime if dispatch else 0.0)
 	write(b)
 	DirAccess.make_dir_recursive_absolute(SAVE_PATH.get_base_dir())
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
@@ -135,8 +135,9 @@ static func peek() -> Dictionary:
 		return {}
 	var ver := b.get_utf8_string()
 	var s := b.get_u32()
+	var detail := b.get_u8()
 	var at := b.get_64()
-	return {"seed": s, "saved": at, "version": ver}
+	return {"seed": s, "detail": detail, "saved": at, "version": ver}
 
 
 static func has_save() -> bool:
@@ -162,12 +163,9 @@ func load_save() -> bool:
 	if b == null:
 		return false
 	b.get_utf8_string()
-	if b.get_u32() != seed_value:
+	if b.get_u32() != seed_value or b.get_u8() != KitLibrary.detail:
 		return false
 	b.get_64()
-	var crime := b.get_float()
-	if dispatch:
-		dispatch.crime = crime
 	read(b, true)
 	dirty = false
 	return true

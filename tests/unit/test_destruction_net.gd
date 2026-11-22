@@ -18,6 +18,7 @@ func test_quantised_transforms_round_trip() -> void:
 
 
 func test_snapshot_respects_body_budget() -> void:
+	KitLibrary.detail = 0   # the kit's own big chunks, so plenty are synced
 	ProtoWorld.ground(self, 200.0)
 	var w := DestructionWorld.new()
 	add_child(w)
@@ -31,3 +32,4 @@ func test_snapshot_respects_body_budget() -> void:
 	b.seek(0)
 	t.check(b.get_u16() <= DestructionWorld.MAX_BODIES_PER_SNAPSHOT, "budget respected")
 	t.check(w.awake_total > DestructionWorld.MAX_BODIES_PER_SNAPSHOT, "test has more awake bodies than the budget: %d" % w.awake_total)
+	KitLibrary.detail = 2

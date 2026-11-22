@@ -71,6 +71,7 @@ func test_officer_walks_upstairs() -> void:
 ## Inside a building the floor is cut away to the camera: near walls, floors
 ## above and anything in the way fade out; far walls and interior walls stay.
 func test_inside_view_shows_the_whole_floor() -> void:
+	IsoCamera.third_person = false   # the overhead cutaway maths, still used by the fader
 	var w := DestructionWorld.new()
 	add_child(w)
 	var fader := RoofFader.new()
@@ -116,6 +117,7 @@ func test_inside_view_shows_the_whole_floor() -> void:
 	t.check(hidden > 10, "pieces cut away: %d" % hidden)
 	t.check(ghosted > 3, "camera-side walls see-through, not gone: %d" % ghosted)
 	t.check(blocking == 0, "nothing left hiding the floor (%d pieces in the way)" % blocking)
+	IsoCamera.third_person = true
 
 
 ## Phase 1.7: furniture on the floor above goes with that floor, and comes

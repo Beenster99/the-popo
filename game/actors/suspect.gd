@@ -216,7 +216,7 @@ func take_damage(amount: float, dir := Vector3.ZERO, _where := "") -> void:
 	if rig and dir != Vector3.ZERO:
 		rig.hit_reaction(dir, 5.0)
 	if hp <= 0.0:
-		velocity = dir * 3.0
+		velocity = dir * clampf(3.0 + amount * 0.12, 5.0, 22.0)   # blasts throw them
 		set_state(S.DOWN)
 		return
 	pressure += (0.4 if fighter else 1.0) if hp > MAX_HP * 0.5 else (1.0 if fighter else 2.0)

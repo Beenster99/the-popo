@@ -166,7 +166,7 @@ func _on_check(_from: int, data: PackedByteArray) -> void:
 	calls.sort()
 	var live := d.suspects.values().filter(func(x): return not (x as Suspect).is_done()).size()
 	report.checks.append({"i": _check_i, "lost": lost.size(), "lost_hash": hash(lost), "props": props.size(), "props_hash": hash(props),
-		"cars": fires, "crime": snappedf(d.crime, 1.0), "calls": calls, "suspects": live, "pawns": (s.sync as PawnSync).pawns.size(),
+		"cars": fires, "calls": calls, "suspects": live, "pawns": (s.sync as PawnSync).pawns.size(),
 		"fires": FireSystem.current.fires.size() if FireSystem.current else -1, "fps": Engine.get_frames_per_second()})
 
 

@@ -104,6 +104,11 @@ const SCHEMA := [
 	["Graphics", "sss_quality", "Subsurface scattering", "enum", 1, ["Off", "Low", "Medium", "High"]],
 	["Graphics", "roughness_limiter", "Specular anti-aliasing", "bool", false],
 	["Graphics", "filter_quality", "Decal and projector filtering", "enum", 2, ["Nearest", "Linear", "Linear mipmaps", "Linear mipmaps anisotropic (best)"]],
+	["Graphics", "", "Look", "head"],
+	["Graphics", "outline_strength", "Outlines", "range", 0.55, [0.0, 1.0, 0.05, ""],
+		null, "How dark and thick the cartoon outlines are. 0 turns them off."],
+	["Graphics", "debris_detail", "Debris detail", "enum", 2, ["Chunky", "Normal", "Fine", "Very fine"],
+		null, "How small things break up. Finer is more pieces, which costs frame rate in big collapses. Applies to the next block."],
 	["Graphics", "", "Colour", "head"],
 	["Graphics", "tonemap", "Tone mapping", "enum", 2, ["Linear", "Reinhard", "Filmic", "ACES", "AgX"]],
 	["Graphics", "exposure", "Exposure", "range", 1.0, [0.25, 3.0, 0.05, ""]],
@@ -123,11 +128,13 @@ const SCHEMA := [
 	["Sound", "mute_unfocused", "Mute when the game is in the background", "bool", false],
 	# --- Gameplay ---------------------------------------------------------
 	["Gameplay", "", "Rules (the host's settings count when playing online)", "head"],
+	["Gameplay", "gore", "Gore", "enum", 3, ["Off", "Some", "Lots", "Extreme"],
+		null, "Blood sprays, splats on walls, pools, wounds and, on Extreme, bits and broken bones. Only on your screen."],
 	["Gameplay", "friendly_fire", "Friendly fire", "bool", true,
 		null, "Officers' bullets, punches and kicks hurt other officers. Blasts always hurt."],
 	["Gameplay", "", "Camera", "head"],
 	["Gameplay", "cam_rotate_speed", "Rotate speed (hold Q / E)", "range", 120.0, [30.0, 360.0, 10.0, " deg/s"]],
-	["Gameplay", "tp_sensitivity", "Third-person mouse sensitivity (Tab switches view)", "range", 1.0, [0.2, 3.0, 0.05, "x"]],
+	["Gameplay", "tp_sensitivity", "Mouse look sensitivity", "range", 1.0, [0.2, 3.0, 0.05, "x"]],
 	["Gameplay", "cam_follow", "Follow tightness", "range", 8.0, [2.0, 20.0, 0.5, ""]],
 	["Gameplay", "cam_zoom", "Starting zoom", "range", 16.0, [6.0, 48.0, 1.0, ""]],
 	["Gameplay", "cam_zoom_max", "Furthest zoom", "range", 48.0, [16.0, 96.0, 2.0, ""]],
@@ -356,6 +363,7 @@ func _apply_viewport() -> void:
 
 
 func _apply_globals() -> void:
+	Cel.set_outline_strength(values.outline_strength)
 	RenderingServer.directional_shadow_atlas_set_size(SHADOW_SIZES[values.sun_shadow_size], values.shadow_16bit)
 	var fq: int = values.shadow_filter
 	RenderingServer.directional_soft_shadow_filter_set_quality(fq)

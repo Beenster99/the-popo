@@ -130,6 +130,36 @@ func _run() -> void:
 			await _frames(60)
 			await _save()
 			IsoCamera.third_person = false
+		"tp_far", "tp_far_gore":
+			# Third person down the street: buildings in the middle distance
+			# and another officer some way off (the v0.2.10-tp1 "black" bug).
+			Block.next_seed = 4242
+			var s := await _scene("res://prototypes/p08_block/block.tscn")
+			await _frames(10)
+			s.find_children("*", "NetOverlay", false, false)[0].queue_free()
+			(s.dispatch as Dispatcher).enabled = false
+			var o: Officer = s.sync.my_pawn()
+			o.global_position = Vector3(-2, 0.2, -3)
+			var mate := Officer.new()
+			mate.peer_id = 99
+			s.add_child(mate)
+			mate.global_position = Vector3(12, 0.2, 8)
+			s.cam._yaw = 220.0
+			s.cam._yaw_target = 220.0
+			s.cam.tp_pitch = -6.0
+			if shot == "tp_far_gore":
+				var sp := Suspect.new()
+				s.add_child(sp)
+				sp.global_position = Vector3(1.5, 0.2, 3.0)
+				await _frames(20)
+				var wall_side := Vector3(1.5, 1.3, 3.0)
+				for k in 3:
+					Gore.hit(s, wall_side + Vector3(-3, 0.1 * k, -4), wall_side + Vector3(0, 0.1 * k, 0))
+				Gore.hit(s, Vector3(1.5, 1.7, -2), Vector3(1.5, 1.68, 2.9))
+				sp.take_damage(500.0, Vector3(0.3, 0, 1).normalized())
+				await _frames(200)
+			await _frames(60)
+			await _save()
 		"block_overview", "block_street", "block_inside":
 			var s := await _scene("res://prototypes/p08_block/block.tscn")
 			s.find_children("*", "NetOverlay", false, false)[0].queue_free()

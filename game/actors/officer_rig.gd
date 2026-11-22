@@ -135,10 +135,18 @@ func _build_ragdoll() -> void:
 		pb.joint_type = PhysicalBone3D.JOINT_TYPE_CONE if not (b.begins_with("shin") or b.begins_with("forearm")) else PhysicalBone3D.JOINT_TYPE_HINGE
 		pb.mass = 4.0 if b in ["hips", "chest_2", "spine"] else 1.5
 		pb.collision_layer = 0
-		pb.collision_mask = 1 | 16
+		pb.collision_mask = 1 | 4 | 16
 		pb.friction = 0.8
 		physics.add_child(pb)
 	physics.active = false
+
+
+## A body on the floor can be shot (it jerks and bleeds): bullets look for
+## Gore.RAGDOLL_LAYER. Standing, the capsule takes the hits instead.
+func _set_ragdoll_layer(on: bool) -> void:
+	for c in physics.get_children():
+		if c is PhysicalBone3D:
+			(c as PhysicalBone3D).collision_layer = Gore.RAGDOLL_LAYER if on else 0
 
 
 ## Called every frame with the officer's current state.
@@ -346,12 +354,19 @@ func hit_reaction(world_dir: Vector3, strength := 6.0) -> void:
 func set_downed(on: bool, push := Vector3.ZERO) -> void:
 	downed = on
 	physics.active = on
+	_set_ragdoll_layer(on)
 	if on:
 		physics.influence = 1.0
 		physics.physical_bones_start_simulation()
 		var chest := physics.get_node_or_null("PB_chest_2") as PhysicalBone3D
 		if chest:
 			chest.apply_central_impulse(push)
+			# The legs go too, so a body is thrown rather than folding up.
+			for b in ["PB_hips", "PB_thigh.L", "PB_thigh.R"]:
+				var pb := physics.get_node_or_null(b) as PhysicalBone3D
+				if pb:
+					pb.apply_central_impulse(push * 0.5)
+		Gore.downed(self)
 	else:
 		physics.physical_bones_stop_simulation()
 		physics.influence = 0.0

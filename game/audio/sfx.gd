@@ -274,18 +274,18 @@ static func shot(parent: Node, pos: Vector3, kind := 0, own := false) -> void:
 	var pitch := 0.82 if sg else 1.0
 	var p: AudioStreamPlayer3D
 	if indoor:
-		p = play(parent, "gun_dry", pos, 3.0, 140.0, 0.04, BUS_INDOOR)
+		p = play(parent, "gun_dry", pos, 5.0, 140.0, 0.04, BUS_INDOOR)
 	elif d > FAR_RANGE:
 		p = play(parent, "gun_far", pos, -4.0, 260.0, 0.06, BUS_OUTDOOR)
 	elif d > NEAR_RANGE:
 		p = play(parent, "gun_far", pos, 0.0, 200.0, 0.05, BUS_OUTDOOR)
 	else:
-		p = play(parent, "gun_near", pos, 0.0, 160.0, 0.04, BUS_OUTDOOR)
+		p = play(parent, "gun_near", pos, 3.0, 180.0, 0.04, BUS_OUTDOOR)
 	if p:
 		p.pitch_scale *= pitch
 	if d < 28.0:
-		var thump_db := (4.0 if indoor else 1.0) + (3.0 if sg else 0.0)
-		play(parent, "gun_shotgun_body" if sg else "gun_thump", pos, thump_db, 45.0, 0.08, BUS_INDOOR if indoor else BUS_OUTDOOR)
+		var thump_db := (6.0 if indoor else 4.0) + (3.0 if sg else 0.0)
+		play(parent, "gun_shotgun_body" if sg else "gun_thump", pos, thump_db, 60.0, 0.08, BUS_INDOOR if indoor else BUS_OUTDOOR)
 	if d < 7.0:
 		play(parent, "gun_mech", pos, -14.0, 10.0, 0.08)
 	if not indoor and d < 160.0:
@@ -333,7 +333,8 @@ static func shot_echoes(parent: Node, pos: Vector3, lis: Variant, shotgun := fal
 ## what: 0 world, 1 a person, 2 nothing (it flew off). own: your bullet.
 static func bullet(parent: Node, a: Vector3, b: Vector3, surface: String, what := 0, own := false) -> void:
 	if what == 1:
-		play(parent, "body_hit", b, 0.0, 40.0, 0.08)
+		play(parent, "body_hit", b, 3.0, 50.0, 0.08)
+		Gore.hit(parent, a, b)
 	elif what == 0:
 		impact(parent, b, surface, 0.9)
 		Feel.impact(parent, b, a, surface)

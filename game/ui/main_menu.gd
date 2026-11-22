@@ -25,7 +25,7 @@ func _ready() -> void:
 	col.add_theme_constant_override("separation", 14)
 	margin.add_child(col)
 	col.add_child(UiTheme.title("THE POPO", 92, UiTheme.ACCENT))
-	var sub := UiTheme.title("Keep the crime down. Try to keep the city up.", 22, UiTheme.DIM)
+	var sub := UiTheme.title("Answer the call. Try to keep the city up.", 22, UiTheme.DIM)
 	col.add_child(sub)
 	var gap := Control.new()
 	gap.custom_minimum_size.y = 40

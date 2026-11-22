@@ -5,21 +5,19 @@ choose More info, then Run anyway.
 
 PLAYING
 You start with the gun holstered: H, or holding right mouse, draws it.
-Inside a building, the walls between you and the camera turn see-through
-and the floors above fade out, so you can see the doorways.
+Inside a building the floors above fade out, so nothing hangs over you.
 The opening menu has Single Player (straight into the city), Online (host or
 join friends, then the host presses Start the game), Settings and Quit. The
 old test scenes are still there under Settings > Debug > Open a test scene. Esc in a game opens the menu: Resume,
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
-THIRD-PERSON TEST VIEW (try it: Tab)
-Tab switches between the normal view and a camera behind the officer's
-shoulder. There the mouse looks around, the dot in the middle of the screen
-is where shots go (hold right mouse to aim, left mouse to fire, as usual),
-the mouse wheel moves the camera in and out, and it works in cars too.
-Tab again goes back. Mouse speed: Settings > Gameplay.
-On a controller the right stick looks around.
+THE VIEW (v0.2.11: third person only)
+The camera sits behind your officer's shoulder. The mouse looks around, the
+dot in the middle of the screen is where shots go (hold right mouse to aim,
+left mouse to fire), the mouse wheel moves the camera in and out, and it
+works in cars too. Mouse speed: Settings > Gameplay. On a controller the
+right stick looks around.
 
 PLAYING OVER THE INTERNET
 1. Choose Online, then press Host. The game asks your router to open port 27015 by itself and
@@ -55,7 +53,7 @@ Left mouse fire (at the reticle), R reload (15 rounds), H holster / draw,
 T torch, middle mouse ping a spot for everyone.
 V punch (while sprinting: shoulder barge), B kick (kicks doors in).
 F use; hold F next to a downed teammate for 2 seconds to get them up.
-Q/E rotate camera (or hold the middle mouse and drag; a click pings), mouse wheel zoom, F3 network overlay, Esc menu.
+Mouse looks round, mouse wheel moves the camera in and out, middle mouse pings a spot, F3 network overlay, Esc menu.
 Ammo: bottom right shows rounds in the gun and spare rounds.
 Health: shots (friendly fire, can be turned off in Settings), blasts and long falls hurt. At zero
 you go down; a teammate gets you up, or you get up by yourself after 30 s.
@@ -99,8 +97,7 @@ the test guns in turn. Shoot the shop's glass, door and walls, the car and
 the crates.
 CALLS AND ARRESTS (1.4)
 Calls come in over the radio (top of the screen) and are listed top left
-with their distance; arrows at the screen edge point the way. The CRIME
-LEVEL bar creeps up while calls are open and drops as you deal with them.
+with their distance; arrows at the screen edge point the way.
 Suspects run and hide, and armed ones may shoot. Aim at one up close, or
 punch them, and they give up and kneel. Hold F next to them to cuff them;
 they follow you. F at a police car door puts them in the back. Drive to

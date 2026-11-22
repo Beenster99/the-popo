@@ -196,3 +196,24 @@ func test_getting_in_alone_puts_you_at_the_wheel() -> void:
 	await _run(a, _cmd(PlayerInput.INTERACT), 1)
 	t.check(a.state == Officer.S.VEHICLE and a.seat == 0, "in by the passenger door, at the wheel: seat %d" % a.seat)
 	t.check(cars.car_for(1) == 0, "and driving")
+
+
+## v0.2.10 bug (beenster): at the wheel, engine running, WASD did nothing.
+## The parked car's handbrake input was being applied over the driver's keys.
+func test_the_driver_drives_off() -> void:
+	var pc := _setup()
+	for i in 60:
+		await get_tree().physics_frame
+	var a := _officer(pc.door_point(0) * Vector3(1, 0, 1) + Vector3(0, 0.1, 0), 1)
+	for i in 20:
+		a.sim_step(_cmd(), 1.0 / 60.0)
+		await get_tree().physics_frame
+	await _run(a, _cmd(PlayerInput.INTERACT), 1)
+	t.check(a.seat == 0, "at the wheel")
+	var p0 := pc.global_position
+	Input.action_press("move_forward")
+	for i in 120:
+		a.sim_step(_cmd(), 1.0 / 60.0)
+		await get_tree().physics_frame
+	Input.action_release("move_forward")
+	t.check(pc.global_position.distance_to(p0) > 2.0, "W drives it: %.1f m in 2 s" % pc.global_position.distance_to(p0))
