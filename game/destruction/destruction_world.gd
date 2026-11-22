@@ -605,6 +605,88 @@ func _on_settle_msg(_from: int, data: PackedByteArray) -> void:
 		bodies[nid].global_transform = xf
 
 
+# --- Catch-up and saving (Phase 1.7) -------------------------------------------
+
+## The block's damage as it is now: every piece no longer standing, and where
+## each big chunk and falling piece is. Sent to a friend who joins late, and
+## what the host saves. Small cosmetic chunks are not kept.
+func write_state(b: StreamPeerBuffer) -> void:
+	var lost: Array = pieces.values().filter(func(p): return p.state != "intact")
+	b.put_u32(lost.size())
+	for p in lost:
+		b.put_u32(p.id)
+	var live: Array = bodies.keys().filter(func(n): return is_instance_valid(bodies[n]))
+	b.put_u32(live.size())
+	for nid in live:
+		b.put_u32(nid)
+		_put_xform(b, (bodies[nid] as RigidBody3D).global_transform)
+
+
+## Brings this machine's block to a written state. On the host (loading a
+## save) the chunks are real bodies, asleep where they lay; on a client they
+## are proxies the host's snapshots move.
+func read_state(b: StreamPeerBuffer) -> void:
+	for i in b.get_u32():
+		var id := b.get_u32()
+		var p: Dictionary = pieces.get(id, {})
+		if p.is_empty() or p.state != "intact":
+			continue
+		p.state = "gone"
+		if is_instance_valid(p.node):
+			p.node.queue_free()
+		piece_broken.emit(id)
+		_stability_dirty = true
+	for i in b.get_u32():
+		var nid := b.get_u32()
+		var xf := _get_xform(b)
+		if bodies.has(nid) and is_instance_valid(bodies[nid]):
+			_buffers.erase(nid)
+			bodies[nid].global_transform = xf
+			continue
+		var p: Dictionary = pieces.get(nid / 64, {})
+		if p.is_empty():
+			continue
+		_restore_body(p, nid % 64, xf)
+
+
+func _restore_body(p: Dictionary, k: int, xf: Transform3D) -> void:
+	var kit := KitLibrary.get_piece(p.kind)
+	var rb: RigidBody3D
+	var nid: int = p.id * 64 + k
+	if k == RELEASED_BIT:
+		var shapes: Array = []
+		var vol := 0.0
+		for ch in kit.chunks:
+			shapes.append([ch.shape, ch.offset])
+			vol += ch.volume
+		rb = _make_body(kit.mesh, shapes, vol * DENSITY)
+		KitLibrary.tint(rb.get_child(0), kit.surfaces, p.tint)
+		rb.collision_layer = FALLING_LAYER
+		rb.set_meta("released_piece", p.id)
+		p.state = "released"
+		if Net.is_host():
+			rb.contact_monitor = true
+			rb.max_contacts_reported = 6
+			rb.body_entered.connect(_on_released_hit.bind(rb, p.id))
+			rb.set_meta("age", SHATTER_GRACE_STEPS)
+	else:
+		if k >= kit.chunks.size():
+			return
+		var ch: Dictionary = kit.chunks[k]
+		rb = _make_body(ch.mesh, [[ch.shape, Vector3.ZERO]], ch.volume * DENSITY)
+		KitLibrary.tint(rb.get_child(0), ch.surfaces, p.tint)
+	rb.set_meta("surface", surface_for(p.kind))
+	rb.set_meta("net_id", nid)
+	rb.transform = xf
+	bodies[nid] = rb
+	if not Net.is_host():
+		_make_proxy(rb)
+	add_child(rb)
+	if Net.is_host():
+		rb.sleeping = true
+		_watch_sleep(rb, nid)
+
+
 ## Final resting transforms of every synced body, for tests and debugging.
 func rest_report() -> Dictionary:
 	var out := {}

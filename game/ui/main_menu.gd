@@ -34,7 +34,11 @@ func _ready() -> void:
 	_home = VBoxContainer.new()
 	_home.add_theme_constant_override("separation", 14)
 	col.add_child(_home)
-	_home.add_child(UiTheme.big_button("Single Player", func(): _play(Scenes.GAME)))
+	var saved := BlockState.peek()
+	if not saved.is_empty():
+		var when := Time.get_datetime_string_from_unix_time(int(saved.saved) + _utc_offset(), true)
+		_home.add_child(UiTheme.big_button("Continue   (block %d, saved %s)" % [saved.seed, when.substr(5, 11)], func(): _play(Scenes.GAME, true)))
+	_home.add_child(UiTheme.big_button("Single Player" if saved.is_empty() else "New Block", func(): _play(Scenes.GAME)))
 	_home.add_child(UiTheme.big_button("Online", func(): get_tree().change_scene_to_file("res://prototypes/launcher/launcher.tscn")))
 	_home.add_child(UiTheme.big_button("Settings", _open_settings))
 	_home.add_child(UiTheme.big_button("Quit", func(): get_tree().quit()))
@@ -46,17 +50,27 @@ func _ready() -> void:
 	add_child(foot)
 	if Net.is_online():
 		Net.leave()
+	if Net.last_notice != "":
+		var note := UiTheme.title(Net.last_notice, 24, UiTheme.ACCENT)
+		col.add_child(note)
+		col.move_child(note, 2)
+		Net.last_notice = ""
 	(_home.get_child(0) as Button).grab_focus.call_deferred()
 
 
 func _open_settings() -> void:
 	var s := SettingsScreen.new()
-	s.closed.connect(func(): (_home.get_child(2) as Button).grab_focus())
+	s.closed.connect(func(): (_home.get_child(_home.get_child_count() - 2) as Button).grab_focus())
 	add_child(s)
 
 
-func _play(path: String) -> void:
+func _play(path: String, resume := false) -> void:
+	Block.resume = resume
 	get_tree().change_scene_to_file(path)
+
+
+static func _utc_offset() -> int:
+	return int(Time.get_time_zone_from_system().get("bias", 0)) * 60
 
 
 ## A night-time city skyline, drawn once into a texture.

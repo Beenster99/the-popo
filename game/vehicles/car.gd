@@ -42,6 +42,10 @@ var _horn_player: AudioStreamPlayer3D
 var net_id := 0
 ## Phase 1.5: burnt out after it went up. No engine, charred black.
 var wrecked := false
+## Every dent so far [local point, local dir, amount], so a friend joining
+## late or a saved game gets the same crumpled car (Phase 1.7).
+var dent_log: Array = []
+const DENT_LOG_MAX := 200
 var bumper_attached := true
 var _wheels: Array = []     # [{pos: local mount, front: bool, rear: bool, node: Node3D, compress: float}]
 var _steer_smooth := 0.0
@@ -239,6 +243,8 @@ func _build_body_mesh() -> void:
 ## machine applies the same dent from the same event. Parts near the dent
 ## take damage and come off once they have had enough.
 func apply_dent(local_point: Vector3, local_dir: Vector3, amount: float) -> void:
+	if dent_log.size() < DENT_LOG_MAX:
+		dent_log.append([local_point, local_dir, amount])
 	var radius := 0.5 + amount * 1.2
 	for e in _deform:
 		var mi: MeshInstance3D = e.mi

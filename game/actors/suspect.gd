@@ -126,6 +126,7 @@ func _init() -> void:
 
 func _ready() -> void:
 	_rng.seed = hash(net_id * 7919 + look)
+	add_to_group(RoofFader.CUTAWAY_GROUP)
 	collision_layer = 2
 	collision_mask = 1 | 4 | 16
 	var cs := CollisionShape3D.new()

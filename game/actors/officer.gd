@@ -795,6 +795,10 @@ func _try_enter_car() -> bool:
 		return false
 	var taken := best.occupants()
 	var s := best_door
+	# Whoever gets in first drives, whichever door they used (Phase 1.7: it
+	# was too easy to end up a passenger and wonder why WASD did nothing).
+	if not taken.has(0) and (best_door in [0, 1] or taken.is_empty()):
+		s = 0
 	if taken.has(s):
 		s = -1
 		var dd := INF

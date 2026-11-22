@@ -116,3 +116,82 @@ func test_inside_view_shows_the_whole_floor() -> void:
 	t.check(hidden > 10, "pieces cut away: %d" % hidden)
 	t.check(ghosted > 3, "camera-side walls see-through, not gone: %d" % ghosted)
 	t.check(blocking == 0, "nothing left hiding the floor (%d pieces in the way)" % blocking)
+
+
+## Phase 1.7: furniture on the floor above goes with that floor, and comes
+## back when you go up.
+func test_upstairs_furniture_goes_with_the_floor() -> void:
+	var w := DestructionWorld.new()
+	add_child(w)
+	var fader := RoofFader.new()
+	add_child(fader)
+	var g := CityBlock.build(w, 4242, fader)
+	var props := PropWorld.new()
+	props.world = w
+	add_child(props)
+	props.furnish(g)
+	var cam := Camera3D.new()
+	add_child(cam)
+	var b: Dictionary = g.buildings.filter(func(x): return x.enterable and x.storeys > 1)[0]
+	var bb: AABB = b.bounds
+	var ground_y := bb.position.y
+	var up := props.props.values().filter(func(p): return bb.has_point((p.body as Node3D).global_position) and (p.body as Node3D).global_position.y > ground_y + 2.5)
+	var down := props.props.values().filter(func(p): return bb.has_point((p.body as Node3D).global_position) and (p.body as Node3D).global_position.y < ground_y + 1.5)
+	t.check(up.size() > 0 and down.size() > 0, "furniture on both floors: %d up, %d down" % [up.size(), down.size()])
+	var spot := Node3D.new()
+	add_child(spot)
+	spot.global_position = Vector3(bb.get_center().x, ground_y + 0.2, bb.get_center().z)
+	cam.global_position = spot.global_position + Vector3(10, 12, 10)
+	cam.look_at(spot.global_position)
+	cam.current = true
+	fader.watch = spot
+	for i in 5:
+		await get_tree().process_frame
+	t.check(up.all(func(p): return fader._cut.has(p.body)), "downstairs, the upstairs furniture is cut away with its floor")
+	t.check(not down.any(func(p): return fader._cut.has(p.body)), "and this floor's stays")
+	spot.global_position.y = ground_y + BlockGenerator.STOREY + 0.2
+	for i in 5:
+		await get_tree().process_frame
+	t.check(not up.any(func(p): return fader._cut.has(p.body)), "upstairs, it's back")
+	spot.global_position = bb.get_center() + Vector3(bb.size.x, -bb.size.y * 0.5 + 0.2, 0)
+	for i in 5:
+		await get_tree().process_frame
+	t.check(fader.cut_count() == 0, "and outside nothing is cut")
+
+
+## Phase 1.7: every lit thing on the block wears the cel shader (markers and
+## effects are unshaded on purpose), so nothing looks out of place.
+func test_everything_on_the_block_is_cel_shaded() -> void:
+	Block.next_seed = 4242
+	var scene: Node = load("res://prototypes/p08_block/block.tscn").instantiate()
+	add_child(scene)
+	for i in 90:
+		await get_tree().physics_frame
+	(scene.dispatch as Dispatcher).start_call(0)
+	(scene.dispatch as Dispatcher).start_call(1)
+	for i in 30:
+		await get_tree().physics_frame
+	var odd := []
+	var n := 0
+	for gi in scene.find_children("*", "MeshInstance3D", true, false):
+		var mi := gi as MeshInstance3D
+		if mi.mesh == null or mi.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY:
+			continue
+		var mats := []
+		if mi.material_override:
+			mats.append(mi.material_override)
+		else:
+			for i in mi.mesh.get_surface_count():
+				mats.append(mi.get_surface_override_material(i) if mi.get_surface_override_material(i) else mi.mesh.surface_get_material(i))
+		for m in mats:
+			n += 1
+			if m is ShaderMaterial and (m as ShaderMaterial).shader == Cel.CEL:
+				continue
+			if m is BaseMaterial3D and (m as BaseMaterial3D).shading_mode == BaseMaterial3D.SHADING_MODE_UNSHADED:
+				continue
+			odd.append("%s (%s)" % [scene.get_path_to(mi), m])
+	t.check(n > 1000, "looked at %d surfaces" % n)
+	t.check(odd.is_empty(), "all cel shaded: %s" % [odd.slice(0, 6)])
+	scene.queue_free()
+	await get_tree().physics_frame
+	BlockState.delete_save()

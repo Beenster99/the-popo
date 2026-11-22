@@ -15,6 +15,14 @@ signal joined
 signal join_failed(reason: String)
 signal left
 signal scene_requested(path: String)
+## A client lost the host (it quit, or the connection dropped).
+signal host_lost(reason: String)
+
+## Why the last game ended, for the main menu to show once (Phase 1.7).
+var last_notice := ""
+## ENet gives up on a silent peer after this long (ms), instead of 30 s.
+const TIMEOUT_MIN_MS := 4000
+const TIMEOUT_MAX_MS := 10000
 
 const MAX_PLAYERS := 3
 const DEFAULT_PORT := 27015
@@ -306,6 +314,7 @@ func _reset_offline_slots() -> void:
 func _on_peer_connected(id: int) -> void:
 	if not is_host():
 		return
+	_set_timeout(id)
 	if slots.size() >= MAX_PLAYERS:
 		send(id, MSG_KICK, "The game is full (3 players).".to_utf8_buffer())
 		get_tree().create_timer(0.5).timeout.connect(func():
@@ -320,7 +329,14 @@ func _on_peer_disconnected(id: int) -> void:
 		_broadcast_lobby()
 
 
+func _set_timeout(id: int) -> void:
+	var enet := multiplayer.multiplayer_peer as ENetMultiplayerPeer
+	if enet and enet.get_peer(id):
+		enet.get_peer(id).set_timeout(0, TIMEOUT_MIN_MS, TIMEOUT_MAX_MS)
+
+
 func _on_connected_to_server() -> void:
+	_set_timeout(1)
 	var b := StreamPeerBuffer.new()
 	b.put_u16(PROTOCOL)
 	b.put_utf8_string(player_name)
@@ -329,12 +345,15 @@ func _on_connected_to_server() -> void:
 
 func _on_server_disconnected() -> void:
 	leave()
-	left.emit()
+	host_lost.emit("Lost the connection to the host.")
 
 
 func _fail(reason: String) -> void:
+	var was_in_game := is_online() and not is_host() and slots.size() > 1
 	leave()
 	join_failed.emit(reason)
+	if was_in_game:
+		host_lost.emit(reason)
 
 
 func _on_hello(from: int, data: PackedByteArray) -> void:

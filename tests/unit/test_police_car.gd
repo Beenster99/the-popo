@@ -181,3 +181,18 @@ func test_wounds_by_where_you_are_hit() -> void:
 		if o.injuries & Officer.LEG:
 			legs += 1
 	t.check(legs >= 8, "leg hits usually leave a leg wound: %d of 20" % legs)
+
+
+## Phase 1.7: beenster got in on the passenger side and WASD did nothing.
+## Into an empty car, from any door, you take the wheel.
+func test_getting_in_alone_puts_you_at_the_wheel() -> void:
+	var pc := _setup()
+	for i in 60:
+		await get_tree().physics_frame
+	var a := _officer(pc.door_point(1) * Vector3(1, 0, 1) + Vector3(0, 0.1, 0), 1)
+	for i in 20:
+		a.sim_step(_cmd(), 1.0 / 60.0)
+		await get_tree().physics_frame
+	await _run(a, _cmd(PlayerInput.INTERACT), 1)
+	t.check(a.state == Officer.S.VEHICLE and a.seat == 0, "in by the passenger door, at the wheel: seat %d" % a.seat)
+	t.check(cars.car_for(1) == 0, "and driving")
