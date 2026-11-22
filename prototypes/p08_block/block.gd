@@ -25,6 +25,8 @@ var nav: BlockNav
 var dispatch: Dispatcher
 var civ_car: Car
 var sounds: GameSounds
+var props: PropWorld
+var fire: FireSystem
 var seed_value := 0
 
 
@@ -130,6 +132,19 @@ func _build(s: int) -> void:
 	if Net.is_host():
 		nav.bake_from(self)
 	dispatch.setup(gen, world, cars, nav, civ_car)
+	# Phase 1.5: furniture and loose things, and fire.
+	props = PropWorld.new()
+	props.name = "Props"
+	props.world = world
+	props.cars = cars
+	add_child(props)
+	props.furnish(gen)
+	fire = FireSystem.new()
+	fire.name = "Fire"
+	fire.world = world
+	fire.props = props
+	fire.cars = cars
+	add_child(fire)
 	# Phase 1.6: the sound of the block.
 	sounds = GameSounds.new()
 	sounds.name = "GameSounds"
