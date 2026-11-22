@@ -19,12 +19,22 @@ func test_buses_are_made_once() -> void:
 
 
 func test_every_sound_file_loads() -> void:
-	for l in Sfx.GUN_LAYERS + [Sfx.GUN_TAIL]:
-		for v in range(1, l[1] + 1):
-			t.check(Sfx.stream(l[0], v) is AudioStreamWAV, "%s_%d" % [l[0], v])
+	for stem in Sfx.COUNTS:
+		for v in range(1, Sfx.COUNTS[stem] + 1):
+			t.check(Sfx.stream(stem, v) is AudioStreamWAV, "%s_%d" % [stem, v])
 	for s in Sfx.SURFACES:
-		for v in range(1, 4):
-			t.check(Sfx.stream("impact_" + s, v) is AudioStreamWAV, "impact_%s_%d" % [s, v])
+		t.check(Sfx.COUNTS.has("impact_" + s), "impacts for " + s)
+
+
+func test_muffled_buses_filter_and_feed_their_room() -> void:
+	Sfx.ensure_buses()
+	for base in [Sfx.BUS_SFX, Sfx.BUS_INDOOR, Sfx.BUS_OUTDOOR]:
+		for w in [1, 2]:
+			var i := AudioServer.get_bus_index(Sfx.muffled_bus(base, w))
+			t.check(i != -1, Sfx.muffled_bus(base, w))
+			t.check(AudioServer.get_bus_send(i) == base, "feeds " + base)
+			t.check(AudioServer.get_bus_effect(i, 0) is AudioEffectLowPassFilter, "low-pass on " + Sfx.muffled_bus(base, w))
+	t.check(Sfx.muffled_bus(Sfx.BUS_INDOOR, 5) == "Indoor_Muffled2", "3+ walls use the strongest")
 
 
 func test_zone_picks_indoor_bus() -> void:
@@ -64,17 +74,36 @@ func test_gunshot_layers_and_tail() -> void:
 	Sfx.attach_listener(listener_spot)
 	Sfx.gunshot(self, Vector3(0, 1.3, 30))
 	var stems := Sfx.history.map(func(s): return s.stem)
-	t.check(stems == ["gun_mech", "gun_crack", "gun_body", "gun_tail_outdoor"], "outdoor shot layers: %s" % [stems])
-	t.check(Sfx.history[-1].bus == Sfx.BUS_OUTDOOR, "tail on outdoor bus")
+	t.check(stems == ["gun_near"], "outdoor close shot: %s" % [stems])
+	t.check(Sfx.history[-1].bus == Sfx.BUS_OUTDOOR, "outdoor bus")
+	Sfx.history.clear()
+	Sfx.gunshot(self, Vector3(0, 1.3, 80))
+	t.check(Sfx.history[-1].stem == "gun_far", "distant shot uses the far recording")
 	var z := SoundZone.new()
 	z.position = Vector3(0, 1.5, 30)
 	add_child(z)
 	Sfx.history.clear()
 	Sfx.gunshot(self, Vector3(0, 1.3, 30))
-	t.check(Sfx.history.size() == 3, "no outdoor tail indoors")
-	t.check(Sfx.history.all(func(s): return s.bus == Sfx.BUS_INDOOR), "indoor shot on indoor bus")
+	t.check(Sfx.history.size() == 1 and Sfx.history[0].stem == "gun_dry", "indoors the tail is cut")
+	t.check(Sfx.history[0].bus == Sfx.BUS_INDOOR, "indoor shot on indoor bus")
 	z.queue_free()
 	listener_spot.queue_free()
+
+
+func test_shot_behind_a_wall_goes_through_a_muffled_bus() -> void:
+	var ears := Node3D.new()
+	add_child(ears)
+	ears.position = Vector3(40, 0, 0)
+	Sfx.attach_listener(ears)
+	_wall(Vector3(40, 1.5, -2), Vector3(6, 3.5, 0.6))
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	Sfx.history.clear()
+	Sfx.gunshot(self, Vector3(40, 1.3, -4))
+	t.check(Sfx.history[-1].played_on == "Outdoor_Muffled1", "played on %s" % Sfx.history[-1].played_on)
+	Sfx.gunshot(self, Vector3(40, 1.3, 3))
+	t.check(Sfx.history[-1].played_on == "Outdoor", "clear shot is not muffled (%s)" % Sfx.history[-1].played_on)
+	ears.queue_free()
 
 
 func test_surface_lookup() -> void:

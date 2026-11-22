@@ -6,7 +6,8 @@ extends Node3D
 ##   inside   no echo tail, a tight bright room reverb instead
 ##   walls    each wall between the shot and your ears muffles and quietens it
 ## Shoot the targets to hear impacts on wood, glass, concrete and metal.
-## F4 pauses the test guns. Glass panes break and come back after 3 s.
+## 5, 6 and 7 fire one test gun each; F4 sets them firing in turn.
+## Glass panes break and come back after 3 s.
 
 const ROOM := Vector3(6, 0, -6)       # centre of the shop floor
 const ROOM_SIZE := Vector3(8, 3.2, 6)
@@ -20,7 +21,7 @@ const GUN_EVERY := 1.6
 var cam: IsoCamera
 var sync: PawnSync
 var sfx: SfxSync
-var auto_fire := true
+var auto_fire := false
 var _next_gun := 0
 var _timer := 0.8
 var _last_test := ""
@@ -92,14 +93,20 @@ func _hud_text() -> String:
 	var last := "none yet"
 	if not Sfx.history.is_empty():
 		var s: Dictionary = Sfx.history[-1]
-		last = "%s on %s bus, %d wall(s) to your ears, low-pass %d Hz" % [s.stem, s.bus, s.walls, int(s.cutoff)]
-	return "Test guns %s (F4)  last test shot: %s\nLast sound: %s\nLMB fire at the wood, glass, concrete and metal targets. Walk into the shop and behind the wall." % [
-		"firing" if auto_fire else "paused", _last_test, last]
+		last = "%s on %s, %d wall(s) to your ears" % [s.stem, s.played_on, s.walls]
+	return "5 street gun  6 shop gun  7 gun behind the wall  F4 auto-fire (%s)   last test shot: %s\nLast sound: %s\nShoot the wood, glass, concrete and metal targets. Stand inside the shop, or behind the thick wall, to hear the others muffled." % [
+		"on" if auto_fire else "off", _last_test, last]
 
 
 func _unhandled_input(e: InputEvent) -> void:
-	if e is InputEventKey and e.pressed and not e.echo and e.keycode == KEY_F4:
+	if not (e is InputEventKey and e.pressed and not e.echo):
+		return
+	if e.keycode == KEY_F4:
 		auto_fire = not auto_fire
+	elif e.keycode in [KEY_5, KEY_6, KEY_7] and Net.is_host():
+		var g: Array = TEST_GUNS[e.keycode - KEY_5]
+		_last_test = g[0]
+		sfx.gunshot(g[1])
 
 
 func _physics_process(delta: float) -> void:
@@ -130,6 +137,7 @@ func _on_fired(origin: Vector3, dir: Vector3, _alt: bool) -> void:
 
 func _break_glass(pane: Node3D) -> void:
 	# Placeholder shatter: hide the pane and its collision, bring it back later.
+	sfx.glass_break(pane.global_position)
 	pane.visible = false
 	var body := pane as CollisionObject3D
 	body.collision_layer = 0
