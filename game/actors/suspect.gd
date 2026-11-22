@@ -161,7 +161,7 @@ func set_state(s: S) -> void:
 	if s in [S.SURRENDER, S.CUFFED, S.IN_CAR, S.DOWN, S.BOOKED]:
 		# The gun goes on the floor, for an officer to pick up.
 		if weapon != EnemyGuns.NONE and s != S.BOOKED and is_host_side() and dispatcher and dispatcher.has_method("drop_gun") and is_inside_tree():
-			dispatcher.drop_gun(global_position + Vector3(sin(rotation.y), 0, cos(rotation.y)) * 0.5, weapon, mag)
+			dispatcher.drop_gun(_toss_spot(), weapon, mag)
 		weapon = EnemyGuns.NONE
 		aim_at = Vector3.ZERO
 		_drop_held(Vector3.ZERO)
@@ -182,6 +182,19 @@ func set_state(s: S) -> void:
 	visible = s not in [S.DRIVE, S.BOOKED]
 	_show_gun()
 	state_changed.emit(self)
+
+
+## Where a gun lands when they give up: tossed away a couple of metres in
+## front, so the officer can cuff them without picking it up by mistake (and
+## short of any wall).
+func _toss_spot() -> Vector3:
+	var fwd := Vector3(sin(rotation.y), 0, cos(rotation.y))
+	var from := global_position + Vector3(0, 0.6, 0)
+	var to := from + fwd * 1.9
+	var hit := get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(from, to, 1 | 4, [get_rid()]))
+	if hit:
+		to = (hit.position as Vector3) - fwd * 0.3
+	return Vector3(to.x, global_position.y, to.z)
 
 
 func _show_gun() -> void:
@@ -651,15 +664,15 @@ func _find_cover(threat_p: Vector3, mode: String) -> Dictionary:
 	var eye := threat_p + Vector3(0, 1.4, 0)
 	var me := global_position
 	var centre := me
-	var radii := [2.5, 5.0, 8.0, 11.0]
+	var radii := [1.5, 3.0, 4.5, 6.0, 7.5, 9.0, 11.0]
 	if mode == "advance":
 		centre = me.lerp(threat_p, 0.5)
-		radii = [1.5, 3.5, 6.0]
+		radii = [1.5, 2.5, 3.5, 5.0, 6.5]
 	elif mode == "flank":
 		centre = threat_p
-		radii = [6.0, 9.0, 12.0]
+		radii = [5.0, 6.5, 8.0, 9.5, 11.0, 12.5]
 	elif mode == "retreat":
-		radii = [5.0, 9.0, 13.0, 17.0]
+		radii = [5.0, 7.0, 9.0, 11.0, 13.0, 15.0, 17.0]
 	var from_threat := me - threat_p
 	from_threat.y = 0.0
 	var others := []
@@ -670,7 +683,7 @@ func _find_cover(threat_p: Vector3, mode: String) -> Dictionary:
 	var best := {}
 	var best_score := -INF
 	for r in radii:
-		var steps := 12
+		var steps := 20
 		for k in steps:
 			var a := TAU * (float(k) + _rng.randf() * 0.6) / steps
 			var sample: Vector3 = centre + Vector3(cos(a) * r, 0, sin(a) * r)
