@@ -1,7 +1,7 @@
 class_name Gunfire
 extends RefCounted
 ## What an officer's shot does (host only), shared by the scenes: bullets
-## hurt officers (with a wound by where they hit), break windows and dent
+## hurt officers and suspects (with a wound by where they hit), break windows and dent
 ## police cars, and chip the destructible world; slot 2's demolition charge
 ## blows up where it lands. Returns where the shot ended, for the tracer.
 
@@ -19,6 +19,11 @@ static func resolve(world: DestructionWorld, cars: CarSync, origin: Vector3, dir
 			var d: float = off.global_position.distance_to(at)
 			if d < 4.5:
 				off.take_damage(110.0 * (1.0 - d / 4.5), (off.global_position - at).normalized(), "blast")
+		for s in shooter.get_tree().get_nodes_in_group("suspects"):
+			var sp := s as Suspect
+			var d2: float = sp.global_position.distance_to(at)
+			if d2 < 4.5:
+				sp.take_damage(110.0 * (1.0 - d2 / 4.5), (sp.global_position - at).normalized(), "blast")
 		if cars:
 			for c in cars.cars:
 				var lp: Vector3 = (c as Car).global_transform.affine_inverse() * at
@@ -28,6 +33,9 @@ static func resolve(world: DestructionWorld, cars: CarSync, origin: Vector3, dir
 	elif hit and hit.collider is Officer:
 		var o := hit.collider as Officer
 		o.take_damage(BULLET_DAMAGE, dir, o.body_part_at(hit.position))
+	elif hit and hit.collider is Suspect:
+		var sp := hit.collider as Suspect
+		sp.take_damage(BULLET_DAMAGE, dir)
 	elif hit and hit.collider is Car and cars:
 		var surface := cars.bullet_hit(hit.collider, hit.position, dir)
 		if world:

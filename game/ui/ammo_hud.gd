@@ -98,9 +98,11 @@ func _process(_delta: float) -> void:
 		s = "EMPTY - RELOAD"
 	_state.text = s
 	_state.visible = s != ""
-	_bar.visible = o.is_reloading() or o.treat_t > 0.0 or o._boot_t > 0.0
+	_bar.visible = o.is_reloading() or o.treat_t > 0.0 or o._boot_t > 0.0 or o.cuff_t > 0.0
 	if o.is_reloading():
 		_bar.value = 1.0 - o.reload_t / Officer.RELOAD_TIME
+	elif o.cuff_t > 0.0:
+		_bar.value = o.cuff_t / Officer.CUFF_TIME
 	elif o._boot_t > 0.0:
 		_bar.value = o._boot_t / Officer.BOOT_TIME
 	elif o.treat_t > 0.0:
@@ -124,6 +126,9 @@ func _prompt(o: Officer) -> String:
 		return "   ".join(parts)
 	if o.state not in [Officer.S.MOVE, Officer.S.CROUCH]:
 		return ""
+	if o.cuff_target():
+		return "Hold %s: cuff the suspect" % use
+	var pr := o.prisoner()
 	for c in o.get_tree().get_nodes_in_group("police_cars"):
 		var pc := c as PoliceCar
 		var bp := pc.boot_point()
@@ -131,8 +136,10 @@ func _prompt(o: Officer) -> String:
 			return "Hold %s: ammo and first aid from the boot" % use
 		for i in 4:
 			var dp := pc.door_point(i)
-			if Vector2(dp.x - o.global_position.x, dp.z - o.global_position.z).length() < Officer.ENTER_RANGE:
-				return "%s get in" % use
+			if Vector2(dp.x - o.global_position.x, dp.z - o.global_position.z).length() < Officer.ENTER_RANGE + (0.4 if pr else 0.0):
+				return ("%s put the suspect in the car" % use) if pr else ("%s get in" % use)
+	if pr:
+		return "Walk them to a police car (they follow you), or straight to the custody bay"
 	if o.pouch > 0:
 		var tt := o.treat_target()
 		if tt == o:

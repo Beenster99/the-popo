@@ -58,6 +58,16 @@ Driver: WASD drive, Space handbrake, H horn, T lights, then lights and wail,
 then yelp, then off. Passengers: hold right mouse to lean out of the window
 and shoot. Windows shatter when shot; doors, bonnet, boot, bumpers and
 mirrors come off in big crashes. Hold F at the boot for ammo and first aid.
+CALLS AND ARRESTS (1.4)
+Calls come in over the radio (top of the screen) and are listed top left
+with their distance; arrows at the screen edge point the way. The CRIME
+LEVEL bar creeps up while calls are open and drops as you deal with them.
+Suspects run and hide, and armed ones may shoot. Aim at one up close, or
+punch them, and they give up and kneel. Hold F next to them to cuff them;
+they follow you. F at a police car door puts them in the back. Drive to
+the CUSTODY bay (yellow box, blue lamp) to book them.
+Speeding car: get behind it with the lights on (T) and it pulls over, then
+walk up to the driver. J (host) calls in a job straight away.
 INJURIES
 Shots can wound: a leg wound makes you limp (no sprint), an arm wound shakes
 your aim, bleeding drains health. Hold F to treat yourself or a teammate

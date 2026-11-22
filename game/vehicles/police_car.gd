@@ -233,7 +233,7 @@ func broken_windows() -> int:
 
 # --- seats -------------------------------------------------------------------
 
-## Officers sitting in this car, by seat index.
+## Officers (and prisoners) sitting in this car, by seat index.
 func occupants() -> Dictionary:
 	var out := {}
 	if not is_inside_tree():
@@ -241,6 +241,9 @@ func occupants() -> Dictionary:
 	for o in get_tree().get_nodes_in_group("officers"):
 		if o.get("car") == self and o.state == Officer.S.VEHICLE:
 			out[o.seat] = o
+	for s in get_tree().get_nodes_in_group("suspects"):
+		if s.get("car") == self and s.state == Suspect.S.IN_CAR:
+			out[s.seat] = s
 	return out
 
 

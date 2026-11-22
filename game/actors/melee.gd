@@ -49,6 +49,8 @@ static func resolve(attacker: Officer, world: DestructionWorld, origin: Vector3,
 			var o := c as Officer
 			o.take_damage(OFFICER_DAMAGE[kind], d, "melee")
 			o.shove(d * SHOVE[kind] + Vector3.UP * (1.5 if kind == Officer.Strike.BARGE else 0.0))
+		elif c is Suspect:
+			(c as Suspect).struck(d, OFFICER_DAMAGE[kind], SHOVE[kind])
 		elif c is Node and (c as Node).has_meta("piece_id") and world:
 			world.strike_piece((c as Node).get_meta("piece_id"), PIECE_DAMAGE[kind], hit.position, d)
 		elif c is RigidBody3D:

@@ -163,3 +163,34 @@ city block. It is built phase by phase; each phase ends with a build.
   window (stretch mode canvas items), so 4K is readable.
 
 ![Inside, v0.2.5](img/inside_v0_2_5.png)
+
+## Phase 1.4: dispatch, suspects and arrests (v0.2.6)
+
+- Dispatcher (`game/missions/dispatcher.gd`, host only, synced to
+  everyone): the first call comes in after about 20 s, then one every
+  25 to 50 s, at most two open at once. Three kinds for now: a shop
+  robbery (two suspects inside), an armed person on the street, and a
+  speeding car on the ring road. A call is lost after 5 minutes.
+- Crime level (top of the screen): starts at 35, creeps up over time and
+  faster with open calls; each suspect dealt with takes 5 off, a closed
+  call 10, a lost call adds 8. Arrests and kills count the same.
+- HUD (`game/ui/dispatch_hud.gd`): the crime meter, radio lines, the open
+  calls with distances, and arrows at the screen edge to each call (and to
+  the custody bay while anyone has a prisoner). Calls have a marker beam.
+- Suspects (`game/actors/suspect.gd`): civilians in their own clothes
+  (`suspect_look.gd`). They notice officers, run and hide in rooms, yards
+  and upstairs (a navmesh baked from the block at load, `game/world/
+  block_nav.gd`), and armed ones may shoot back instead. Aiming at one up
+  close, a punch, or cornering them makes them give up: hands up, kneel.
+- Arrests: hold F next to a kneeling suspect to cuff them; they follow
+  you. F at a police car door seats them in the back. Drive to the
+  CUSTODY bay (yellow box with a blue lamp) to book them.
+- Traffic stop: get behind the speeding car with lights on and it pulls
+  over; walk up and the driver gets out and gives up, or runs.
+- New clips on the officer rig, reused by suspects: hands_up, cuffed,
+  kneel.
+- The host's J key calls in a job at once (for testing).
+
+![A call](img/dispatch_call.png)
+![Cuffed suspect following](img/dispatch_arrest.png)
+![Custody bay](img/dispatch_bay.png)

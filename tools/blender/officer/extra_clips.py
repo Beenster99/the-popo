@@ -549,6 +549,56 @@ def drive(rig, A):
     return (1, 61)
 
 
+def hands_up(rig, A):
+    """Upper body, giving up: both hands raised open beside the head."""
+    K.gun_visible(rig, False)
+    for s in 'LR':
+        A.ik('arm.' + s, 1, 1)
+    for f, b in ((1, 0.0), (31, 1.0), (61, 0.0)):
+        A.rot('spine', f, -2, 0, 0)
+        A.rot('chest', f, -3 + b, 0, 0)
+        A.rot('neck', f, 4, 0, 0)
+        A.rot('head', f, 2, 0, 3 * b)
+        A.pos('hand_ik.L', f, 0.40, -0.12, 1.80 + 0.01 * b)
+        A.rot('hand_ik.L', f, 180, 0, 15)
+        A.pos('hand_ik.R', f, -0.40, -0.12, 1.80 + 0.01 * b)
+        A.rot('hand_ik.R', f, 180, 0, -15)
+    return (1, 61)
+
+
+def cuffed(rig, A):
+    """Upper body, handcuffed: hands together behind the back."""
+    K.gun_visible(rig, False)
+    for s in 'LR':
+        A.ik('arm.' + s, 1, 1)
+    for f, b in ((1, 0.0), (31, 1.0), (61, 0.0)):
+        A.rot('spine', f, 4, 0, 0)
+        A.rot('chest', f, -4 + b, 0, 0)
+        A.rot('neck', f, 10, 0, 0)
+        A.rot('head', f, 8, 0, 4 * b)
+        A.pos('hand_ik.L', f, 0.05, 0.17, 0.98)
+        A.rot('hand_ik.L', f, 180, 0, 20)
+        A.pos('hand_ik.R', f, -0.05, 0.17, 0.98)
+        A.rot('hand_ik.R', f, 180, 0, -20)
+    return (1, 61)
+
+
+def kneel(rig, A):
+    """Lower body: kneeling upright on both knees, shins flat behind."""
+    K.gun_visible(rig, False)
+    for f, b in ((1, 0.0), (31, 1.0), (61, 0.0)):
+        A.loc('hips', f, 0, 0.12, -0.50 - 0.005 * b)
+        A.rot('hips', f, -4, 0, 0)
+        A.rot('spine', f, 2, 0, 0)
+        A.pos('foot_ik.L', f, 0.14, 0.42, 0.12)
+        A.rot('foot_ik.L', f, 70, 0, 4)
+        A.pos('foot_ik.R', f, -0.14, 0.42, 0.12)
+        A.rot('foot_ik.R', f, 70, 0, -4)
+        A.loc('knee_pole.L', f, 0.05, -0.4, 0)
+        A.loc('knee_pole.R', f, -0.05, -0.4, 0)
+    return (1, 61)
+
+
 EXTRA = {
     'idle': idle, 'walk': walk, 'crouch_idle': crouch_idle, 'crouch_walk': crouch_walk,
     'prone_idle': prone_idle, 'crawl': crawl, 'slide': slide, 'jump': jump, 'fall': fall,
@@ -556,4 +606,5 @@ EXTRA = {
     'reload': reload, 'holster': holster, 'draw': draw, 'cover_low_idle': cover_low_idle,
     'limp': limp, 'sit': sit, 'drive': drive,
     'ready_hold': ready_hold, 'climb': climb,
+    'hands_up': hands_up, 'cuffed': cuffed, 'kneel': kneel,
 }

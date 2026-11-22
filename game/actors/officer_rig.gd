@@ -10,8 +10,8 @@ extends Node3D
 const MODEL := preload("res://assets/models/characters/officer.glb")
 const UPPER_BONES := ["spine", "chest_2", "neck_2", "head_2", "upper_arm.L", "forearm.L", "hand.L", "upper_arm.R", "forearm.R", "hand.R"]
 const LOWER_STATES := ["idle", "walk", "run", "crouch_idle", "crouch_walk", "prone_idle", "crawl", "cover_idle",
-	"peek", "slide", "roll", "mantle", "climb", "jump", "fall", "kick", "cover_low_idle", "limp", "sit"]
-const UPPER_STATES := ["none", "aim_hold", "ready_hold", "punch", "reload", "holster", "draw", "drive"]
+	"peek", "slide", "roll", "mantle", "climb", "jump", "fall", "kick", "cover_low_idle", "limp", "sit", "kneel"]
+const UPPER_STATES := ["none", "aim_hold", "ready_hold", "punch", "reload", "holster", "draw", "drive", "hands_up", "cuffed"]
 var RUN_CLIP_SPEED := 3.3    # m/s of the run cycle (2.27 for the mocap run)
 const WALK_CLIP_SPEED := 1.4
 ## Upper-body crossfade time (seconds), see _build_tree.
@@ -44,7 +44,7 @@ func _ready() -> void:
 	var lib := OfficerClips.library(anim_player, skeleton)
 	anim_player.remove_animation_library("")
 	anim_player.add_animation_library("", lib)
-	for n in ["idle", "walk", "run", "crouch_idle", "crouch_walk", "prone_idle", "crawl", "cover_idle", "cover_low_idle", "fall", "aim_hold", "ready_hold", "peek", "limp", "sit", "drive"]:
+	for n in ["idle", "walk", "run", "crouch_idle", "crouch_walk", "prone_idle", "crawl", "cover_idle", "cover_low_idle", "fall", "aim_hold", "ready_hold", "peek", "limp", "sit", "drive", "kneel", "hands_up", "cuffed"]:
 		if lib.has_animation(n):
 			lib.get_animation(n).loop_mode = Animation.LOOP_LINEAR
 	if "run" in OfficerClips.mocap_clips:
@@ -275,6 +275,47 @@ func _upper_state(o: Officer) -> String:
 	if (o.buttons & PlayerInput.SPRINT) == 0:
 		return "ready_hold"
 	return "none"
+
+
+## Drives the rig straight from named states, for characters that are not
+## officers (suspects): lower and upper clip names, ground speed, and an aim
+## point while shooting (Vector3.ZERO for none).
+func update_pose(lower: String, upper: String, hs: float, delta: float, aim_at := Vector3.ZERO) -> void:
+	if downed:
+		return
+	if lower != _lower:
+		tree.set("parameters/lower/transition_request", lower)
+		_lower = lower
+	if upper != _upper:
+		tree.set("parameters/upper/transition_request", upper)
+		_upper = upper
+	tree.set("parameters/split/blend_amount", 0.0 if upper == "none" else 1.0)
+	tree.set("parameters/ts_run/scale", clampf(hs / RUN_CLIP_SPEED, 0.6, 1.7))
+	tree.set("parameters/ts_walk/scale", clampf(hs / WALK_CLIP_SPEED, 0.5, 1.6))
+	tree.set("parameters/ts_crouch_walk/scale", clampf(hs / CROUCH_CLIP_SPEED, 0.5, 1.8))
+	var root := get_parent() as Node3D
+	procedural.aim_active = aim_at != Vector3.ZERO and root != null
+	procedural.aim_yaw_offset = 0.0
+	if procedural.aim_active:
+		procedural.aim_target = aim_at
+		if not procedural.have_slide:
+			var sl := model.find_child("gun_slide", true, false) as Node3D
+			if sl and sl.get_parent() is BoneAttachment3D:
+				procedural.slide_rel = (sl.get_parent() as Node3D).global_transform.affine_inverse() * sl.global_transform
+				procedural.have_slide = true
+	procedural.feet_enabled = lower in ["idle", "walk", "run", "crouch_idle", "crouch_walk"]
+	procedural.hand_lock = false
+	procedural.recoil = 0.0
+	procedural.reload_k = 0.0
+	procedural.lean = Vector3.ZERO
+	if root:
+		procedural.ground_y = root.global_position.y
+	if _hit_t > 0.0:
+		_hit_t -= delta
+		physics.influence = clampf(_hit_t / 0.5, 0.0, 1.0) * 0.55
+		if _hit_t <= 0.0:
+			physics.physical_bones_stop_simulation()
+			physics.active = false
 
 
 ## The fresh magazine shows in the left hand from the belt pouch until it is
