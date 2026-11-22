@@ -6,7 +6,7 @@ var port: int
 var t := 0.0
 var phase := "connect"
 var sync: PawnSync
-var start_x := 0.0
+var start_pos := Vector3.ZERO
 
 
 func _ready() -> void:
@@ -49,19 +49,36 @@ func _physics_process(_d: float) -> void:
 			if sync == null or sync.pawns.size() < 2:
 				return
 			if role == "client":
-				# Walk for the first 2 s of the "wait" phase (t is reset below).
-				sync.input_source = func(): return {"move": Vector2(1, 0) if t < 2.0 else Vector2.ZERO, "buttons": 0, "aim_yaw": 0.0}
+				# Spawns are random, so walk the way with the most open floor
+				# (not into a crate), for the first 2 s of "wait" (t is reset below).
+				var dir := _open_direction(sync.pawns[Net.my_id()])
+				sync.input_source = func(): return {"move": dir if t < 2.0 else Vector2.ZERO, "buttons": 0, "aim_yaw": 0.0}
 			var cid: int = Net.my_id() if role == "client" else Net.player_ids().filter(func(i): return i != 1)[0]
-			start_x = sync.pawns[cid].global_position.x
+			start_pos = sync.pawns[cid].global_position
 			phase = "wait"
 			t = 0.0
 		"wait":
 			if t > 5.0:
 				var id: int = Net.my_id() if role == "client" else Net.player_ids().filter(func(i): return i != 1)[0]
 				var p: Node3D = sync.pawns[id]
-				print("RESULT %.3f %.3f %.3f corrections=%d" % [p.global_position.x, p.global_position.z, p.global_position.x - start_x, sync.prediction_errors])
+				print("RESULT %.3f %.3f %.3f corrections=%d" % [p.global_position.x, p.global_position.z, Vector2(p.global_position.x - start_pos.x, p.global_position.z - start_pos.z).length(), sync.prediction_errors])
 				phase = "done"
 				t = 0.0
 		"done":
 			if t > 1.0:
 				get_tree().quit(0)
+
+
+func _open_direction(pawn: Node3D) -> Vector2:
+	var space := pawn.get_world_3d().direct_space_state
+	var from := pawn.global_position + Vector3(0, 0.5, 0)
+	var best := Vector2(1, 0)
+	var best_d := -1.0
+	for d in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
+		var to := from + Vector3(d.x, 0, d.y) * 20.0
+		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(from, to, 1))
+		var dist: float = from.distance_to(hit.position) if hit else 20.0
+		if dist > best_d:
+			best_d = dist
+			best = d
+	return best
