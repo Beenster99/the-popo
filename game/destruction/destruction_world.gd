@@ -211,7 +211,12 @@ func strike_piece(id: int, amount: float, point: Vector3, dir: Vector3) -> void:
 	_host_break(id, BREAK_RELEASE, point, 0.0)
 	var rb: RigidBody3D = bodies.get(id * 64 + RELEASED_BIT)
 	if rb:
-		rb.apply_impulse(dir * rb.mass * 4.0, point - rb.global_position)
+		# Off its hinges: free of the frame, pushed high so it topples in.
+		var frame: Dictionary = pieces.get(p.held_by, {})
+		if frame.get("state", "") == "intact" and is_instance_valid(frame.node):
+			rb.add_collision_exception_with(frame.node)
+		var high := Vector3(point.x, rb.global_position.y + 1.7, point.z)
+		rb.apply_impulse(dir * rb.mass * 3.0, high - rb.global_position)
 
 
 ## Explosion: damages pieces in range and pushes every rigid body nearby.
