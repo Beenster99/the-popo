@@ -43,7 +43,7 @@ func _ready() -> void:
 	left.custom_minimum_size.x = 420
 	root.add_child(left)
 	var title := Label.new()
-	title.text = "THE POPO  ·  Wave 0"
+	title.text = "THE POPO  ·  v%s" % ProjectSettings.get_setting("application/config/version", "dev")
 	title.add_theme_font_size_override("font_size", 34)
 	left.add_child(title)
 	left.add_child(_label("Your name"))
