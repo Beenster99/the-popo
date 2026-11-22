@@ -28,6 +28,10 @@ func test_shop_starts_fully_supported() -> void:
 
 
 func test_losing_a_side_wall_drops_the_floor_above() -> void:
+	# Breaks pick their chunk pattern with randi(): fix the seed so the same
+	# rubble falls every run (some patterns wedge the slab or knock the
+	# neighbouring slab, which made this test pass or fail at random).
+	seed(1234)
 	var w := _world()
 	BuildingLayout.shop(w, Vector3.ZERO)
 	w.finalize()
