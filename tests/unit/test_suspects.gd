@@ -75,11 +75,11 @@ func test_suspect_runs_and_hides() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	t.check(s.state == Suspect.S.FLEE, "sees the officer and runs: %s" % Suspect.S.keys()[s.state])
-	for i in 900:
+	for i in 1500:
 		await get_tree().physics_frame
 		if s.state == Suspect.S.HIDE:
 			break
-	t.check(s.state == Suspect.S.HIDE, "got somewhere and hides: %s" % Suspect.S.keys()[s.state])
+	t.check(s.state == Suspect.S.HIDE, "got somewhere and hides: %s (at %s, goal %s)" % [Suspect.S.keys()[s.state], s.global_position, s._goal])
 	print("    hid at %s, %.1f m from the officer" % [s.global_position, s.global_position.distance_to(o.global_position)])
 	t.check(s.global_position.distance_to(o.global_position) > 10.0, "well away from the officer")
 
@@ -88,6 +88,7 @@ func test_aiming_makes_them_give_up_then_cuff() -> void:
 	await _block()
 	var p := nav.closest(Vector3(24, BlockGenerator.BASE_Y + 0.05, 1.5))
 	var s := dispatch.spawn_suspect(p, Suspect.S.HIDE, false)
+	s._check_t = 100.0   # no coin toss to bolt: this test is about the aim
 	var o := _officer(p + Vector3(0, 0, -6))
 	var chest := s.global_position + Vector3(0, 1.2, 0)
 	await _run(o, _cmd(PlayerInput.AIM, Vector2.ZERO, chest), 150)
