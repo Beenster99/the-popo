@@ -560,7 +560,7 @@ func take_damage(amount: float, dir := Vector3.ZERO, where := "") -> void:
 		collision_mask = 1 | 4 | 16
 		_set_state(S.DOWNED)
 		if rig:
-			rig.set_downed(true, (dir + Vector3.UP * 0.3) * 30.0)
+			rig.set_downed(true, (dir + Vector3.UP * 0.3) * 14.0, Vector3(velocity.x, 0.0, velocity.z))
 	elif rig:
 		rig.hit_reaction(dir, clampf(amount * 0.25, 2.0, 10.0))
 

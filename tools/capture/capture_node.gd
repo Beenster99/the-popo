@@ -2,12 +2,14 @@ extends Node
 
 var shot: String
 var out: String
+var args_extra := ""
 
 
 func _ready() -> void:
 	var a := OS.get_cmdline_user_args()
 	shot = a[0]
 	out = a[1]
+	args_extra = a[2] if a.size() > 2 else ""
 	await _run()
 	get_tree().quit()
 
@@ -31,6 +33,42 @@ func _scene(path: String) -> Node:
 
 func _run() -> void:
 	match shot:
+		"fallen":
+			# v0.2.11: how bodies lie after going down (beenster: "collapse
+			# in a heap"). Three suspects shot from different sides and one
+			# shot while running, seen from the side.
+			var root := Node3D.new()
+			get_tree().root.add_child(root)
+			ProtoWorld.ground(root, 60.0)
+			var sun := DirectionalLight3D.new()
+			sun.rotation_degrees = Vector3(-50, 30, 0)
+			root.add_child(sun)
+			var env := WorldEnvironment.new()
+			env.environment = Environment.new()
+			env.environment.background_mode = Environment.BG_COLOR
+			env.environment.background_color = Color(0.55, 0.6, 0.68)
+			env.environment.ambient_light_color = Color(0.6, 0.6, 0.65)
+			env.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+			root.add_child(env)
+			var cam := Camera3D.new()
+			root.add_child(cam)
+			cam.look_at_from_position(Vector3(0, 3.5, 7.5), Vector3(0, 0.2, 0.5))
+			cam.current = true
+			var pushes := [Vector3(0, 0, -1), Vector3(1, 0, 0), Vector3(0, 0, 1), Vector3.ZERO]
+			var sps := []
+			for k in 4:
+				var sp := Suspect.new()
+				root.add_child(sp)
+				sp.global_position = Vector3(-4.5 + k * 3.0, 0.05, 0)
+				sps.append(sp)
+			await _frames(20)
+			for k in 4:
+				if k == 3:
+					sps[k].velocity = Vector3(0, 0, 6)
+				sps[k].hp = 1.0   # a pistol round finishes them
+				sps[k].take_damage(35.0, pushes[k])
+			await _frames(int(args_extra) if args_extra != "" else 200)
+			await _save()
 		"look_day", "look_night", "look_inside", "look_rotated":
 			var s := await _scene("res://prototypes/p05_look/look.tscn")
 			await _frames(5)

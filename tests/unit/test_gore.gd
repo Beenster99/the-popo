@@ -38,7 +38,7 @@ func test_a_shot_bleeds_onto_the_wall_and_the_body() -> void:
 func test_the_fallen_bleed_and_are_thrown() -> void:
 	Settings.values["gore"] = 3
 	var s: Suspect = await _scene()
-	var hips := s.rig.physics.get_node("PB_hips") as Node3D
+	var hips := s.rig.bone_body("hips")
 	var p0 := hips.global_position
 	s.take_damage(500.0, Vector3(0, 0, 1))
 	for i in 150:

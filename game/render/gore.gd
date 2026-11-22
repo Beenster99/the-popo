@@ -49,6 +49,10 @@ static func hit(parent: Node, from: Vector3, at: Vector3) -> void:
 	if lv == 0 or not parent.is_inside_tree():
 		return
 	var head := who != null and at.y - (who as Node3D).global_position.y > 1.45
+	# The wet sound of it, louder the higher the setting; bone on a head shot.
+	Sfx.play(parent, "gore_hit", at, -6.0 + lv * 2.0, 35.0, 0.08)
+	if head and lv >= 2:
+		Sfx.play(parent, "bone_snap", at, -2.0, 30.0, 0.1)
 	_spray(parent, at, dir, SPRAY[lv] * (2 if head else 1))
 	var space := (parent as Node).get_viewport().world_3d.direct_space_state
 	var ex: Array[RID] = []
@@ -107,6 +111,7 @@ static func downed(rig: OfficerRig) -> void:
 		var limbs := ["forearm.L", "forearm.R", "shin.L", "shin.R"]
 		var pick: String = limbs[absi(hash(body.name)) % limbs.size()]
 		_bone_out(rig, pick)
+		Sfx.play(rig, "bone_snap", body.global_position, 0.0, 30.0, 0.1)
 
 
 static func _pool(rig_id: int, lv: int) -> void:
@@ -114,7 +119,7 @@ static func _pool(rig_id: int, lv: int) -> void:
 	if rig == null or not rig.is_inside_tree() or not rig.downed:
 		return
 	var body := rig.get_parent() as Node3D
-	var hips := rig.physics.get_node_or_null("PB_hips") as Node3D
+	var hips := rig.bone_body("hips")
 	var at: Vector3 = hips.global_position if hips else body.global_position
 	var space := rig.get_viewport().world_3d.direct_space_state
 	var h := space.intersect_ray(PhysicsRayQueryParameters3D.create(at + Vector3.UP * 0.3, at + Vector3.DOWN * 2.0, 1 | 16))

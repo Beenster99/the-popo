@@ -125,7 +125,7 @@ func test_near_miss_cracks_past_your_head() -> void:
 	t.check(not _stems().has("bullet_crack"), "not for your own shots")
 	Sfx.history.clear()
 	Sfx.bullet(self, head + Vector3(0, 0, 10), head + Vector3(0, 0, 30), "metal", 1)
-	t.check(_stems() == ["body_hit"], "a hit on a person is a body hit")
+	t.check(_stems().slice(0, 2) == ["body_hit", "gore_hit"], "a hit on a person is a body hit and a wet hit: %s" % [_stems()])
 
 
 func test_close_shot_ducks_and_rings() -> void:

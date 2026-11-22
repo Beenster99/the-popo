@@ -33,12 +33,12 @@ const MAX_WALLS := 3
 const SURFACES := ["wood", "glass", "concrete", "metal"]
 const MUFFLE_CUTOFF := [1200.0, 500.0]
 const NEAR_RANGE := 30.0     # beyond this the distant recording is used
-const COUNTS := {"amb_air": 1, "amb_far_traffic": 1, "amb_street": 1, "body_hit": 6, "break_concrete": 4,
+const COUNTS := {"amb_air": 1, "amb_far_traffic": 1, "amb_street": 1, "body_hit": 6, "bone_snap": 4, "break_concrete": 4,
 	"break_metal": 5, "break_wood": 7, "bullet_crack": 3, "bullet_whizz": 3, "car_crash": 3,
 	"car_door_close": 1, "car_door_open": 1, "car_engine": 1, "car_horn": 1, "car_start": 1,
 	"casing_concrete": 3, "casing_metal": 3, "casing_wood": 3, "cloth": 4, "door_close": 4, "door_open": 2,
 	"dry_fire": 1, "ear_ring": 1, "explosion": 1, "explosion_body": 2, "fire_loop": 1, "fire_whoomph": 2, "gas_hiss": 1, "gear": 4, "glass_big": 3, "glass_break": 3,
-	"glass_settle": 4, "gun_dry": 5, "gun_far": 4, "gun_mech": 1, "gun_near": 5, "gun_shotgun_body": 3,
+	"glass_settle": 4, "gore_hit": 5, "gun_dry": 5, "gun_far": 4, "gun_mech": 1, "gun_near": 5, "gun_shotgun_body": 3,
 	"gun_thump": 3, "holster": 2, "impact_concrete": 4, "impact_glass": 3, "impact_metal": 5, "impact_wood": 4,
 	"mag_drop_concrete": 2, "mag_drop_metal": 2, "mag_drop_wood": 2, "mag_in": 1, "mag_out": 1, "ping": 1,
 	"punch": 5, "ricochet": 4, "room_tone": 1, "rubble": 6, "shotgun_pump": 1, "siren_wail": 1, "siren_yelp": 1,
