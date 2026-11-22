@@ -12,4 +12,8 @@ HOST=$!
 sleep 1
 "$GODOT" --headless --path . -s res://tests/net/car_probe.gd -- client $PORT $RTT $LOSS > /tmp/popo_car_client.log 2>&1 || true
 wait $HOST || true
-grep LATENCY /tmp/popo_car_client.log || { echo "FAIL: no results"; exit 1; }
+grep LATENCY /tmp/popo_car_client.log || {
+  echo "FAIL: no results. Client log tail:"; tail -n 20 /tmp/popo_car_client.log
+  echo "Host log tail:"; tail -n 20 /tmp/popo_car_host.log
+  exit 1
+}

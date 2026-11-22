@@ -11,6 +11,7 @@ var cars: CarSync
 var mode_i := 0
 var start_pos := Vector3.ZERO
 var press_t := 0.0
+var drift := Vector3.ZERO
 var results := []
 
 
@@ -33,7 +34,7 @@ func _car() -> Car:
 func _physics_process(delta: float) -> void:
 	t += delta
 	if t > 40.0:
-		print("TIMEOUT ", phase)
+		print("TIMEOUT %s mode %d speed %.3f" % [phase, mode_i, _car().linear_velocity.length() if cars else -1.0])
 		get_tree().quit(2)
 	match phase:
 		"connect":
@@ -56,14 +57,25 @@ func _physics_process(delta: float) -> void:
 				phase = "arm"
 				t = 0.0
 		"arm":
-			if t > 1.5 and _car().linear_velocity.length() < 0.05:
+			# Wait for the car to stop. A car that is still creeping after 5 s
+			# (the proxy on a slow machine can jitter) is armed anyway, and its
+			# creep is subtracted from the measurement below.
+			# The client also waits until the host's mode change has reached it.
+			var want := CarSync.Mode.HOST if mode_i == 0 else CarSync.Mode.DRIVER
+			if cars.mode != want:
+				t = 0.0  # give the car time to settle after the hand-over
+				return
+			var speed := _car().linear_velocity.length()
+			if (t > 1.5 and speed < 0.05) or (t > 5.0 and speed < 0.6):
 				start_pos = _car().global_position
+				drift = _car().linear_velocity if speed >= 0.05 else Vector3.ZERO
 				press_t = t
 				if role == "client":
 					Input.action_press("move_forward")
 				phase = "measure"
 		"measure":
-			if role == "client" and (_car().global_position - start_pos).dot(_car().global_transform.basis.z) > 0.03:
+			var moved := _car().global_position - start_pos - drift * (t - press_t)
+			if role == "client" and moved.dot(_car().global_transform.basis.z) > 0.03:
 				results.append(["host" if mode_i == 0 else "driver", (t - press_t) * 1000.0])
 				Input.action_release("move_forward")
 				phase = "stop"

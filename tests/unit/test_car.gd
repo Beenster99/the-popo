@@ -50,3 +50,21 @@ func test_wall_hit_dents_and_drops_bumper() -> void:
 	t.check(c.dent_amount() > 0.05, "dented %f" % c.dent_amount())
 	print("    deepest dent %.2f m" % c.dent_amount())
 	t.check(not c.bumper_attached, "bumper came off")
+
+
+func test_coasting_car_comes_to_rest() -> void:
+	var c := _car()
+	for i in 30:
+		await get_tree().physics_frame
+	c.throttle = 1.0
+	for i in 90:
+		await get_tree().physics_frame
+	c.throttle = 0.0
+	var from := c.speed_kmh()
+	var frames := 0
+	while c.linear_velocity.length() > 0.05 and frames < 900:
+		await get_tree().physics_frame
+		frames += 1
+	print("    coasted from %.0f km/h to rest in %.1f s" % [from, frames / 60.0])
+	t.check(frames < 900, "still rolling at %.2f m/s after 15 s" % c.linear_velocity.length())
+	t.check(frames > 120, "stops too abruptly (%d frames)" % frames)

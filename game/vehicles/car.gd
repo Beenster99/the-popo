@@ -17,6 +17,8 @@ const DAMP := 3800.0        # N s/m
 const ENGINE := 9500.0      # N at the wheels at low speed
 const TOP_SPEED := 38.0     # m/s, about 85 mph
 const BRAKE := 14000.0
+const ENGINE_BRAKE := 900.0  # N per driven wheel when off the throttle
+const ROLLING := 0.015       # tyre rolling resistance, fraction of wheel load
 const GRIP := 9.0           # lateral stiffness per unit load
 const MU := 1.25            # tyre friction coefficient
 const HANDBRAKE_REAR_GRIP := 0.25
@@ -278,7 +280,15 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		if brake > 0.0 or (handbrake and not w.front):
 			var b := (BRAKE * 0.25 * brake) + (BRAKE * 0.5 if handbrake and not w.front else 0.0)
 			lon_f -= sign(lon_v) * min(b, absf(lon_v) * mass * 2.0)
-		lon_f -= lon_v * 25.0  # rolling resistance
+		# Off the throttle the engine drags the driven wheels, and every tyre
+		# has a little rolling resistance, so a coasting car comes to rest
+		# instead of creeping for half a minute. Clamped so it never pushes
+		# the car backwards.
+		var drag := load * ROLLING
+		if not w.front and absf(throttle) < 0.01:
+			drag += ENGINE_BRAKE
+		lon_f -= sign(lon_v) * minf(drag, absf(lon_v) * mass * 0.5)
+		lon_f -= lon_v * 25.0  # air and bearing drag
 		# Friction circle.
 		var limit: float = MU * load * (0.7 if handbrake and not w.front else 1.0)
 		var f := Vector2(lat_f, lon_f)
