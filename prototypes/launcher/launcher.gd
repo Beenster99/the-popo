@@ -101,7 +101,8 @@ func _ready() -> void:
 		var b := _button(p[0], func(): _start(p[1]))
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		_list.add_child(b)
-	right.add_child(_label("\nEsc returns here. F3 toggles the network overlay. Q/E rotate the camera, mouse wheel zooms."))
+	right.add_child(_label("\nEsc returns here. F3 toggles the network overlay. Q/E rotate the camera, mouse wheel zooms.\nA game controller works too."))
+	right.add_child(_button("Controls...", func(): add_child(load("res://prototypes/launcher/controls_screen.gd").new())))
 
 	Net.lobby_changed.connect(_refresh)
 	Net.joined.connect(func(): _status.text = "Joined. Waiting for the host to pick a prototype."; _refresh())

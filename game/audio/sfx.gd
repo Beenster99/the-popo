@@ -26,7 +26,7 @@ const SURFACES := ["wood", "glass", "concrete", "metal"]
 const MUFFLE_CUTOFF := [1200.0, 500.0]
 const NEAR_RANGE := 30.0     # beyond this the distant recording is used
 const COUNTS := {"gun_near": 5, "gun_dry": 5, "gun_far": 4, "impact_wood": 4, "impact_glass": 3,
-	"impact_metal": 5, "impact_concrete": 4, "glass_break": 3}
+	"impact_metal": 5, "impact_concrete": 4, "glass_break": 3, "car_horn": 1}
 
 static var _cache := {}
 static var _rng := RandomNumberGenerator.new()

@@ -51,6 +51,19 @@ func mouse_on_plane(height := 0.0) -> Vector3:
 	return hit if hit != null else global_position
 
 
+## What the mouse points at: the first wall, prop, car or chunk under the
+## cursor, else the point at chest height. Returns {point, normal, hit}.
+func mouse_on_world(chest_height: float, exclude: Array[RID] = []) -> Dictionary:
+	var mp := get_viewport().get_mouse_position()
+	var from := camera.project_ray_origin(mp)
+	var dir := camera.project_ray_normal(mp)
+	var q := PhysicsRayQueryParameters3D.create(from, from + dir * 500.0, 1 | 4 | 16, exclude)
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	if hit:
+		return {"point": hit.position, "normal": hit.normal, "hit": true}
+	return {"point": mouse_on_plane(chest_height), "normal": Vector3.UP, "hit": false}
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("cam_zoom_in"):
 		zoom = clamp(zoom * 0.88, zoom_min, zoom_max)

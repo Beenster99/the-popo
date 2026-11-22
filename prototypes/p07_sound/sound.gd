@@ -84,6 +84,9 @@ func _ready() -> void:
 			cam.target = p
 			Sfx.attach_listener(p))
 	add_child(sync)
+	var reticle := Reticle.new()
+	reticle.pawn_getter = func(): return sync.my_pawn()
+	add_child(reticle)
 	var overlay := NetOverlay.new()
 	overlay.extra_lines = _hud_text
 	add_child(overlay)

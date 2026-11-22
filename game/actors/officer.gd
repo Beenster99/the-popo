@@ -6,8 +6,9 @@ extends CharacterBody3D
 ## CapsuleOfficer, so PawnSync predicts and interpolates it the same way.
 ##
 ## Controls: WASD move, Shift sprint, Space jump / vault / climb, C crouch,
-## Z prone, Ctrl roll (or slide while sprinting), V take cover at a wall,
-## RMB aim (upper body turns to the mouse), LMB fire, G punch, H kick.
+## Z prone, Ctrl roll (or slide while sprinting), R take cover at a wall,
+## RMB aim, LMB fire from the barrel at the reticle, V punch, B kick
+## (defaults; players can rebind them, and a controller works too).
 
 enum S { MOVE, CROUCH, PRONE, COVER, AIR, ROLL, SLIDE, VAULT, CLIMB, KICK }
 
@@ -36,6 +37,14 @@ var peer_id := 1
 var state: S = S.MOVE
 var state_t := 0.0
 var aim_yaw := 0.0
+var aim_point := Vector3.ZERO
+## Turning on the spot to face the aim (the feet step round, see OfficerRig).
+var turning := false
+const TURN_START := 0.6   # rad between body and aim before the feet step round
+const TURN_STOP := 0.12
+const TURN_RATE := 7.0    # rad/s
+var _turn_active := false
+var _slide_node: Node3D
 var buttons := 0
 var punch_t := 0.0
 var rig: OfficerRig
@@ -86,6 +95,7 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 	_prev_buttons = buttons
 	buttons = cmd.get("buttons", 0)
 	aim_yaw = cmd.get("aim_yaw", aim_yaw)
+	aim_point = cmd.get("aim_point", aim_point)
 	var move: Vector2 = cmd.get("move", Vector2.ZERO)
 	var wish := Vector3(move.x, 0, move.y)
 	state_t += delta
@@ -177,10 +187,25 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 	elif state == S.AIR and state_t > 0.1:
 		_set_state(S.MOVE)
 	# Facing: toward the aim when aiming, else toward travel (not in cover).
+	turning = false
 	if state != S.COVER:
 		if is_aiming():
+			# Aiming: the body follows the aim. Standing still, it waits until
+			# the aim is well off to one side, then the feet step round,
+			# instead of the upper body twisting a long way.
+			var off := angle_difference(rotation.y, aim_yaw)
 			if wish.length() > 0.1:
-				rotation.y = lerp_angle(rotation.y, atan2(wish.x, wish.z), 12.0 * delta)
+				rotation.y = lerp_angle(rotation.y, aim_yaw, 10.0 * delta)
+				_turn_active = false
+			else:
+				if absf(off) > TURN_START:
+					_turn_active = true
+				if _turn_active:
+					var step := clampf(off, -TURN_RATE * delta, TURN_RATE * delta)
+					rotation.y += step
+					turning = true
+					if absf(off) < TURN_STOP:
+						_turn_active = false
 		elif wish.length() > 0.1:
 			rotation.y = lerp_angle(rotation.y, atan2(wish.x, wish.z), 14.0 * delta)
 	move_and_slide()
@@ -188,8 +213,30 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 
 	if buttons & PlayerInput.FIRE and is_aiming() and _cooldown <= 0.0 and Net.is_host():
 		_cooldown = 0.18
-		var dir := Vector3(sin(aim_yaw), 0, cos(aim_yaw))
-		fired.emit(global_position + Vector3(0, 1.35 if state != S.CROUCH else 0.95, 0), dir, false)
+		var muzzle := muzzle_position()
+		fired.emit(muzzle, shot_direction(muzzle), false)
+
+
+## The end of the pistol barrel (falls back to chest height without a model).
+func muzzle_position() -> Vector3:
+	if _slide_node == null and rig and rig.model:
+		_slide_node = rig.model.find_child("gun_slide", true, false) as Node3D
+	if _slide_node:
+		# The slide is a box 19 cm long along its local Y; the muzzle is its
+		# far end, away from the grip.
+		var xf := _slide_node.global_transform
+		return xf.origin - xf.basis.y.normalized() * 0.095
+	return global_position + Vector3(0, 1.35 if state != S.CROUCH else 0.95, 0)
+
+
+## From the barrel toward what the player is pointing at. If the target is
+## behind the barrel or right on top of it, shoot straight along the aim.
+func shot_direction(muzzle: Vector3) -> Vector3:
+	var flat := Vector3(sin(aim_yaw), 0, cos(aim_yaw))
+	var to := aim_point - muzzle
+	if aim_point == Vector3.ZERO or to.length() < 0.6 or to.normalized().dot(flat) < 0.3:
+		return flat
+	return to.normalized()
 
 
 func _set_state(s: S) -> void:
