@@ -13,6 +13,14 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
+THIRD-PERSON TEST VIEW (try it: Tab)
+Tab switches between the normal view and a camera behind the officer's
+shoulder. There the mouse looks around, the dot in the middle of the screen
+is where shots go (hold right mouse to aim, left mouse to fire, as usual),
+the mouse wheel moves the camera in and out, and it works in cars too.
+Tab again goes back. Mouse speed: Settings > Gameplay.
+On a controller the right stick looks around.
+
 PLAYING OVER THE INTERNET
 1. Choose Online, then press Host. The game asks your router to open port 27015 by itself and
    shows the address to give friends, with a button to copy it.
