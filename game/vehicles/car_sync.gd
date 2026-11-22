@@ -18,6 +18,7 @@ const MSG_CAR_SNAP := 32    # host -> all
 const MSG_CAR_DENT := 33
 const MSG_CAR_MODE := 34
 const MSG_CAR_HIT := 35     # driver -> host: hit a building piece
+const MSG_CAR_SHOT := 36    # host -> all: a bullet broke a window
 
 enum Mode { HOST, DRIVER }
 
@@ -25,10 +26,14 @@ var mode := Mode.DRIVER
 var cars: Array = []          # Car, index = slot
 var destruction: DestructionWorld
 var sync: PawnSync            # only for its clock when present
+## Drivers come from the officers in the driver's seats (Phase 1.3), instead
+## of one car per player slot (the Phase 0.4 car spike).
+var use_seats := false
 var _owner := {}              # car index -> peer id
 var _buffers := {}            # car index -> [[time, state]]
 var _inputs := {}             # host: car index -> latest input dict
 var _clock := 0.0
+var _light_want := {}         # car index -> [lights, siren] asked for, until it shows
 var _tick := 0
 
 
@@ -39,10 +44,11 @@ func _ready() -> void:
 	Net.register(MSG_CAR_DENT, _on_dent)
 	Net.register(MSG_CAR_MODE, _on_mode)
 	Net.register(MSG_CAR_HIT, _on_hit)
+	Net.register(MSG_CAR_SHOT, _on_shot)
 
 
 func _exit_tree() -> void:
-	for m in [MSG_CAR_INPUT, MSG_CAR_STATE, MSG_CAR_SNAP, MSG_CAR_DENT, MSG_CAR_MODE, MSG_CAR_HIT]:
+	for m in [MSG_CAR_INPUT, MSG_CAR_STATE, MSG_CAR_SNAP, MSG_CAR_DENT, MSG_CAR_MODE, MSG_CAR_HIT, MSG_CAR_SHOT]:
 		Net.unregister(m)
 
 
@@ -54,12 +60,24 @@ func add_car(car: Car) -> void:
 	car.hit_piece.connect(func(pid, imp): _local_hit(pid, imp))
 
 
-## Car index driven by a peer: slot order in the lobby.
+## Car index driven by a peer: slot order in the lobby, or with seats the
+## car whose driver's seat that peer's officer is in (-1 for none).
 func car_for(peer_id: int) -> int:
+	if use_seats:
+		for o in get_tree().get_nodes_in_group("officers"):
+			if o.peer_id == peer_id and o.state == Officer.S.VEHICLE and o.seat == 0 and o.car != null:
+				return cars.find(o.car)
+		return -1
 	return Net.player_ids().find(peer_id)
 
 
+## Who drives car idx (the host when nobody does).
 func driver_of(idx: int) -> int:
+	if use_seats:
+		for o in get_tree().get_nodes_in_group("officers"):
+			if o.state == Officer.S.VEHICLE and o.seat == 0 and idx < cars.size() and o.car == cars[idx]:
+				return o.peer_id if Net.player_ids().has(o.peer_id) or not Net.is_online() else 1
+		return 1
 	var ids := Net.player_ids()
 	return ids[idx] if idx < ids.size() else 1
 
@@ -97,21 +115,46 @@ func _physics_process(delta: float) -> void:
 	# Driver input.
 	var mine := car_for(Net.my_id())
 	if mine >= 0 and mine < cars.size():
+		var car_m: Car = cars[mine]
+		var on := not PlayerInput.blocked
 		var inp := {
-			"throttle": Input.get_axis("move_back", "move_forward"),
-			"steer": Input.get_axis("move_right", "move_left"),
-			"handbrake": Input.is_action_pressed("handbrake"),
-			"horn": Input.is_action_pressed("horn"),
+			"throttle": Input.get_axis("move_back", "move_forward") if on else 0.0,
+			"steer": Input.get_axis("move_right", "move_left") if on else 0.0,
+			"handbrake": Input.is_action_pressed("handbrake") and on,
+			"horn": Input.is_action_pressed("horn") and on,
+			"lights": car_m.get("lights") == true,
+			"siren": int(car_m.get("siren")) if car_m.get("siren") != null else 0,
 		}
+		# The torch key works the roof lights and siren from the driver's seat.
+		if on and car_m is PoliceCar and Input.is_action_just_pressed("torch"):
+			var tmp := {"lights": inp.lights, "siren": inp.siren}
+			car_m.cycle_lights()
+			inp.lights = car_m.lights
+			inp.siren = car_m.siren
+			if not simulates_locally(mine):
+				car_m.lights = tmp.lights   # the host's echo decides
+				car_m.siren = tmp.siren
+				_light_want[mine] = [inp.lights, inp.siren]
+		if _light_want.has(mine):
+			inp.lights = _light_want[mine][0]
+			inp.siren = _light_want[mine][1]
+			if car_m.get("lights") == inp.lights and car_m.get("siren") == inp.siren:
+				_light_want.erase(mine)
 		if simulates_locally(mine):
-			_apply_input(cars[mine], inp)
+			_apply_input(car_m, inp)
 		else:
 			var b := StreamPeerBuffer.new()
 			b.put_u8(mine)
 			b.put_half(inp.throttle)
 			b.put_half(inp.steer)
-			b.put_u8((1 if inp.handbrake else 0) | (2 if inp.horn else 0))
+			b.put_u8((1 if inp.handbrake else 0) | (2 if inp.horn else 0) | (4 if inp.lights else 0) | (inp.siren << 3))
 			Net.send(1, MSG_CAR_INPUT, b.data_array, Net.UNRELIABLE, 2)
+	if use_seats and Net.is_host():
+		# Nobody at the wheel: the car is parked with the handbrake on.
+		for i in cars.size():
+			if car_for_driver_missing(i):
+				_inputs[i] = {"throttle": 0.0, "steer": 0.0, "handbrake": true, "horn": false,
+					"lights": cars[i].get("lights") == true, "siren": int(cars[i].get("siren")) if cars[i].get("siren") != null else 0}
 	if Net.is_host():
 		for i in _inputs:
 			if i < cars.size() and simulates_locally(i):
@@ -132,6 +175,10 @@ func _physics_process(delta: float) -> void:
 	_interpolate()
 
 
+func car_for_driver_missing(i: int) -> bool:
+	return driver_of(i) == 1 and car_for(Net.my_id()) != i
+
+
 func _apply_input(car: Car, inp: Dictionary) -> void:
 	var t: float = inp.throttle
 	var fwd_speed := car.linear_velocity.dot(car.global_transform.basis.z)
@@ -145,6 +192,9 @@ func _apply_input(car: Car, inp: Dictionary) -> void:
 	car.steer = inp.steer
 	car.handbrake = inp.handbrake
 	car.horn = inp.get("horn", false)
+	if car is PoliceCar and inp.has("lights"):
+		(car as PoliceCar).lights = inp.lights
+		(car as PoliceCar).siren = inp.siren
 
 
 func _on_input(from: int, data: PackedByteArray) -> void:
@@ -158,7 +208,8 @@ func _on_input(from: int, data: PackedByteArray) -> void:
 	var th := b.get_half()
 	var st := b.get_half()
 	var flags := b.get_u8()
-	_inputs[idx] = {"throttle": th, "steer": st, "handbrake": (flags & 1) != 0, "horn": (flags & 2) != 0}
+	_inputs[idx] = {"throttle": th, "steer": st, "handbrake": (flags & 1) != 0, "horn": (flags & 2) != 0,
+		"lights": (flags & 4) != 0, "siren": (flags >> 3) & 3}
 
 
 func _push(idx: int, t: float, s: Dictionary) -> void:
@@ -178,7 +229,7 @@ func _on_state(from: int, data: PackedByteArray) -> void:
 	var idx := b.get_u8()
 	if driver_of(idx) != from or mode != Mode.DRIVER:
 		return
-	_push(idx, t, Car.decode_state(b))
+	_push(idx, t, _decode(idx, b))
 
 
 func _on_snap(_from: int, data: PackedByteArray) -> void:
@@ -189,9 +240,16 @@ func _on_snap(_from: int, data: PackedByteArray) -> void:
 	var t := b.get_double()
 	var n := b.get_u8()
 	for i in n:
-		var s := Car.decode_state(b)
+		var s := _decode(i, b)
 		if i < cars.size() and not simulates_locally(i):
 			_push(i, t, s)
+
+
+func _decode(idx: int, b: StreamPeerBuffer) -> Dictionary:
+	var s := Car.decode_state(b)
+	if idx < cars.size() and cars[idx] is PoliceCar:
+		s.merge((cars[idx] as PoliceCar).extra_state(b), true)
+	return s
 
 
 ## Plays remote cars 100 ms behind the newest state, mapped onto local time.
@@ -212,7 +270,8 @@ func _interpolate() -> void:
 			var a: Dictionary = buf[0][1]
 			var c: Dictionary = buf[1][1]
 			var k: float = clamp((rt - buf[0][0]) / max(buf[1][0] - buf[0][0], 0.0001), 0.0, 1.0)
-			s = {"pos": a.pos.lerp(c.pos, k), "rot": (a.rot as Quaternion).slerp(c.rot, k), "lv": a.lv.lerp(c.lv, k), "av": a.av.lerp(c.av, k), "steer": lerpf(a.steer, c.steer, k), "horn": c.horn}
+			s = {"pos": a.pos.lerp(c.pos, k), "rot": (a.rot as Quaternion).slerp(c.rot, k), "lv": a.lv.lerp(c.lv, k), "av": a.av.lerp(c.av, k), "steer": lerpf(a.steer, c.steer, k), "horn": c.horn,
+				"lights": c.get("lights", false), "siren": c.get("siren", 0)}
 		else:
 			s = buf[0][1]
 		car.global_transform = Transform3D(Basis(s.rot), s.pos)
@@ -220,6 +279,9 @@ func _interpolate() -> void:
 		car.angular_velocity = s.av
 		car.steer = s.steer
 		car.horn = s.get("horn", false)
+		if car is PoliceCar:
+			(car as PoliceCar).lights = s.get("lights", false)
+			(car as PoliceCar).siren = s.get("siren", 0)
 
 
 func _local_dent(idx: int, p: Vector3, d: Vector3, a: float) -> void:
@@ -273,3 +335,69 @@ func _on_hit(_from: int, data: PackedByteArray) -> void:
 	var imp: float = min(b.get_float(), 60000.0)
 	if destruction.pieces.has(pid):
 		destruction.damage_piece(pid, imp / 160.0, destruction.pieces[pid].aabb.get_center(), 2.0)
+
+
+## Host: a bullet hit a car. Glass breaks for everyone; metal takes a small
+## dent (through the usual dent event). Returns the surface hit, for sound.
+func bullet_hit(car: Car, point: Vector3, dir: Vector3) -> String:
+	var idx := cars.find(car)
+	if idx < 0 or not Net.is_host():
+		return "metal"
+	var lp := car.global_transform.affine_inverse() * point
+	if car is PoliceCar:
+		var w := (car as PoliceCar).window_at(lp)
+		if w != "":
+			var names := (car as PoliceCar).glass.keys()
+			var b := StreamPeerBuffer.new()
+			b.put_u8(idx)
+			b.put_u8(names.find(w))
+			Net.broadcast(MSG_CAR_SHOT, b.data_array)
+			(car as PoliceCar).shatter(w)
+			return "glass"
+	var ld := (car.global_transform.basis.inverse() * dir).normalized()
+	var b2 := StreamPeerBuffer.new()
+	b2.put_u8(idx)
+	for v in [lp, ld]:
+		b2.put_float(v.x)
+		b2.put_float(v.y)
+		b2.put_float(v.z)
+	b2.put_float(0.015)
+	Net.broadcast(MSG_CAR_DENT, b2.data_array)
+	car.apply_dent(lp, ld, 0.015)
+	return "metal"
+
+
+func _on_shot(from: int, data: PackedByteArray) -> void:
+	if from != 1 or Net.is_host():
+		return
+	var idx := data[0]
+	if idx < cars.size() and cars[idx] is PoliceCar:
+		var pc := cars[idx] as PoliceCar
+		var names := pc.glass.keys()
+		if data[1] < names.size():
+			pc.shatter(names[data[1]])
+
+
+## Host: dents a car for everyone (blasts).
+func _local_dent_host(car: Car, lp: Vector3, ld: Vector3, amount: float) -> void:
+	var idx := cars.find(car)
+	if idx < 0 or not Net.is_host():
+		return
+	var b := StreamPeerBuffer.new()
+	b.put_u8(idx)
+	for v in [lp, ld]:
+		b.put_float(v.x)
+		b.put_float(v.y)
+		b.put_float(v.z)
+	b.put_float(amount)
+	Net.broadcast(MSG_CAR_DENT, b.data_array)
+	car.apply_dent(lp, ld, amount)
+	if car is PoliceCar:
+		var pc := car as PoliceCar
+		for n in pc.glass.keys():
+			if not pc.glass[n].broken and (pc.glass[n].box as AABB).get_center().distance_to(lp) < 2.5 * amount / 0.3 + 0.5:
+				var sb := StreamPeerBuffer.new()
+				sb.put_u8(idx)
+				sb.put_u8(pc.glass.keys().find(n))
+				Net.broadcast(MSG_CAR_SHOT, sb.data_array)
+				pc.shatter(n)

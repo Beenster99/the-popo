@@ -146,6 +146,8 @@ const SCHEMA := [
 	["Debug", "fake_latency", "Fake round trip", "range", 0, [0, 500, 5, " ms"]],
 	["Debug", "fake_jitter", "Fake jitter", "range", 0, [0, 100, 1, " ms"]],
 	["Debug", "fake_loss", "Fake packet loss", "range", 0, [0, 50, 1, "%"]],
+	["Debug", "", "Test scenes", "head"],
+	["Debug", "tests", "Open a test scene...", "button", null, "show_tests"],
 	["Debug", "", "Simulation (single player only)", "head"],
 	["Debug", "time_scale", "Game speed", "range", 1.0, [0.1, 2.0, 0.05, "x"]],
 ]

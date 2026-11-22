@@ -4,7 +4,7 @@ var t
 
 
 func test_every_prototype_runs() -> void:
-	var protos: Array = load("res://prototypes/launcher/launcher.gd").PROTOTYPES
+	var protos: Array = Scenes.TESTS
 	for p in protos:
 		var path: String = p[1]
 		if not ResourceLoader.exists(path):

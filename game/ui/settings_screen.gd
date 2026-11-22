@@ -197,3 +197,16 @@ func open_controls(_b: Button) -> void:
 	var cs: Control = load("res://prototypes/launcher/controls_screen.gd").new()
 	cs.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(cs)
+
+
+func show_tests(b: Button) -> void:
+	var pm := PopupMenu.new()
+	for sc in Scenes.TESTS:
+		pm.add_item(sc[0])
+	pm.id_pressed.connect(func(i):
+		close()
+		for m in get_tree().root.find_children("*", "PauseMenu", false, false):
+			(m as PauseMenu).resume()
+		Scenes.load_scene(get_tree(), Scenes.TESTS[i][1]))
+	add_child(pm)
+	pm.popup(Rect2i(Vector2i(b.global_position + Vector2(0, b.size.y)), Vector2i(420, 0)))

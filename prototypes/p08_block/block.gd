@@ -1,4 +1,6 @@
 extends Node3D
+## The game for now (Single Player and Online start here): a generated city
+## block with two police cars parked on the north road.
 ## Phase 1.1: a generated city block. Roads, pavements and 4 to 6 buildings
 ## from the Wave 1 kit, laid out from a seed; two of them can be entered
 ## (rooms, stairs, upper floor). Everything is breakable: 1 pistol,
@@ -17,6 +19,7 @@ var sync: PawnSync
 var world: DestructionWorld
 var fader: RoofFader
 var gen: BlockGenerator
+var cars: CarSync
 var seed_value := 0
 
 
@@ -86,6 +89,18 @@ func _build(s: int) -> void:
 		return
 	seed_value = s
 	gen = CityBlock.build(world, s, fader)
+	# Two patrol cars parked on the north road (the same on every machine).
+	cars = CarSync.new()
+	cars.destruction = world
+	cars.use_seats = true
+	cars.sync = sync
+	add_child(cars)
+	for c in [[Vector3(14, 0.95, -3.5), 90.0], [Vector3(34, 0.95, -8.5), -90.0]]:
+		var pc := PoliceCar.new()
+		pc.position = c[0]
+		pc.rotation_degrees.y = c[1]
+		add_child(pc)
+		cars.add_car(pc)
 	add_child(sync)
 	# Camera starts over the first enterable building's door.
 	cam.global_position = _spawn_point(0)
@@ -115,19 +130,7 @@ func _on_seed(_from: int, data: PackedByteArray) -> void:
 
 
 func _on_fired(origin: Vector3, dir: Vector3, alt: bool, shooter: Officer) -> void:
-	var hit := Melee.bullet_ray(get_world_3d().direct_space_state, origin, dir, shooter)
-	if alt:
-		var at: Vector3 = hit.position if hit else origin + dir * 8.0
-		world.explode(at, 3.5, 200.0, 9.0)
-		for o in get_tree().get_nodes_in_group("officers"):
-			var d: float = (o as Officer).global_position.distance_to(at)
-			if d < 4.5:
-				(o as Officer).take_damage(110.0 * (1.0 - d / 4.5), ((o as Officer).global_position - at).normalized())
-	elif hit and hit.collider is Officer:
-		# Friendly fire (on unless the host turned it off in Settings).
-		(hit.collider as Officer).take_damage(25.0, dir)
-	elif hit:
-		world.bullet_hit(hit.collider, hit.position, hit.normal, dir)
+	Gunfire.resolve(world, cars, origin, dir, alt, shooter)
 
 
 func _unhandled_key_input(event: InputEvent) -> void:

@@ -7,6 +7,7 @@ extends RigidBody3D
 
 signal dented(local_point: Vector3, local_dir: Vector3, amount: float)
 signal bumper_lost
+signal part_lost(part_name: String)
 signal hit_piece(piece_id: int, impulse: float)
 
 const SIZE := Vector3(1.86, 0.9, 4.3)
@@ -44,12 +45,14 @@ var _wheels: Array = []     # [{pos: local mount, front: bool, rear: bool, node:
 var _steer_smooth := 0.0
 var _body_mesh: ArrayMesh
 var _body_mi: MeshInstance3D
-var _verts: PackedVector3Array
-var _rest_verts: PackedVector3Array
-var _normals: PackedVector3Array
-var _indices: PackedInt32Array
 var _bumper: MeshInstance3D
 var _dent_cooldown := 0.0
+## Meshes that dent: [{mi, mesh: ArrayMesh, inv: Transform3D (car -> mesh),
+## surfaces: [{arrays, verts, rest}]}]
+var _deform: Array = []
+## Parts that come off: name -> {node: Node3D, box: AABB (car space),
+## damage: float, limit: float, mass: float}
+var parts := {}
 
 
 func _init() -> void:
@@ -88,23 +91,79 @@ func _ready() -> void:
 	cabin.shape = cbs
 	cabin.position = Vector3(0, 0.75, -0.2)
 	add_child(cabin)
-	_build_body_mesh()
-	_build_details()
+	_build_body()
 	for x in [-0.8, 0.8]:
 		for z in [1.35, -1.35]:
-			var wn := MeshInstance3D.new()
-			var cm := CylinderMesh.new()
-			cm.top_radius = WHEEL_RADIUS
-			cm.bottom_radius = WHEEL_RADIUS
-			cm.height = 0.26
-			cm.radial_segments = 14
-			wn.mesh = cm
-			wn.material_override = Cel.material(Color("1c1c20"))
 			var holder := Node3D.new()
-			holder.add_child(wn)
-			wn.rotation_degrees.z = 90
+			holder.add_child(_make_wheel())
 			add_child(holder)
 			_wheels.append({"pos": Vector3(x, -0.25, z), "front": z > 0, "node": holder, "compress": 0.0, "spin": 0.0})
+
+
+## The car's look: the Phase 0.4 box car. PoliceCar replaces it.
+func _build_body() -> void:
+	_build_body_mesh()
+	_build_details()
+
+
+## One wheel's mesh, its axle along x.
+func _make_wheel() -> Node3D:
+	var wn := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = WHEEL_RADIUS
+	cm.bottom_radius = WHEEL_RADIUS
+	cm.height = 0.26
+	cm.radial_segments = 14
+	wn.mesh = cm
+	wn.material_override = Cel.material(Color("1c1c20"))
+	wn.rotation_degrees.z = 90
+	return wn
+
+
+## Lets a mesh dent. Its surfaces are copied into editable arrays.
+func add_deformable(mi: MeshInstance3D) -> void:
+	var src := mi.mesh
+	var mesh := ArrayMesh.new()
+	var entry := {"mi": mi, "mesh": mesh, "surfaces": []}
+	for i in src.get_surface_count():
+		var arr := src.surface_get_arrays(i)
+		var mat := mi.get_surface_override_material(i)
+		if mat == null:
+			mat = src.surface_get_material(i)
+		entry.surfaces.append({"arrays": arr, "verts": (arr[Mesh.ARRAY_VERTEX] as PackedVector3Array).duplicate(),
+			"rest": (arr[Mesh.ARRAY_VERTEX] as PackedVector3Array).duplicate(), "mat": mat})
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+		mesh.surface_set_material(i, mat)
+	for i in src.get_surface_count():
+		mi.set_surface_override_material(i, null)
+	mi.mesh = mesh
+	_deform.append(entry)
+
+
+## A part that can be knocked off: once its damage passes limit it falls
+## away as a loose body. box is its bounds in the car's space.
+func add_part(part_name: String, node: Node3D, limit: float, part_mass := 12.0) -> void:
+	var box := AABB()
+	var first := true
+	for mi in [node] + node.find_children("*", "MeshInstance3D", true, false):
+		if mi is MeshInstance3D:
+			var b: AABB = _local_xf(mi) * (mi as MeshInstance3D).get_aabb()
+			box = b if first else box.merge(b)
+			first = false
+	parts[part_name] = {"node": node, "box": box, "damage": 0.0, "limit": limit, "mass": part_mass}
+
+
+func _local_xf(n: Node3D) -> Transform3D:
+	var xf := n.transform
+	var p := n.get_parent()
+	while p and p != self and p is Node3D:
+		xf = (p as Node3D).transform * xf
+		p = p.get_parent()
+	return xf
+
+
+func has_part(part_name: String) -> bool:
+	return parts.has(part_name)
 
 
 func _build_details() -> void:
@@ -122,6 +181,7 @@ func _build_details() -> void:
 	_bumper.position = Vector3(0, -0.22, SIZE.z * 0.5 + 0.08)
 	_bumper.material_override = Cel.material(Color("2a2a2e"))
 	add_child(_bumper)
+	add_part("bumper_f", _bumper, 0.19, 18.0)
 	for x in [-0.55, 0.55]:
 		var lamp := MeshInstance3D.new()
 		var lb := BoxMesh.new()
@@ -166,70 +226,118 @@ func _build_body_mesh() -> void:
 					st.add_vertex(quad[k])
 	st.index()
 	_body_mesh = st.commit()
-	var arr := _body_mesh.surface_get_arrays(0)
-	_verts = arr[Mesh.ARRAY_VERTEX]
-	_rest_verts = _verts.duplicate()
-	_normals = arr[Mesh.ARRAY_NORMAL]
-	_indices = arr[Mesh.ARRAY_INDEX]
 	_body_mi = MeshInstance3D.new()
 	_body_mi.mesh = _body_mesh
-	_body_mi.material_override = Cel.material(color)
+	_body_mi.set_surface_override_material(0, Cel.material(color))
 	add_child(_body_mi)
+	add_deformable(_body_mi)
 
 
 ## Push body vertices near a local point inward. Deterministic, so every
-## machine applies the same dent from the same event.
+## machine applies the same dent from the same event. Parts near the dent
+## take damage and come off once they have had enough.
 func apply_dent(local_point: Vector3, local_dir: Vector3, amount: float) -> void:
 	var radius := 0.5 + amount * 1.2
-	for i in _verts.size():
-		var d := _verts[i].distance_to(local_point)
-		if d < radius:
-			var falloff := 1.0 - d / radius
-			_verts[i] += local_dir * amount * falloff * falloff
-			# Never cave more than 45 cm from the original shape.
-			var off := _verts[i] - _rest_verts[i]
-			if off.length() > 0.45:
-				_verts[i] = _rest_verts[i] + off.normalized() * 0.45
-	var arr := []
-	arr.resize(Mesh.ARRAY_MAX)
-	arr[Mesh.ARRAY_VERTEX] = _verts
-	arr[Mesh.ARRAY_NORMAL] = _normals
-	arr[Mesh.ARRAY_INDEX] = _indices
-	_body_mesh.clear_surfaces()
-	_body_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
-	if local_point.z > SIZE.z * 0.3 and amount > 0.12 and bumper_attached:
-		detach_bumper()
+	for e in _deform:
+		var mi: MeshInstance3D = e.mi
+		if not is_instance_valid(mi) or not is_ancestor_of(mi):
+			continue   # knocked off
+		var to_mesh := _local_xf(mi).affine_inverse()
+		var p := to_mesh * local_point
+		var d := (to_mesh.basis * local_dir).normalized()
+		var mesh: ArrayMesh = e.mesh
+		var changed := false
+		for si in e.surfaces.size():
+			var sf: Dictionary = e.surfaces[si]
+			var verts: PackedVector3Array = sf.verts
+			var rest: PackedVector3Array = sf.rest
+			for i in verts.size():
+				var dist := verts[i].distance_to(p)
+				if dist < radius:
+					var falloff := 1.0 - dist / radius
+					verts[i] += d * amount * falloff * falloff
+					# Never cave more than 45 cm from the original shape.
+					var off := verts[i] - rest[i]
+					if off.length() > 0.45:
+						verts[i] = rest[i] + off.normalized() * 0.45
+					changed = true
+			sf.verts = verts
+		if changed:
+			mesh.clear_surfaces()
+			for si in e.surfaces.size():
+				var sf: Dictionary = e.surfaces[si]
+				var arr: Array = sf.arrays
+				arr[Mesh.ARRAY_VERTEX] = sf.verts
+				mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+				mesh.surface_set_material(si, sf.mat)
+	for n in parts.keys():
+		var part: Dictionary = parts[n]
+		var gap := _box_distance(part.box, local_point)
+		if gap < radius:
+			part.damage += amount * (1.0 - gap / radius) * 1.6
+			if part.damage >= part.limit:
+				detach_part(n, local_dir * -1.0)
 
 
+static func _box_distance(b: AABB, p: Vector3) -> float:
+	var q := p.clamp(b.position, b.end)
+	return q.distance_to(p)
+
+
+## Box car: the front bumper.
 func detach_bumper() -> void:
-	if not bumper_attached:
+	detach_part("bumper_f", Vector3.FORWARD)
+
+
+## Knocks a part off: it becomes a loose body that tumbles away.
+func detach_part(part_name: String, push := Vector3.ZERO) -> void:
+	if not parts.has(part_name):
 		return
-	bumper_attached = false
-	bumper_lost.emit()
+	var part: Dictionary = parts[part_name]
+	parts.erase(part_name)
+	var node: Node3D = part.node
+	if not is_instance_valid(node):
+		return
+	if part_name == "bumper_f":
+		bumper_attached = false
+		bumper_lost.emit()
+	part_lost.emit(part_name)
+	var box: AABB = part.box
 	var rb := RigidBody3D.new()
-	rb.mass = 18.0
+	rb.mass = part.mass
 	rb.collision_layer = 16
 	rb.collision_mask = 1 | 4 | 16
 	var cs := CollisionShape3D.new()
 	var bs := BoxShape3D.new()
-	bs.size = (_bumper.mesh as BoxMesh).size
+	bs.size = box.size.max(Vector3(0.04, 0.04, 0.04))
 	cs.shape = bs
 	rb.add_child(cs)
-	var gxf := _bumper.global_transform
-	_bumper.get_parent().remove_child(_bumper)
-	_bumper.transform = Transform3D.IDENTITY
-	rb.add_child(_bumper)
-	get_parent().add_child(rb)
-	rb.global_transform = gxf
-	rb.linear_velocity = linear_velocity * 0.7 + Vector3.UP * 1.5
+	var gxf := node.global_transform if node.is_inside_tree() else global_transform * _local_xf(node)
+	var centre_g := global_transform * box.get_center() if is_inside_tree() else box.get_center()
+	node.get_parent().remove_child(node)
+	rb.add_child(node)
+	var host := get_parent() if get_parent() else self
+	host.add_child(rb)
+	rb.global_transform = Transform3D(global_transform.basis.orthonormalized(), centre_g)
+	node.global_transform = gxf
+	cs.position = Vector3.ZERO
+	var out := (box.get_center() * Vector3(1, 0, 1)).normalized()
+	if push != Vector3.ZERO:
+		out = (out + global_transform.basis * push * 0.5).normalized()
+	rb.linear_velocity = linear_velocity * 0.7 + global_transform.basis * out * 1.5 + Vector3.UP * 1.5
 	rb.angular_velocity = Vector3(randf_range(-4, 4), randf_range(-4, 4), randf_range(-4, 4))
+	rb.add_to_group("car_debris")
 
 
 ## Deepest dent in metres.
 func dent_amount() -> float:
 	var deepest := 0.0
-	for i in _verts.size():
-		deepest = maxf(deepest, _verts[i].distance_to(_rest_verts[i]))
+	for e in _deform:
+		for sf in e.surfaces:
+			var verts: PackedVector3Array = sf.verts
+			var rest: PackedVector3Array = sf.rest
+			for i in verts.size():
+				deepest = maxf(deepest, verts[i].distance_to(rest[i]))
 	return deepest
 
 

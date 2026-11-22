@@ -206,6 +206,45 @@ func _run() -> void:
 				await RenderingServer.frame_post_draw
 				get_viewport().get_texture().get_image().save_png("%s-%s.png" % [base, ps[0]])
 				print("saved ", ps[0], " state ", Officer.S.keys()[o.state], " low ", o._cover_low, " rot ", o.rotation.y, " n ", o._cover_n, " pos ", o.global_position, " lower ", o.rig._lower, " upper ", o.rig._upper, " rl ", o.reload_t, " ammo ", o.ammo)
+		"patrol":
+			# The police car: parked, then driven with the lights on, then beaten up.
+			var s := await _scene("res://prototypes/p10_patrol/patrol.tscn")
+			s.find_children("*", "NetOverlay", false, false)[0].queue_free()
+			await _frames(20)
+			var o: Officer = s.sync.my_pawn()
+			var pc: PoliceCar = s.cars.cars[0]
+			var box := {"cmd": {"move": Vector2.ZERO, "buttons": 0, "aim_yaw": 0.0}}
+			s.sync.input_source = func(): return box.cmd
+			var base := out.get_basename()
+			s.cam.zoom = 9.0
+			o.global_position = pc.door_point(1) * Vector3(1, 0, 1) + Vector3(0, 0.05, 0)
+			await _frames(40)
+			await RenderingServer.frame_post_draw
+			get_viewport().get_texture().get_image().save_png("%s-parked.png" % base)
+			box.cmd = {"move": Vector2.ZERO, "buttons": PlayerInput.INTERACT, "aim_yaw": 0.0}
+			await _frames(3)
+			box.cmd = {"move": Vector2.ZERO, "buttons": 0, "aim_yaw": 0.0}
+			pc.lights = true
+			pc.siren = 1
+			await _frames(4)
+			# Lean out and aim to the right.
+			box.cmd = {"move": Vector2.ZERO, "buttons": PlayerInput.AIM, "aim_yaw": PI * 0.5, "aim_point": pc.global_position + Vector3(8, 1, 0)}
+			await _frames(40)
+			await RenderingServer.frame_post_draw
+			get_viewport().get_texture().get_image().save_png("%s-leanout.png" % base)
+			print("seat ", o.seat, " state ", Officer.S.keys()[o.state])
+			box.cmd = {"move": Vector2.ZERO, "buttons": 0, "aim_yaw": 0.0}
+			for d in [[Vector3(-0.95, 0.1, 0.4), Vector3.RIGHT, 0.3], [Vector3(-0.95, 0.0, 0.3), Vector3.RIGHT, 0.3],
+					[Vector3(0, 0.0, 2.1), Vector3.BACK * -1, 0.3], [Vector3(0.9, 0.2, -1.2), Vector3.LEFT, 0.25]]:
+				pc.apply_dent(d[0], d[1], d[2])
+			pc.shatter("win_front")
+			pc.shatter("win_fl")
+			await _frames(40)
+			s.cam.zoom = 11.0
+			await _frames(20)
+			await RenderingServer.frame_post_draw
+			get_viewport().get_texture().get_image().save_png("%s-wrecked.png" % base)
+			print("saved patrol")
 		"yard":
 			var s := await _scene("res://prototypes/p09_yard/yard.tscn")
 			s.find_children("*", "NetOverlay", false, false)[0].queue_free()

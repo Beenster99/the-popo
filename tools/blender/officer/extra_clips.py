@@ -476,10 +476,83 @@ def draw(rig, A):
 
 
 
+def limp(rig, A):
+    """Walking on a wounded right leg, 1.4 m/s: the right knee stays stiff,
+    a short quick step on it, the hips drop and the body lurches over it."""
+    K.gun_visible(rig, False)
+    N = 36
+    # Left (good) leg: a full, slow step.
+    good = [(0, 0.30, 0.10, 0), (20, -0.30, 0.10, -6), (24, -0.20, 0.18, -14), (28, 0.05, 0.20, 10),
+            (32, 0.27, 0.13, 14), (36, 0.30, 0.10, 0)]
+    # Right (hurt) leg: short stance, swung round stiff and low.
+    bad = [(0, -0.10, 0.10, -4), (4, -0.16, 0.12, -6), (10, 0.0, 0.13, 2), (16, 0.22, 0.11, 6),
+           (20, 0.24, 0.10, 0), (36, -0.10, 0.10, -4)]
+    for s, x, path, ph in (('L', 0.09, good, 0), ('R', -0.10, bad, 0)):
+        keys = {}
+        for t, y, z, p in path:
+            keys[(t + ph) % N] = (y, z, p)
+        keys[N] = keys[0]
+        for f in sorted(keys):
+            y, z, p = keys[f]
+            A.pos('foot_ik.' + s, f + 1, x, y, z)
+            A.rot('foot_ik.' + s, f + 1, p, 0, 0)
+    for t in range(0, N + 1, 2):
+        # Weight on the hurt leg from about 20 to 36: hips sag and tip.
+        on_bad = 1.0 if 20 <= t <= 34 else 0.0
+        ph = 2 * math.pi * t / N
+        A.loc('hips', t + 1, -0.03 * on_bad, 0.0, -0.04 - 0.035 * on_bad + 0.01 * math.cos(2 * ph))
+        A.rot('hips', t + 1, 4, 0, -7 * on_bad + 3 * (1 - on_bad))
+        A.rot('spine', t + 1, 5, 0, 6 * on_bad)
+        A.rot('chest', t + 1, 3, 0, 4 * on_bad)
+        A.rot('head', t + 1, 2, 0, -4 * on_bad)
+        a = math.cos(ph)
+        A.rot('upper_arm.L', t + 1, -14 * a - 3, -10 - 10 * on_bad, 0)
+        A.rot('upper_arm.R', t + 1, -8, 6, 0)
+        A.rot('forearm.L', t + 1, -25, 0, 0)
+        A.rot('forearm.R', t + 1, -60, 0, 0)
+    return (1, N + 1)
+
+
+def sit(rig, A):
+    """Sat in a car seat: thighs level, feet on the floor ahead."""
+    K.gun_visible(rig, True)
+    for f, b in ((1, 0), (31, 1), (61, 0)):
+        A.loc('hips', f, 0, 0.06, -0.50)
+        A.rot('hips', f, -8, 0, 0)
+        A.rot('spine', f, 4, 0, 0)
+        A.rot('chest', f, 2 + b, 0, 0)
+        A.pos('foot_ik.L', f, 0.13, -0.42, 0.06)
+        A.rot('foot_ik.L', f, 0, 0, 4)
+        A.pos('foot_ik.R', f, -0.13, -0.44, 0.06)
+        A.rot('foot_ik.R', f, 0, 0, -4)
+        A.loc('knee_pole.L', f, 0.10, -0.6, 0)
+        A.loc('knee_pole.R', f, -0.10, -0.6, 0)
+    return (1, 61)
+
+
+def drive(rig, A):
+    """Upper body at the wheel: both hands on it, steering a little."""
+    K.gun_visible(rig, False)
+    for s in 'LR':
+        A.ik('arm.' + s, 1, 1)
+    for f, st in ((1, 0), (21, 1), (41, -1), (61, 0)):
+        A.rot('spine', f, 0, 0, 0)
+        A.rot('chest', f, 2, 0, 0)
+        A.rot('neck', f, 4, 0, 0)
+        A.rot('head', f, 0, 0, 2 * st)
+        dz = 0.03 * st
+        A.pos('hand_ik.L', f, 0.17, -0.42, 1.20 + dz)
+        A.rot('hand_ik.L', f, -70, 0, -20)
+        A.pos('hand_ik.R', f, -0.17, -0.42, 1.20 - dz)
+        A.rot('hand_ik.R', f, -70, 0, 20)
+    return (1, 61)
+
+
 EXTRA = {
     'idle': idle, 'walk': walk, 'crouch_idle': crouch_idle, 'crouch_walk': crouch_walk,
     'prone_idle': prone_idle, 'crawl': crawl, 'slide': slide, 'jump': jump, 'fall': fall,
     'punch': punch, 'kick': kick, 'cover_idle': cover_idle, 'aim_hold': aim_hold,
     'reload': reload, 'holster': holster, 'draw': draw, 'cover_low_idle': cover_low_idle,
+    'limp': limp, 'sit': sit, 'drive': drive,
     'ready_hold': ready_hold, 'climb': climb,
 }

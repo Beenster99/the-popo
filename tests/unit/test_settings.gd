@@ -63,7 +63,6 @@ func test_menus_open() -> void:
 	var menu: Control = load("res://game/ui/main_menu.tscn").instantiate()
 	add_child(menu)
 	await get_tree().process_frame
-	menu.call("_show_single")
 	menu.call("_open_settings")
 	await get_tree().process_frame
 	var ss := menu.find_children("*", "SettingsScreen", true, false)

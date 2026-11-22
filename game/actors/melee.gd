@@ -18,6 +18,8 @@ static func friendly_fire() -> bool:
 ## A bullet's ray. With friendly fire off it passes through other officers.
 static func bullet_ray(space: PhysicsDirectSpaceState3D, origin: Vector3, dir: Vector3, shooter: Officer, length := 60.0) -> Dictionary:
 	var exclude := [shooter.get_rid()]
+	if shooter.car != null:
+		exclude.append(shooter.car.get_rid())   # shooting out of your own car
 	var ff := friendly_fire()
 	for i in 4:
 		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(origin, origin + dir * length, 1 | 2 | 16, exclude))
@@ -45,7 +47,7 @@ static func resolve(attacker: Officer, world: DestructionWorld, origin: Vector3,
 		var c: Object = hit.collider
 		if c is Officer:
 			var o := c as Officer
-			o.take_damage(OFFICER_DAMAGE[kind], d)
+			o.take_damage(OFFICER_DAMAGE[kind], d, "melee")
 			o.shove(d * SHOVE[kind] + Vector3.UP * (1.5 if kind == Officer.Strike.BARGE else 0.0))
 		elif c is Node and (c as Node).has_meta("piece_id") and world:
 			world.strike_piece((c as Node).get_meta("piece_id"), PIECE_DAMAGE[kind], hit.position, d)
