@@ -58,6 +58,10 @@ Driver: WASD drive, Space handbrake, H horn, T lights, then lights and wail,
 then yelp, then off. Passengers: hold right mouse to lean out of the window
 and shoot. Windows shatter when shot; doors, bonnet, boot, bumpers and
 mirrors come off in big crashes. Hold F at the boot for ammo and first aid.
+GOING DOWN AND RESPAWNING (0.2.9)
+When you go down, wait 3 seconds and press R to respawn where you started,
+healed, with full ammo. Or a teammate can hold F on you to get you up
+where you are, or after 30 seconds you get up by yourself.
 FIGHTS AND MAYHEM (1.5)
 Armed suspects now fight back from cover: they duck, peek, fire in bursts,
 blind fire, go round your side and call friends. Shooting close past them

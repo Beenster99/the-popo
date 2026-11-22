@@ -54,6 +54,11 @@ const REVIVE_TIME := 2.0
 const REVIVE_RANGE := 1.6
 ## Alone, a downed officer gets up by themselves after this long.
 const SELF_REVIVE := 30.0
+## Downed: after this long R respawns you back where you started, healed,
+## patched up and with full ammo (beenster, v0.2.9).
+const RESPAWN_AFTER := 3.0
+## Where this officer came into the game; respawns put them back here.
+var home := Vector3.INF
 ## Landing faster than this hurts.
 const FALL_HURT_V := 11.0
 const KICK_HIT_T := 0.28
@@ -185,6 +190,7 @@ func _init() -> void:
 
 
 func _ready() -> void:
+	home = global_position
 	_shape = CollisionShape3D.new()
 	var cap := CapsuleShape3D.new()
 	cap.radius = 0.3
@@ -909,12 +915,47 @@ func _downed_step(delta: float) -> void:
 		revive_t += delta
 	else:
 		revive_t = maxf(0.0, revive_t - delta)
+	if state_t >= RESPAWN_AFTER and _pressed(PlayerInput.RELOAD) and revive_t <= 0.0:
+		respawn()
+		return
 	if revive_t >= REVIVE_TIME or state_t >= SELF_REVIVE:
 		hp = 50.0 if revive_t >= REVIVE_TIME else 25.0
 		if revive_t >= REVIVE_TIME:
 			injuries &= ~BLEED   # the teammate patched the bleeding
 		revive_t = 0.0
 		_set_state(S.CROUCH)
+
+
+## Back on your feet where you came into the game, as good as new: full
+## health, wounds and pouch seen to, a full magazine and belt, service pistol
+## holstered (a picked-up gun is lost).
+func respawn() -> void:
+	var to := home if home != Vector3.INF else global_position
+	# Step aside if a teammate is standing on the spot.
+	for n in get_tree().get_nodes_in_group("officers"):
+		var o := n as Officer
+		if o and o != self and Vector2(o.global_position.x - to.x, o.global_position.z - to.z).length() < 0.8:
+			to += Vector3(1.0, 0, 0)
+	global_position = to + Vector3(0, 0.05, 0)
+	velocity = Vector3.ZERO
+	hp = MAX_HP
+	injuries = 0
+	pouch = POUCH_MAX
+	ammo = MAG
+	reserve = RESERVE_MAX
+	reload_t = 0.0
+	revive_t = 0.0
+	gun = EnemyGuns.NONE
+	gun_ammo = 0
+	_shown_gun = -1
+	holstered = true
+	collision_mask = 1 | 4 | 16
+	_set_state(S.MOVE)
+
+
+## Seconds until R respawns (0 once it can).
+func respawn_wait() -> float:
+	return maxf(RESPAWN_AFTER - state_t, 0.0) if state == S.DOWNED else 0.0
 
 
 ## A teammate close by, up, and holding interact.

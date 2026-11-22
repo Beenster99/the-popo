@@ -238,3 +238,26 @@ func test_shotgun_fires_pellets() -> void:
 	for d in dirs:
 		widest = maxf(widest, rad_to_deg((d as Vector3).angle_to(Vector3.FORWARD)))
 	t.check(widest > 1.0 and widest <= EnemyGuns.SPREAD_DEG[EnemyGuns.SHOTGUN] + 0.5, "spread out a little: %.1f deg" % widest)
+
+
+## beenster (v0.2.9): when you go down you can respawn.
+func test_downed_officer_can_respawn() -> void:
+	ProtoWorld.ground(self, 100.0)
+	var o := _officer(Vector3(3, 0.05, 2))
+	await _run(o, _cmd(), 5)
+	var start := o.home
+	o.global_position = Vector3(20, 0.05, 15)
+	o.injuries = Officer.BLEED | Officer.LEG
+	o.ammo = 2
+	o.reserve = 0
+	o.take_damage(500.0, Vector3.FORWARD, "torso")
+	t.check(o.state == Officer.S.DOWNED, "down")
+	await _run(o, _cmd(PlayerInput.RELOAD), 2)
+	await _run(o, _cmd(), 2)
+	t.check(o.state == Officer.S.DOWNED, "R does nothing straight away")
+	await _run(o, _cmd(), int(Officer.RESPAWN_AFTER * 60.0))
+	await _run(o, _cmd(PlayerInput.RELOAD), 2)
+	t.check(o.state == Officer.S.MOVE, "after a moment R gets you back up: %s" % Officer.S.keys()[o.state])
+	t.check(Vector2(o.global_position.x - start.x, o.global_position.z - start.z).length() < 0.5, "back where you started: %s" % o.global_position)
+	t.check(o.hp == Officer.MAX_HP and o.injuries == 0, "healed and patched up")
+	t.check(o.ammo == Officer.MAG and o.reserve == Officer.RESERVE_MAX, "with full ammo")

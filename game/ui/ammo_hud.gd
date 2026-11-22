@@ -129,6 +129,12 @@ func _prompt(o: Officer) -> String:
 		else:
 			parts.append("%s lean out and aim" % Controls.describe(Controls.pc_event("aim")))
 		return "   ".join(parts)
+	if o.state == Officer.S.DOWNED:
+		var r := Controls.describe(Controls.pc_event("reload"))
+		var up := maxf(Officer.SELF_REVIVE - o.state_t, 0.0)
+		var w := o.respawn_wait()
+		var first := ("%s respawn in %d" % [r, ceili(w)]) if w > 0.0 else ("%s respawn back at the start" % r)
+		return "DOWN   %s   or a teammate holds %s on you   (you get up here in %d s)" % [first, use, ceili(up)]
 	if o.state not in [Officer.S.MOVE, Officer.S.CROUCH]:
 		return ""
 	if o.cuff_target():
