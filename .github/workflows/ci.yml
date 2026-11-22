@@ -32,6 +32,8 @@ jobs:
         run: tests/net/run_net_test.sh 150 0.1
       - name: Two-process collapse test (100 ms, 5% loss)
         run: tests/net/run_collapse_test.sh 100 0.05
+      - name: Driving delay under both authority options (100 ms)
+        run: tests/net/run_car_test.sh 100 0.02
 
   export:
     if: github.event_name == 'workflow_dispatch' && inputs.export

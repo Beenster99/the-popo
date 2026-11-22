@@ -12,7 +12,8 @@ var world: DestructionWorld
 func _ready() -> void:
 	var a := OS.get_cmdline_user_args()
 	role = a[0]
-	Net.sim_latency_ms = float(a[2])
+	# Both processes add fake delay, so each takes half the requested round trip.
+	Net.sim_latency_ms = float(a[2]) * 0.5
 	Net.sim_loss = float(a[3])
 	if role == "host":
 		Net.host(int(a[1]))
