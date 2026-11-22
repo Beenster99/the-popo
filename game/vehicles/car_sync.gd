@@ -19,6 +19,17 @@ const MSG_CAR_DENT := 33
 const MSG_CAR_MODE := 34
 const MSG_CAR_HIT := 35     # driver -> host: hit a building piece
 const MSG_CAR_SHOT := 36    # host -> all: a bullet broke a window
+const MSG_CAR_FIRE := 37    # host -> all: a car smokes, burns or is a wreck (Phase 1.5)
+
+## Phase 1.5: cars take damage from bullets, crashes, blasts and fire. Low,
+## they smoke; at nothing they catch fire, and a few seconds later go up.
+const CAR_HP := 100.0
+const SMOKE_AT := 40.0
+const BURN_TIME := 7.0
+const TANK_DAMAGE := 12.0     # a bullet in the fuel tank (low at the back)
+const BODY_DAMAGE := 3.0
+enum Fire { OK, SMOKING, BURNING, WRECKED }
+const SIZE_Z_TANK := 1.3      # m behind the middle where the tank is
 
 enum Mode { HOST, DRIVER }
 
@@ -38,6 +49,9 @@ var _inputs := {}             # host: car index -> latest input dict
 var _clock := 0.0
 var _light_want := {}         # car index -> [lights, siren] asked for, until it shows
 var _tick := 0
+var car_hp := {}             # car index -> hp (host)
+var fire_state := {}         # car index -> Fire
+var _burn_t := {}            # host: car index -> s until it goes up
 
 
 func _ready() -> void:
@@ -48,10 +62,11 @@ func _ready() -> void:
 	Net.register(MSG_CAR_MODE, _on_mode)
 	Net.register(MSG_CAR_HIT, _on_hit)
 	Net.register(MSG_CAR_SHOT, _on_shot)
+	Net.register(MSG_CAR_FIRE, _on_fire)
 
 
 func _exit_tree() -> void:
-	for m in [MSG_CAR_INPUT, MSG_CAR_STATE, MSG_CAR_SNAP, MSG_CAR_DENT, MSG_CAR_MODE, MSG_CAR_HIT, MSG_CAR_SHOT]:
+	for m in [MSG_CAR_INPUT, MSG_CAR_STATE, MSG_CAR_SNAP, MSG_CAR_DENT, MSG_CAR_MODE, MSG_CAR_HIT, MSG_CAR_SHOT, MSG_CAR_FIRE]:
 		Net.unregister(m)
 
 
@@ -109,6 +124,8 @@ func _on_mode(from: int, data: PackedByteArray) -> void:
 func _physics_process(delta: float) -> void:
 	_tick += 1
 	_clock += delta
+	if Net.is_host():
+		_burn_step(delta)
 	for i in cars.size():
 		var car: Car = cars[i]
 		var local := simulates_locally(i)
@@ -185,6 +202,11 @@ func car_for_driver_missing(i: int) -> bool:
 
 
 func _apply_input(car: Car, inp: Dictionary) -> void:
+	if car.wrecked:
+		car.throttle = 0.0
+		car.brake = 1.0
+		car.steer = 0.0
+		return
 	var t: float = inp.throttle
 	var fwd_speed := car.linear_velocity.dot(car.global_transform.basis.z)
 	# Pulling back while rolling forward brakes; when stopped, it reverses.
@@ -301,6 +323,7 @@ func _local_dent(idx: int, p: Vector3, d: Vector3, a: float) -> void:
 	b.put_float(a)
 	if Net.is_host():
 		Net.broadcast(MSG_CAR_DENT, b.data_array)
+		damage_car(cars[idx], a * 150.0, cars[idx].global_transform * p)
 	else:
 		Net.send(1, MSG_CAR_DENT, b.data_array)
 	cars[idx].apply_dent(p, d, a)
@@ -316,7 +339,10 @@ func _on_dent(from: int, data: PackedByteArray) -> void:
 		Net.broadcast(MSG_CAR_DENT, data)  # relay to the other client
 	var p := Vector3(b.get_float(), b.get_float(), b.get_float())
 	var d := Vector3(b.get_float(), b.get_float(), b.get_float())
-	cars[idx].apply_dent(p, d, b.get_float())
+	var a := b.get_float()
+	cars[idx].apply_dent(p, d, a)
+	if Net.is_host():
+		damage_car(cars[idx], a * 150.0, cars[idx].global_transform * p)
 
 
 func _local_hit(piece_id: int, imp: float) -> void:
@@ -369,6 +395,8 @@ func bullet_hit(car: Car, point: Vector3, dir: Vector3) -> String:
 	b2.put_float(0.015)
 	Net.broadcast(MSG_CAR_DENT, b2.data_array)
 	car.apply_dent(lp, ld, 0.015)
+	var tank := lp.z < -SIZE_Z_TANK and lp.y < 0.1
+	damage_car(car, TANK_DAMAGE if tank else BODY_DAMAGE, point)
 	return "metal"
 
 
@@ -406,3 +434,100 @@ func _local_dent_host(car: Car, lp: Vector3, ld: Vector3, amount: float) -> void
 				sb.put_u8(pc.glass.keys().find(n))
 				Net.broadcast(MSG_CAR_SHOT, sb.data_array)
 				pc.shatter(n)
+
+
+# --- Phase 1.5: damage, fire and wrecks ---------------------------------------------------
+
+## Host: hurts a car (bullets, crashes, blasts, fire).
+func damage_car(car: Car, amount: float, _at := Vector3.ZERO) -> void:
+	var idx := cars.find(car)
+	if idx < 0 or not Net.is_host() or amount <= 0.0:
+		return
+	var st: int = fire_state.get(idx, Fire.OK)
+	if st >= Fire.BURNING:
+		return
+	var hp: float = car_hp.get(idx, CAR_HP) - amount
+	car_hp[idx] = hp
+	if hp <= 0.0:
+		_burn_t[idx] = BURN_TIME
+		_set_fire(idx, Fire.BURNING)
+		if FireSystem.current:
+			FireSystem.current.ignite(car.global_position, 1.4, BURN_TIME + 25.0, -1, idx)
+	elif hp < SMOKE_AT and st == Fire.OK:
+		_set_fire(idx, Fire.SMOKING)
+
+
+func _burn_step(delta: float) -> void:
+	for idx in _burn_t.keys():
+		_burn_t[idx] -= delta
+		if _burn_t[idx] > 0.0:
+			continue
+		_burn_t.erase(idx)
+		var car: Car = cars[idx]
+		_set_fire(idx, Fire.WRECKED)
+		var at := car.global_position + Vector3(0, 0.4, 0)
+		Blast.go(get_tree(), destruction, self, at, 4.5, 170.0, 12.0)
+		if simulates_locally(idx):
+			car.apply_central_impulse(Vector3.UP * car.mass * 5.0)
+			car.apply_torque_impulse(car.global_transform.basis.z * car.mass * 0.9)
+
+
+func _set_fire(idx: int, st: int) -> void:
+	if Net.is_host() and Net.is_online():
+		var b := PackedByteArray([idx, st])
+		Net.broadcast(MSG_CAR_FIRE, b)
+	_apply_fire(idx, st)
+
+
+func _on_fire(from: int, data: PackedByteArray) -> void:
+	if from != 1 or Net.is_host() or data.size() < 2:
+		return
+	if data[0] < cars.size():
+		_apply_fire(data[0], data[1])
+
+
+func _apply_fire(idx: int, st: int) -> void:
+	var prev: int = fire_state.get(idx, Fire.OK)
+	if st <= prev:
+		return
+	fire_state[idx] = st
+	var car: Car = cars[idx]
+	if st >= Fire.SMOKING and car.get_node_or_null("DamageSmoke") == null and DisplayServer.get_name() != "headless":
+		var smoke := CPUParticles3D.new()
+		smoke.name = "DamageSmoke"
+		smoke.amount = 16
+		smoke.lifetime = 2.5
+		smoke.position = Vector3(0, 0.5, Car.SIZE.z * 0.38)
+		smoke.direction = Vector3.UP
+		smoke.spread = 15.0
+		smoke.gravity = Vector3(0, 1.0, 0)
+		smoke.initial_velocity_min = 0.5
+		smoke.initial_velocity_max = 1.2
+		smoke.scale_amount_min = 0.6
+		smoke.scale_amount_max = 1.2
+		var grad := Gradient.new()
+		grad.set_color(0, Color(0.35, 0.35, 0.36, 0.5))
+		grad.set_color(1, Color(0.5, 0.5, 0.5, 0.0))
+		smoke.color_ramp = grad
+		var q := QuadMesh.new()
+		q.size = Vector2(0.8, 0.8)
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		m.vertex_color_use_as_albedo = true
+		m.albedo_texture = FireSystem.soft_texture()
+		q.material = m
+		smoke.mesh = q
+		car.add_child(smoke)
+		smoke.emitting = true
+	if st >= Fire.BURNING:
+		var sm := car.get_node_or_null("DamageSmoke") as CPUParticles3D
+		if sm:
+			sm.amount = 32
+			var g2 := Gradient.new()
+			g2.set_color(0, Color(0.08, 0.08, 0.08, 0.7))
+			g2.set_color(1, Color(0.2, 0.2, 0.2, 0.0))
+			sm.color_ramp = g2
+	if st == Fire.WRECKED:
+		car.wreck()

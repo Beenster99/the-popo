@@ -13,6 +13,9 @@ free recordings of.
   whoosh          a fist or boot swinging through the air
   tyre_skid       tyres squealing (loops)
   room_tone       the hush of an indoor room (loops)
+  fire_loop       a fire roaring and crackling (loops; Phase 1.5)
+  fire_whoomph    flames catching
+  gas_hiss        a fire extinguisher bursting
 
     python3 tools/audio/make_layers.py        (needs ffmpeg and numpy)
 
@@ -237,6 +240,46 @@ def room_tone():
     return x[:-m]
 
 
+def crackles(n, rate, lo, hi, amp):
+    x = np.zeros(n)
+    k = int(rate * n / SR)
+    for at in rng.integers(0, n - int(0.03 * SR), k):
+        m = int(rng.uniform(0.002, 0.012) * SR)
+        burst = bandpass(rng.standard_normal(m * 4), lo, hi)[:m] * np.exp(-np.arange(m) / (m * 0.25))
+        x[at:at + m] += burst * amp * rng.uniform(0.2, 1.0) ** 2
+    return x
+
+
+def fire_loop():
+    dur = 6.0
+    n = int(dur * SR)
+    roar = bandpass(rng.standard_normal(n), 60, 900)
+    am = 0.7 + 0.3 * onepole_lp(rng.standard_normal(n), 3) * 25
+    x = roar * np.clip(am, 0.2, 1.4) * 0.5
+    x += crackles(n, 28, 1500, 7000, 3.0) + crackles(n, 6, 300, 2500, 4.0)
+    m = int(0.5 * SR)
+    w = np.linspace(0, 1, m)
+    x[:m] = x[:m] * w + x[-m:] * (1 - w)
+    return x[:-m]
+
+
+def fire_whoomph(i):
+    n = int((1.0 + 0.2 * i) * SR)
+    k = np.linspace(0, 1, n)
+    x = swept_band(n, 150, 900 + 300 * i, 600)
+    x += bandpass(rng.standard_normal(n), 40, 220) * 0.8
+    env = np.minimum(k / 0.12, 1.0) * np.exp(-np.maximum(k - 0.12, 0) * 4.5)
+    return x * env + crackles(n, 20, 1500, 6000, 1.5) * env
+
+
+def gas_hiss():
+    n = int(1.6 * SR)
+    k = np.arange(n) / SR
+    x = bandpass(rng.standard_normal(n), 1800, 9000) * np.exp(-k / 0.6) * np.minimum(k / 0.01, 1.0)
+    pop = bandpass(rng.standard_normal(n), 80, 1200) * np.exp(-k / 0.05) * 2.0
+    return x + pop
+
+
 ROWS = []
 
 
@@ -259,6 +302,10 @@ def main():
     write("ear_ring_1.wav", ear_ring(), "ear ring after a very close shot", -6.0)
     write("tyre_skid_1.wav", tyre_skid(), "tyres squealing, loops", -3.0)
     write("room_tone_1.wav", room_tone(), "indoor room hush, loops", -6.0)
+    write("fire_loop_1.wav", fire_loop(), "fire roaring and crackling, loops", -3.0)
+    for i in (1, 2):
+        write(f"fire_whoomph_{i}.wav", fire_whoomph(i), "flames catching")
+    write("gas_hiss_1.wav", gas_hiss(), "fire extinguisher bursting")
     rows = list(csv.reader(open(MANIFEST)))
     have = {r[0]: i for i, r in enumerate(rows)}
     for r in ROWS:

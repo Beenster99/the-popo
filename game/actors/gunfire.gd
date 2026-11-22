@@ -12,24 +12,7 @@ static func resolve(world: DestructionWorld, cars: CarSync, origin: Vector3, dir
 	var hit := Melee.bullet_ray(shooter.get_world_3d().direct_space_state, origin, dir, shooter)
 	if alt:
 		var at: Vector3 = hit.position if hit else origin + dir * 8.0
-		if world:
-			world.explode(at, 3.5, 200.0, 9.0)
-		for o in shooter.get_tree().get_nodes_in_group("officers"):
-			var off := o as Officer
-			var d: float = off.global_position.distance_to(at)
-			if d < 4.5:
-				off.take_damage(110.0 * (1.0 - d / 4.5), (off.global_position - at).normalized(), "blast")
-		for s in shooter.get_tree().get_nodes_in_group("suspects"):
-			var sp := s as Suspect
-			var d2: float = sp.global_position.distance_to(at)
-			if d2 < 4.5:
-				sp.take_damage(110.0 * (1.0 - d2 / 4.5), (sp.global_position - at).normalized(), "blast")
-		if cars:
-			for c in cars.cars:
-				var lp: Vector3 = (c as Car).global_transform.affine_inverse() * at
-				if lp.length() < 5.0:
-					var ld: Vector3 = -lp.normalized()
-					cars._local_dent_host(c, lp, ld, clampf(0.3 * (1.0 - lp.length() / 5.0), 0.05, 0.3))
+		Blast.go(shooter.get_tree(), world, cars, at, 3.5, 200.0, 9.0)
 	elif hit and hit.collider is Officer:
 		var o := hit.collider as Officer
 		o.take_damage(shooter.shot_damage(), dir, o.body_part_at(hit.position))

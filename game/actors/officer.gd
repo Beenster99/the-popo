@@ -533,7 +533,7 @@ func _drop_gun() -> void:
 
 
 ## Host only: bullets, blasts, falls and blows. At 0 hp the officer is downed.
-## where: "leg", "arm", "torso", "blast", "fall", "bleed" or "" (unknown),
+## where: "leg", "arm", "torso", "blast", "fall", "burn", "bleed" or "" (unknown),
 ## for the wound it may leave.
 func take_damage(amount: float, dir := Vector3.ZERO, where := "") -> void:
 	if not Net.is_host() or state == S.DOWNED or amount <= 0.0:
@@ -576,6 +576,8 @@ func _wound(amount: float, where: String) -> void:
 		"fall":
 			if amount >= 15.0:
 				injuries |= LEG
+		"burn":
+			pass
 		_:
 			if r < 0.3:
 				injuries |= BLEED

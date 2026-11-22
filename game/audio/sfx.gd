@@ -37,7 +37,7 @@ const COUNTS := {"amb_air": 1, "amb_far_traffic": 1, "amb_street": 1, "body_hit"
 	"break_metal": 5, "break_wood": 7, "bullet_crack": 3, "bullet_whizz": 3, "car_crash": 3,
 	"car_door_close": 1, "car_door_open": 1, "car_engine": 1, "car_horn": 1, "car_start": 1,
 	"casing_concrete": 3, "casing_metal": 3, "casing_wood": 3, "cloth": 4, "door_close": 4, "door_open": 2,
-	"dry_fire": 1, "ear_ring": 1, "explosion": 1, "explosion_body": 2, "gear": 4, "glass_big": 3, "glass_break": 3,
+	"dry_fire": 1, "ear_ring": 1, "explosion": 1, "explosion_body": 2, "fire_loop": 1, "fire_whoomph": 2, "gas_hiss": 1, "gear": 4, "glass_big": 3, "glass_break": 3,
 	"glass_settle": 4, "gun_dry": 5, "gun_far": 4, "gun_mech": 1, "gun_near": 5, "gun_shotgun_body": 3,
 	"gun_thump": 3, "holster": 2, "impact_concrete": 4, "impact_glass": 3, "impact_metal": 5, "impact_wood": 4,
 	"mag_drop_concrete": 2, "mag_drop_metal": 2, "mag_drop_wood": 2, "mag_in": 1, "mag_out": 1, "ping": 1,
@@ -336,6 +336,7 @@ static func bullet(parent: Node, a: Vector3, b: Vector3, surface: String, what :
 		play(parent, "body_hit", b, 0.0, 40.0, 0.08)
 	elif what == 0:
 		impact(parent, b, surface, 0.9)
+		Feel.impact(parent, b, a, surface)
 		var roll := absf(sin(b.x * 12.9898 + b.z * 78.233 + b.y * 3.71))   # same on every machine
 		if surface in ["metal", "concrete"] and roll < (0.4 if surface == "metal" else 0.2):
 			play(parent, "ricochet", b, -4.0, 60.0, 0.1)
@@ -349,6 +350,7 @@ static func bullet(parent: Node, a: Vector3, b: Vector3, surface: String, what :
 	var miss := c.distance_to(l)
 	if miss < 2.4 and c.distance_to(a) > 2.0 and c.distance_to(b) > 0.6:
 		play(parent, "bullet_crack" if miss < 1.3 else "bullet_whizz", c, 2.0 if miss < 1.3 else -2.0, 12.0, 0.1)
+		Feel.shake(parent.get_tree(), 0.2 if miss < 1.3 else 0.08)
 
 
 ## Plays a sound after t seconds (through the scene's GameSounds, which

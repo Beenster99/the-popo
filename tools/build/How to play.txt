@@ -58,6 +58,19 @@ Driver: WASD drive, Space handbrake, H horn, T lights, then lights and wail,
 then yelp, then off. Passengers: hold right mouse to lean out of the window
 and shoot. Windows shatter when shot; doors, bonnet, boot, bumpers and
 mirrors come off in big crashes. Hold F at the boot for ammo and first aid.
+FIGHTS AND MAYHEM (1.5)
+Armed suspects now fight back from cover: they duck, peek, fire in bursts,
+blind fire, go round your side and call friends. Shooting close past them
+keeps their heads down. Unarmed ones throw chairs, crates and bottles.
+New call: SHOTS FIRED, three or four armed, one with a shotgun.
+When one gives up they toss their gun: F picks it up (you only get the
+rounds in it), H drops it.
+Furniture and junk break: chairs, tables, shelves, crates, bottles. Red
+barrels and gas bottles explode and start fires. Fire spreads to wooden
+things and burns. Shoot a red extinguisher to put out fires round it.
+Cars smoke when badly shot up, then catch fire and blow up a few seconds
+later (shots low at the back hit the fuel tank).
+Camera shake strength: Settings > Gameplay > Camera shake.
 SOUND (1.6)
 Turn your speakers or headphones up: gunshots, bullet hits and near misses,
 footsteps, engines, the street outside and breaking glass all play now.

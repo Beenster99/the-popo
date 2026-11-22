@@ -131,6 +131,7 @@ const SCHEMA := [
 	["Gameplay", "cam_zoom", "Starting zoom", "range", 16.0, [6.0, 48.0, 1.0, ""]],
 	["Gameplay", "cam_zoom_max", "Furthest zoom", "range", 48.0, [16.0, 96.0, 2.0, ""]],
 	["Gameplay", "cutaway", "See inside buildings (fade walls and roofs)", "bool", true],
+	["Gameplay", "camera_shake", "Camera shake", "range", 1.0, [0.0, 2.0, 0.1, ""]],
 	["Gameplay", "", "Screen", "head"],
 	["Gameplay", "ammo_hud", "Ammo panel", "bool", true],
 	["Gameplay", "reticle", "Aiming reticle", "bool", true],
