@@ -15,7 +15,9 @@ const KEYS := {
 	"cover": [KEY_V],
 	"punch": [KEY_G],
 	"kick": [KEY_H],
-	"interact": [KEY_F],          # enter or leave a car
+	"interact": [KEY_F],
+	"weapon_1": [KEY_1],
+	"weapon_2": [KEY_2],          # enter or leave a car
 	"cam_rotate_left": [KEY_Q],
 	"cam_rotate_right": [KEY_E],
 	"handbrake": [KEY_SPACE],

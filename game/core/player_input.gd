@@ -13,6 +13,9 @@ const KICK := 128
 const AIM := 256
 const FIRE := 512
 const INTERACT := 1024
+const ALT_TOOL := 2048  # weapon slot 2 (demolition charge in the destruction spike)
+
+static var alt_tool := false
 
 const _MAP := {
 	"sprint": SPRINT, "jump": JUMP, "crouch": CROUCH, "prone": PRONE, "dive": DIVE,
@@ -29,6 +32,12 @@ static func sample(cam: IsoCamera, from: Node3D) -> Dictionary:
 	for a in _MAP:
 		if Input.is_action_pressed(a):
 			buttons |= _MAP[a]
+	if Input.is_action_just_pressed("weapon_1"):
+		alt_tool = false
+	elif Input.is_action_just_pressed("weapon_2"):
+		alt_tool = true
+	if alt_tool:
+		buttons |= ALT_TOOL
 	var aim_yaw := 0.0
 	if cam and from:
 		var p := cam.mouse_on_plane(from.global_position.y)

@@ -9,7 +9,10 @@ const ACCEL := 40.0
 const JUMP_V := 5.0
 const GRAVITY := 18.0
 
+signal fired(origin: Vector3, dir: Vector3, alt_tool: bool)
+
 var peer_id := 1
+var _cooldown := 0.0
 var color := Color("2c4a8c")
 var _visual: Node3D
 var _label: Label3D
@@ -75,6 +78,12 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 	if buttons & PlayerInput.AIM:
 		rotation.y = cmd.get("aim_yaw", rotation.y)
 	move_and_slide()
+	_cooldown -= delta
+	if buttons & PlayerInput.FIRE and _cooldown <= 0.0 and Net.is_host():
+		var alt := (buttons & PlayerInput.ALT_TOOL) != 0
+		_cooldown = 0.8 if alt else 0.15
+		var yaw: float = cmd.get("aim_yaw", rotation.y)
+		fired.emit(global_position + Vector3(0, 1.3, 0), Vector3(sin(yaw), 0, cos(yaw)), alt)
 
 
 func encode_state(b: StreamPeerBuffer) -> void:
