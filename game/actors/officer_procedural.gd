@@ -11,6 +11,13 @@ var aim_yaw_offset := 0.0     # radians, aim direction minus body facing
 var feet_enabled := true
 var hand_lock := false
 var ground_y := 0.0           # the character's floor height (world)
+## Point the barrel at this world point while aiming (the reticle).
+var aim_active := false
+var aim_target := Vector3.ZERO
+## The gun slide's transform relative to the right hand bone (set by the rig).
+var slide_rel := Transform3D()
+var have_slide := false
+const MAX_AIM_FIX := 1.0      # radians the chest may turn to line up the barrel
 
 var _legs := [["thigh.L", "shin.L", "foot.L"], ["thigh.R", "shin.R", "foot.R"]]
 var _idx := {}
@@ -24,6 +31,7 @@ func _ready() -> void:
 	for n in ["hips", "spine", "chest_2", "neck_2", "head_2", "thigh.L", "shin.L", "foot.L", "thigh.R", "shin.R", "foot.R",
 			"upper_arm.L", "forearm.L", "hand.L", "hand.R"]:
 		_idx[n] = sk.find_bone(n)
+	_idx["hand.R"] = sk.find_bone("hand.R")
 
 
 func _process_modification() -> void:
@@ -31,6 +39,7 @@ func _process_modification() -> void:
 	if sk == null or _idx.is_empty():
 		return
 	_aim(sk)
+	_line_up_barrel(sk)
 	if feet_enabled:
 		_feet(sk)
 	else:
@@ -53,6 +62,34 @@ func _aim(sk: Skeleton3D) -> void:
 	_rotate_global(sk, _idx["spine"], Quaternion(up.normalized(), yaw * 0.35))
 	_rotate_global(sk, _idx["chest_2"], Quaternion(up.normalized(), yaw * 0.45))
 	_rotate_global(sk, _idx["head_2"], Quaternion(up.normalized(), yaw * 0.2))
+
+
+## The barrel in world space: [muzzle, direction], from the posed right hand.
+func barrel(sk: Skeleton3D) -> Array:
+	var hand := sk.global_transform * sk.get_bone_global_pose(_idx["hand.R"])
+	var sl := hand * slide_rel
+	var d := -sl.basis.y.normalized()
+	return [sl.origin + d * 0.095, d]
+
+
+## Turns the chest (arms and gun with it) so the barrel lines up with the
+## aim point, up and down as well as sideways. Two passes, because the gun
+## sits off to the side of the chest.
+func _line_up_barrel(sk: Skeleton3D) -> void:
+	if not (aim_active and have_slide):
+		return
+	for i in 2:
+		var b := barrel(sk)
+		var want: Vector3 = aim_target - b[0]
+		if want.length() < 0.5:
+			return
+		var axis: Vector3 = (b[1] as Vector3).cross(want.normalized())
+		var ang := (b[1] as Vector3).angle_to(want.normalized())
+		if axis.length() < 0.0001 or ang < 0.002:
+			return
+		ang = minf(ang, MAX_AIM_FIX)
+		var axis_sk := (sk.global_basis.inverse() * axis).normalized()
+		_rotate_global(sk, _idx["chest_2"], Quaternion(axis_sk, ang))
 
 
 func _feet(sk: Skeleton3D) -> void:

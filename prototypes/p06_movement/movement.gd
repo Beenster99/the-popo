@@ -77,8 +77,8 @@ func _ready() -> void:
 			return ""
 		return "state %s  speed %.1f m/s\n%s\n%s   J take a hit   K go down / get up   (controller works too)" % [
 			Officer.S.keys()[o.state], Vector2(o.velocity.x, o.velocity.z).length(),
-			Controls.help(["sprint", "jump", "crouch", "prone", "dive"]),
-			Controls.help(["cover", "aim", "fire", "punch", "kick"])]
+			Controls.help(["sprint", "jump", "stance"]),
+			Controls.help(["cover", "aim", "fire", "ping", "punch", "kick"])]
 	add_child(overlay)
 
 

@@ -26,10 +26,14 @@ If the launcher warns about CGNAT or a second router, your internet provider
 shares one address between customers; ask them for a public IP address.
 
 KEYBOARD AND MOUSE (defaults)
-WASD move, Shift sprint, Space jump / vault / climb, C crouch, Z prone,
-Ctrl roll (slide when sprinting), R cover, V punch, B kick, F use,
-right mouse aim, left mouse fire (at the reticle), Q/E rotate camera,
-mouse wheel zoom, F3 network overlay.
+WASD move, Shift sprint, Space jump / vault / climb.
+Ctrl: tap to crouch, tap again to stand; hold to lie prone; hold while
+running to roll (slide when sprinting). C crouch, Z prone and X roll also work.
+R take cover at a wall (low walls: crouch behind; at a wall's end the
+officer tucks in). Hold right mouse to aim, and in cover to peek out.
+Left mouse fire (at the reticle), middle mouse ping a spot for everyone,
+V punch, B kick, F use, Q/E rotate camera, mouse wheel zoom,
+F3 network overlay.
 Car: WASD drive, Space handbrake, H horn, T switches who simulates the car.
 Look scene: N day / night. Sound scene: 5, 6, 7 fire the test guns, F4 auto-fire.
 
@@ -37,4 +41,5 @@ GAME CONTROLLER (Xbox names, PlayStation in brackets)
 Left stick move, right stick aim, LT (L2) aim, RT (R2) fire,
 A (Cross) jump / handbrake, B (Circle) crouch, X (Square) roll,
 Y (Triangle) prone / horn, LB (L1) cover, RB (R1) punch, R3 kick, L3 sprint,
-D-pad rotate and zoom the camera, Start back to the launcher.
+D-pad rotate and zoom the camera, touchpad ping (PlayStation),
+Start back to the launcher.
