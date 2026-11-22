@@ -1,0 +1,24 @@
+file,source,licence,notes
+sfx/gun_mech_1.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Pistol layer 1: mechanism
+sfx/gun_mech_2.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Pistol layer 1: mechanism
+sfx/gun_mech_3.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Pistol layer 1: mechanism
+sfx/gun_crack_1.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Pistol layer 2: crack
+sfx/gun_crack_2.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Pistol layer 2: crack
+sfx/gun_crack_3.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Pistol layer 2: crack
+sfx/gun_body_1.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Pistol layer 3: body
+sfx/gun_body_2.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Pistol layer 3: body
+sfx/gun_body_3.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Pistol layer 3: body
+sfx/gun_tail_outdoor_1.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Pistol layer 4: outdoor tail (indoors the reverb bus does the tail)
+sfx/gun_tail_outdoor_2.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Pistol layer 4: outdoor tail (indoors the reverb bus does the tail)
+sfx/impact_wood_1.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Bullet impact on wood
+sfx/impact_wood_2.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Bullet impact on wood
+sfx/impact_wood_3.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Bullet impact on wood
+sfx/impact_glass_1.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Bullet impact on glass
+sfx/impact_glass_2.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Bullet impact on glass
+sfx/impact_glass_3.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Bullet impact on glass
+sfx/impact_concrete_1.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Bullet impact on concrete and brick
+sfx/impact_concrete_2.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Bullet impact on concrete and brick
+sfx/impact_concrete_3.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Bullet impact on concrete and brick
+sfx/impact_metal_1.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Bullet impact on metal
+sfx/impact_metal_2.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Bullet impact on metal
+sfx/impact_metal_3.wav,Synthesised by tools/audio/synth_placeholders.py,Project's own (no third-party audio),Bullet impact on metal

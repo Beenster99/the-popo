@@ -63,6 +63,12 @@ func _run() -> void:
 			s.cam.zoom = 9.0
 			await _frames(60)
 			await _save()
+		"sound":
+			# Keeps the HUD so the shot shows which bus and how many walls.
+			var s := await _scene("res://prototypes/p07_sound/sound.tscn")
+			s.cam.zoom = 22.0
+			await _frames(200)
+			await _save()
 		"officer_poses":
 			# One officer, several moves: saves out-<n>.png per pose.
 			var s := await _scene("res://prototypes/p06_movement/movement.tscn")
