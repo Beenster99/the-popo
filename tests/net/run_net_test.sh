@@ -24,7 +24,9 @@ if len(h) < 4 or len(c) < 4:
     print("FAIL: missing result"); sys.exit(1)
 hx, hz, cx, cz = float(h[1]), float(h[2]), float(c[1]), float(c[2])
 d = ((hx - cx) ** 2 + (hz - cz) ** 2) ** 0.5
-moved = abs(float(h[3])) > 1.5
-print(f"distance between host and client views: {d:.3f} m, client walked {float(h[3]):.2f} m")
+# The client measures its own walk: it records its start before it moves,
+# while the host may only start watching after the client has set off.
+moved = abs(float(c[3])) > 1.5
+print(f"distance between host and client views: {d:.3f} m, client walked {float(c[3]):.2f} m")
 sys.exit(0 if d < 0.05 and moved else 1)
 PY

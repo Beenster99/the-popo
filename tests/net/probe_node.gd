@@ -49,8 +49,8 @@ func _physics_process(_d: float) -> void:
 			if sync == null or sync.pawns.size() < 2:
 				return
 			if role == "client":
-				var start := t
-				sync.input_source = func(): return {"move": Vector2(1, 0) if t - start < 2.0 else Vector2.ZERO, "buttons": 0, "aim_yaw": 0.0}
+				# Walk for the first 2 s of the "wait" phase (t is reset below).
+				sync.input_source = func(): return {"move": Vector2(1, 0) if t < 2.0 else Vector2.ZERO, "buttons": 0, "aim_yaw": 0.0}
 			var cid: int = Net.my_id() if role == "client" else Net.player_ids().filter(func(i): return i != 1)[0]
 			start_x = sync.pawns[cid].global_position.x
 			phase = "wait"
