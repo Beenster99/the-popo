@@ -216,6 +216,11 @@ static func _load_overrides() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("back_to_launcher"):
 		var tree := get_tree()
-		if tree.current_scene and tree.current_scene.scene_file_path != "res://prototypes/launcher/launcher.tscn":
+		var path: String = tree.current_scene.scene_file_path if tree.current_scene else ""
+		if path == "res://game/ui/main_menu.tscn":
+			return
+		if path == "res://prototypes/launcher/launcher.tscn":
 			Net.leave()
-			tree.change_scene_to_file("res://prototypes/launcher/launcher.tscn")
+			tree.change_scene_to_file("res://game/ui/main_menu.tscn")
+			return
+		PauseMenu.toggle(tree)

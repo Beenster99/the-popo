@@ -157,10 +157,11 @@ def prone_idle(rig, A):
         A.rot('neck', f, -35, 0, 0)
         A.rot('head', f, -30, 0, 0)
         _prone_arms(A, f)
-        A.rot('thigh.L', f, 0, -8, 0)
-        A.rot('thigh.R', f, 0, 8, 0)
-        A.rot('shin.L', f, 4, 0, 0)
-        A.rot('shin.R', f, 4, 0, 0)
+        # Legs flat on the ground: knees down, toes touching.
+        A.rot('thigh.L', f, -4, -8, 0)
+        A.rot('thigh.R', f, -4, 8, 0)
+        A.rot('shin.L', f, -4, 0, 0)
+        A.rot('shin.R', f, -4, 0, 0)
         A.rot('foot.L', f, 60, 0, 0)
         A.rot('foot.R', f, 60, 0, 0)
     return (1, 61)
@@ -180,14 +181,12 @@ def crawl(rig, A):
         A.rot('chest', t + 1, -10, 0, -5 * s)
         A.rot('neck', t + 1, -35, 0, 0)
         A.rot('head', t + 1, -30, 0, 3 * s)
-        A.rot('upper_arm.L', t + 1, -150 + 25 * s, -25, 0)
-        A.rot('upper_arm.R', t + 1, -150 - 25 * s, 25, 0)
-        A.rot('forearm.L', t + 1, -70 - 15 * s, 0, 0)
-        A.rot('forearm.R', t + 1, -60 + 15 * s, 0, 0)
-        A.rot('thigh.L', t + 1, -35 * max(0.0, -s), -15, 0)
-        A.rot('thigh.R', t + 1, -35 * max(0.0, s), 15, 0)
-        A.rot('shin.L', t + 1, 4 + 60 * max(0.0, -s), 0, 0)
-        A.rot('shin.R', t + 1, 4 + 60 * max(0.0, s), 0, 0)
+        # Elbows pull forward in turn, hands stay on the pistol.
+        _prone_arms(A, t + 1, sway=12 * s)
+        A.rot('thigh.L', t + 1, -4 - 35 * max(0.0, -s), -15, 0)
+        A.rot('thigh.R', t + 1, -4 - 35 * max(0.0, s), 15, 0)
+        A.rot('shin.L', t + 1, -4 + 60 * max(0.0, -s), 0, 0)
+        A.rot('shin.R', t + 1, -4 + 60 * max(0.0, s), 0, 0)
         A.rot('foot.L', t + 1, 60, 0, 0)
         A.rot('foot.R', t + 1, 60, 0, 0)
     return (1, N + 1)
@@ -303,6 +302,38 @@ def cover_idle(rig, A):
     for f, b in ((1, 0), (31, 1), (61, 0)):
         K.cover_feet(A, f)
         K.cover(rig, A, f, breathe=b)
+        # Back flat against the wall (the wall is behind, +Y): hips and
+        # shoulders pressed back.
+        A.loc('hips', f, 0, 0.05, -0.07)
+        A.rot('hips', f, -3, 0, 0)
+        A.rot('spine', f, -2, 0, 0)
+        A.rot('chest', f, -1 + b, 0, 0)
+    return (1, 61)
+
+
+def cover_low_idle(rig, A):
+    """Tucked down behind low cover: a deep crouch, back rounded, head below
+    the top of a 1 m wall, pistol held in close to the chest."""
+    K.gun_visible(rig, True)
+    for s in 'LR':
+        A.ik('arm.' + s, 1, 1)
+    for f, b in ((1, 0), (31, 1), (61, 0)):
+        A.loc('hips', f, 0, 0.10, -0.60)
+        A.rot('hips', f, 34, 0, 0)
+        A.rot('spine', f, 20, 0, 0)
+        A.rot('chest', f, 14 + b * 1.5, 0, 0)
+        A.rot('neck', f, -18, 0, 0)
+        A.rot('head', f, -16, 0, 0)
+        A.pos('foot_ik.L', f, 0.21, -0.14, 0.10)
+        A.rot('foot_ik.L', f, 0, 0, 10)
+        A.pos('foot_ik.R', f, -0.21, 0.12, 0.10)
+        A.rot('foot_ik.R', f, 14, 0, -12)
+        A.loc('knee_pole.L', f, 0.18, 0, 0)
+        A.loc('knee_pole.R', f, -0.18, 0, 0)
+        A.pos('hand_ik.R', f, -0.05, -0.36, 0.66 + b * 0.004)
+        A.rot('hand_ik.R', f, -20, 0, 10)
+        A.pos('hand_ik.L', f, 0.01, -0.34, 0.64 + b * 0.004)
+        A.rot('hand_ik.L', f, -18, 0, -26)
     return (1, 61)
 
 
@@ -357,9 +388,98 @@ def climb(rig, A):
     return (1, 36)
 
 
+FPS = 30
+
+
+def _fr(t):
+    return 1 + int(round(t * FPS))
+
+
+def _upper_still(A, f, head=4.0, chest=3.0):
+    A.loc('hips', f, 0, 0.0, -0.03)
+    A.rot('hips', f, 2, 0, 0)
+    A.rot('spine', f, 4, 0, 0)
+    A.rot('chest', f, chest, 0, 0)
+    A.rot('neck', f, 2, 0, 0)
+    A.rot('head', f, head, 0, 0)
+    K.stance_feet(A, f)
+
+
+# Reload, 1.7 s (Officer.RELOAD_TIME): tilt the pistol in, drop the empty
+# magazine, the left hand fetches a fresh one from the belt, seats it with a
+# slap, then racks the slide over the top and comes back to low ready.
+# (t, right hand pos, right rot, left pos, left rot, head pitch)
+RELOAD_KEYS = [
+    (0.00, (-0.04, -0.30, 1.08), (-42, 0, 6), (0.00, -0.27, 1.05), (-40, 0, -28), 4),
+    (0.18, (-0.03, -0.31, 1.20), (-62, 0, 32), (0.03, -0.26, 1.14), (-50, 0, -20), 14),
+    (0.32, (-0.03, -0.31, 1.21), (-64, 0, 36), (0.10, -0.16, 1.06), (-20, 0, -10), 16),
+    (0.58, (-0.03, -0.31, 1.21), (-64, 0, 36), (0.17, -0.07, 0.99), (0, 0, 0), 14),
+    (0.86, (-0.03, -0.31, 1.21), (-64, 0, 36), (-0.01, -0.30, 1.07), (-62, 0, -20), 18),
+    (1.00, (-0.03, -0.31, 1.22), (-66, 0, 36), (-0.02, -0.31, 1.13), (-66, 0, -20), 18),
+    (1.16, (-0.04, -0.33, 1.20), (-70, 0, 14), (-0.03, -0.40, 1.27), (-90, 0, -70), 14),
+    (1.32, (-0.04, -0.33, 1.20), (-70, 0, 14), (-0.03, -0.27, 1.27), (-90, 0, -70), 12),
+    (1.50, (-0.04, -0.30, 1.10), (-46, 0, 8), (0.00, -0.27, 1.06), (-42, 0, -28), 6),
+    (1.70, (-0.04, -0.30, 1.08), (-42, 0, 6), (0.00, -0.27, 1.05), (-40, 0, -28), 4),
+]
+
+
+def reload(rig, A):
+    K.gun_visible(rig, True)
+    for s in 'LR':
+        A.ik('arm.' + s, 1, 1)
+    for t, rp, rr, lp, lr, head in RELOAD_KEYS:
+        f = _fr(t)
+        _upper_still(A, f, head=head, chest=3 + head * 0.25)
+        A.pos('hand_ik.R', f, *rp)
+        A.rot('hand_ik.R', f, *rr)
+        A.pos('hand_ik.L', f, *lp)
+        A.rot('hand_ik.L', f, *lr)
+    return (1, _fr(1.70))
+
+
+# Holster, 0.6 s (Officer.HOLSTER_TIME): the pistol comes down the right side
+# muzzle first into the holster, the hand lets go and both arms relax.
+# Draw is the same move played backwards.
+HOLSTER_KEYS = [
+    (0.00, (-0.04, -0.30, 1.08), (-42, 0, 6), (0.00, -0.27, 1.05), (-40, 0, -28)),
+    (0.15, (-0.15, -0.14, 1.12), (-15, 0, 10), (0.16, -0.10, 1.00), (-10, 0, -10)),
+    (0.30, (-0.205, -0.01, 1.13), (0, 0, 0), (0.25, -0.02, 0.96), (0, 0, -6)),
+    (0.42, (-0.205, 0.00, 1.03), (0, 0, 0), (0.26, 0.00, 0.95), (0, 0, -4)),
+    (0.60, (-0.26, 0.01, 0.95), (0, 0, 6), (0.26, 0.00, 0.95), (0, 0, -6)),
+]
+
+
+def _holster_keys(A, keys, total):
+    for t, rp, rr, lp, lr in keys:
+        f = _fr(t)
+        _upper_still(A, f, head=4 + 6 * (1 - abs(t / total - 0.5) * 2))
+        A.pos('hand_ik.R', f, *rp)
+        A.rot('hand_ik.R', f, *rr)
+        A.pos('hand_ik.L', f, *lp)
+        A.rot('hand_ik.L', f, *lr)
+
+
+def holster(rig, A):
+    K.gun_visible(rig, True)
+    for s in 'LR':
+        A.ik('arm.' + s, 1, 1)
+    _holster_keys(A, HOLSTER_KEYS, 0.6)
+    return (1, _fr(0.6))
+
+
+def draw(rig, A):
+    K.gun_visible(rig, True)
+    for s in 'LR':
+        A.ik('arm.' + s, 1, 1)
+    _holster_keys(A, [(0.6 - k[0],) + k[1:] for k in reversed(HOLSTER_KEYS)], 0.6)
+    return (1, _fr(0.6))
+
+
+
 EXTRA = {
     'idle': idle, 'walk': walk, 'crouch_idle': crouch_idle, 'crouch_walk': crouch_walk,
     'prone_idle': prone_idle, 'crawl': crawl, 'slide': slide, 'jump': jump, 'fall': fall,
     'punch': punch, 'kick': kick, 'cover_idle': cover_idle, 'aim_hold': aim_hold,
+    'reload': reload, 'holster': holster, 'draw': draw, 'cover_low_idle': cover_low_idle,
     'ready_hold': ready_hold, 'climb': climb,
 }

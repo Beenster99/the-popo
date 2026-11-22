@@ -100,7 +100,7 @@ func _run() -> void:
 				s.cam.global_position = o.global_position
 				await RenderingServer.frame_post_draw
 				get_viewport().get_texture().get_image().save_png("%s-%s.png" % [base, ps[0]])
-				print("saved ", ps[0])
+				print("saved ", ps[0], " pos ", o.global_position, " state ", Officer.S.keys()[o.state])
 			# Mid-vault over the first wall.
 			o.global_position = Vector3(-6, 0.05, 3.3)
 			o.rotation.y = 0.0
@@ -133,6 +133,79 @@ func _run() -> void:
 					s.cam.zoom = 12.0
 			await _frames(90)
 			await _save()
+		"prone_side":
+			# Side-on views of prone idle, prone aiming and crawling.
+			var s := await _scene("res://prototypes/p06_movement/movement.tscn")
+			s.find_children("*", "NetOverlay", false, false)[0].queue_free()
+			await _frames(5)
+			var o: Officer = s.sync.my_pawn()
+			var box := {"cmd": {"move": Vector2.ZERO, "buttons": 0, "aim_yaw": 0.0}}
+			s.sync.input_source = func(): return box.cmd
+			var cam := Camera3D.new()
+			cam.projection = Camera3D.PROJECTION_ORTHOGONAL
+			cam.size = 2.6
+			s.add_child(cam)
+			o.global_position = Vector3(-14, 0.05, -10)
+			o.rotation.y = 0.0
+			box.cmd = {"move": Vector2.ZERO, "buttons": PlayerInput.PRONE, "aim_yaw": 0.0}
+			await _frames(2)
+			var base := out.get_basename()
+			for ps in [["idle", Vector2.ZERO, 0], ["aim", Vector2.ZERO, PlayerInput.AIM], ["crawl", Vector2(0, 1), 0]]:
+				box.cmd = {"move": ps[1], "buttons": ps[2], "aim_yaw": 0.0, "aim_point": o.global_position + Vector3(0, 0.3, 8)}
+				await _frames(70)
+				cam.global_position = o.global_position + Vector3(6, 0.25, 0)
+				cam.look_at(o.global_position + Vector3(0, 0.25, 0), Vector3.UP)
+				cam.current = true
+				await RenderingServer.frame_post_draw
+				get_viewport().get_texture().get_image().save_png("%s-%s.png" % [base, ps[0]])
+				print("saved ", ps[0], " pos ", o.global_position, " state ", Officer.S.keys()[o.state])
+		"menu":
+			await _scene("res://game/ui/main_menu.tscn")
+			await _frames(10)
+			await _save()
+		"settings":
+			var s := await _scene("res://game/ui/main_menu.tscn")
+			await _frames(3)
+			s.call("_open_settings")
+			await _frames(10)
+			await _save()
+		"cover_back":
+			# Back-to-wall cover at a tall wall and a low wall, and a reload.
+			var s := await _scene("res://prototypes/p06_movement/movement.tscn")
+			s.find_children("*", "NetOverlay", false, false)[0].queue_free()
+			await _frames(5)
+			var o: Officer = s.sync.my_pawn()
+			var box := {"cmd": {"move": Vector2.ZERO, "buttons": 0, "aim_yaw": 0.0}}
+			s.sync.input_source = func(): return box.cmd
+			var base := out.get_basename()
+			var spot := Vector3(-30, 0.05, 25)
+			ProtoWorld.block(s, Vector3(3, 2.2, 0.3), spot + Vector3(0, 1.1, 1.0), Color("8a8f96"))
+			ProtoWorld.block(s, Vector3(3, 1.0, 0.3), spot + Vector3(6, 0.5, 1.0), Color("8a8f96"))
+			var cam := Camera3D.new()
+			cam.fov = 40.0
+			s.add_child(cam)
+			for ps in [["tall", Vector3.ZERO, 0], ["low", Vector3(6, 0, 0), 0], ["reload", Vector3.ZERO, PlayerInput.RELOAD]]:
+				o.global_position = spot + ps[1]
+				o.state = Officer.S.MOVE
+				o.ammo = 5
+				box.cmd = {"move": Vector2.ZERO, "buttons": 0, "aim_yaw": 0.0}
+				await _frames(10)
+				box.cmd = {"move": Vector2.ZERO, "buttons": PlayerInput.COVER, "aim_yaw": 0.0}
+				await _frames(2)
+				box.cmd = {"move": Vector2.ZERO, "buttons": 0, "aim_yaw": 0.0}
+				await _frames(40)
+				if ps[2]:
+					box.cmd = {"move": Vector2.ZERO, "buttons": ps[2], "aim_yaw": 0.0}
+					await _frames(2)
+					box.cmd = {"move": Vector2.ZERO, "buttons": 0, "aim_yaw": 0.0}
+					while o.reload_t > 0.95:   # the fresh magazine on its way up
+						await _frames(1)
+				cam.global_position = o.global_position + Vector3(3.4, 0.9, -0.3)
+				cam.look_at(o.global_position + Vector3(0, 0.8, 0.2), Vector3.UP)
+				cam.current = true
+				await RenderingServer.frame_post_draw
+				get_viewport().get_texture().get_image().save_png("%s-%s.png" % [base, ps[0]])
+				print("saved ", ps[0], " state ", Officer.S.keys()[o.state], " low ", o._cover_low, " rot ", o.rotation.y, " n ", o._cover_n, " pos ", o.global_position, " lower ", o.rig._lower, " upper ", o.rig._upper, " rl ", o.reload_t, " ammo ", o.ammo)
 		"yard":
 			var s := await _scene("res://prototypes/p09_yard/yard.tscn")
 			s.find_children("*", "NetOverlay", false, false)[0].queue_free()

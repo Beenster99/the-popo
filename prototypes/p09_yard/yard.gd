@@ -7,6 +7,7 @@ extends Node3D
 ## (hold interact next to them). K (host): go down yourself. G (host): reset.
 
 const SCENE := "res://prototypes/p09_yard/yard.tscn"
+const AMMO_BOX := Vector3(-4.5, 0, -7.0)
 
 var cam: IsoCamera
 var sync: PawnSync
@@ -70,6 +71,9 @@ func _ready() -> void:
 	_label3d("COVER TO COVER", Vector3(16, 0.1, -8.5))
 	_label3d("CLIMB, THEN JUMP", Vector3(-17, 0.1, -6.5))
 	_label3d("TARGETS", Vector3(0, 0.1, -10))
+	# Ammo box: hold interact next to it to fill your belt.
+	ProtoWorld.block(self, Vector3(0.7, 0.45, 0.45), AMMO_BOX + Vector3(0, 0.225, 0), Color("4d5a2e"), "AmmoBox")
+	_label3d("AMMO (HOLD F)", AMMO_BOX + Vector3(0, 0, -0.9))
 
 	cam = IsoCamera.new()
 	cam.zoom = 14.0
@@ -91,6 +95,9 @@ func _ready() -> void:
 	var reticle := Reticle.new()
 	reticle.pawn_getter = func(): return sync.my_pawn()
 	add_child(reticle)
+	var hud := AmmoHud.new()
+	hud.pawn_getter = func(): return sync.my_pawn()
+	add_child(hud)
 	var overlay := NetOverlay.new()
 	overlay.extra_lines = func():
 		var o: Officer = sync.my_pawn()
@@ -107,6 +114,15 @@ func _ready() -> void:
 	add_child(overlay)
 
 
+func _physics_process(_delta: float) -> void:
+	if not Net.is_host() or sync == null:
+		return
+	for o in get_tree().get_nodes_in_group("officers"):
+		var off: Officer = o
+		if (off.buttons & PlayerInput.INTERACT) != 0 and off.global_position.distance_to(AMMO_BOX) < 1.4:
+			off.refill_ammo()
+
+
 func _label3d(t: String, at: Vector3) -> void:
 	var l := Label3D.new()
 	l.text = t
@@ -119,7 +135,7 @@ func _label3d(t: String, at: Vector3) -> void:
 
 
 func _on_fired(origin: Vector3, dir: Vector3, alt: bool, shooter: Officer) -> void:
-	var hit := get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(origin, origin + dir * 60.0, 1 | 2 | 16, [shooter.get_rid()]))
+	var hit := Melee.bullet_ray(get_world_3d().direct_space_state, origin, dir, shooter)
 	if alt:
 		var at: Vector3 = hit.position if hit else origin + dir * 8.0
 		world.explode(at, 3.5, 200.0, 9.0)

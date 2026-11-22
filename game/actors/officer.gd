@@ -98,15 +98,28 @@ var _ledge := Vector3.ZERO
 # Weapon handling (synced: prediction replays it the same way everywhere).
 const MAG := 15
 const RELOAD_TIME := 1.7
+## Holstering or drawing the pistol takes this long. The hand reaches the
+## holster HOLSTER_GRIP seconds into holstering (the gun disappears there).
+const HOLSTER_TIME := 0.6
+const HOLSTER_GRIP := 0.42
 const FIRE_GAP := 0.18
 var ammo := MAG
+## Spare rounds on the belt (magazines), used up by reloading.
+const RESERVE_START := 60
+const RESERVE_MAX := 90
+var reserve := RESERVE_START
+const WEAPON_NAME := "Service pistol"
 var reload_t := 0.0       # seconds of reload left
 var holstered := false
+var holster_t := 0.0      # seconds of holstering / drawing left
+var drawing := false      # holster_t counts down a draw (else a holster)
 var bloom := 0.0          # grows with rapid fire, widens the spread
 ## Cosmetic: chest kick after a shot, and how long the gun stays up after a
 ## blind-fire shot from cover.
 var recoil := 0.0
 var blind_t := 0.0
+var _cover_lost_t := 0
+var _cover_armed := false
 var _rng := RandomNumberGenerator.new()
 var _torch: SpotLight3D
 # Cover: the wall's outward normal, where the officer tucked in, and whether
@@ -118,6 +131,8 @@ var _cover_low := false
 var _dash := false
 const LOW_COVER := 1.35   # walls lower than this are crouched behind
 const BODY_HALF := 0.35   # half the body's width, kept behind the wall
+const COVER_GAP := 0.36   # body centre to the wall: back pressed against it
+const COVER_SNAP := 1.6   # cover within this reach is snapped to
 const PEEK_OUT := 0.6     # how far the officer leans out past a wall's edge
 var _shape: CollisionShape3D
 var _visual: Node3D
@@ -147,12 +162,32 @@ func _ready() -> void:
 
 
 func is_aiming() -> bool:
-	return (buttons & PlayerInput.AIM) != 0 and not holstered and state in [S.MOVE, S.CROUCH, S.PRONE, S.COVER, S.AIR]
+	return (buttons & PlayerInput.AIM) != 0 and gun_up() and state in [S.MOVE, S.CROUCH, S.PRONE, S.COVER, S.AIR]
+
+
+## The pistol is out and in the hand (not mid-holster, nearly done drawing).
+func gun_up() -> bool:
+	if holstered:
+		return false
+	if holster_t <= 0.0:
+		return true
+	return drawing and holster_t < 0.15
+
+
+## The pistol mesh shows in the hand (part way through a holster or draw).
+func gun_in_hand() -> bool:
+	if holstered:
+		return false
+	if holster_t <= 0.0:
+		return true
+	if drawing:
+		return holster_t < HOLSTER_GRIP
+	return holster_t > HOLSTER_TIME - HOLSTER_GRIP
 
 
 ## Firing over or round cover without looking (fire held, aim not).
 func is_blind_firing() -> bool:
-	return state == S.COVER and (buttons & PlayerInput.FIRE) != 0 and (buttons & PlayerInput.AIM) == 0 and not holstered
+	return state == S.COVER and (buttons & PlayerInput.FIRE) != 0 and (buttons & PlayerInput.AIM) == 0 and gun_up()
 
 
 func is_reloading() -> bool:
@@ -226,7 +261,7 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 		elif _dash:
 			_dash = false
 		elif state in [S.MOVE, S.CROUCH]:
-			_try_cover()
+			_try_cover(wish)
 	if _dash and (state != S.MOVE or state_t > DASH_TIME or _pressed(PlayerInput.JUMP) or _pressed(PlayerInput.DIVE)):
 		_dash = false
 
@@ -272,6 +307,17 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 			elif buttons & PlayerInput.SPRINT:
 				speed = SPRINT
 	if state == S.COVER:
+		# Moving away from the cover leaves it; so does the cover being
+		# shot or blown away.
+		# (Only once the stick has come off the way in: holding the run to
+		# cover, or the corner swing, does not pop you straight back out.)
+		if wish.dot(_cover_n) < 0.3:
+			_cover_armed = true
+		if not is_aiming() and _cover_armed and wish.dot(_cover_n) > 0.6:
+			_set_state(S.MOVE)
+		elif _cover_gone():
+			_set_state(S.MOVE)
+	if state == S.COVER:
 		wish = _cover_wish(wish)
 	elif _dash:
 		wish = _dash_wish()
@@ -299,8 +345,9 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 	# Facing: toward the aim when aiming, else toward travel (not in cover).
 	turning = false
 	if state == S.COVER:
-		# Facing the wall while hidden; facing the aim while peeking.
-		var yaw := aim_yaw if is_aiming() else atan2(-_cover_n.x, -_cover_n.z)
+		# Back to the wall while hidden; facing the aim while peeking or
+		# blind firing over or round it.
+		var yaw := aim_yaw if is_aiming() or blind_t > 0.0 else atan2(_cover_n.x, _cover_n.z)
 		rotation.y = lerp_angle(rotation.y, yaw, 12.0 * delta)
 	else:
 		if is_aiming() and state == S.PRONE:
@@ -334,7 +381,8 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 	if buttons & PlayerInput.FIRE and (is_aiming() or is_blind_firing()) and _cooldown <= 0.0 and reload_t <= 0.0:
 		_cooldown = FIRE_GAP
 		if ammo <= 0:
-			reload_t = RELOAD_TIME   # dry: reload by itself
+			if reserve > 0:
+				reload_t = RELOAD_TIME   # dry: reload by itself
 		else:
 			ammo -= 1
 			recoil = 1.0
@@ -415,20 +463,38 @@ func is_reviving() -> bool:
 	return false
 
 
+## Host only: refill the belt (an ammo box). Returns true if any was taken.
+func refill_ammo() -> bool:
+	if not Net.is_host() or reserve >= RESERVE_MAX:
+		return false
+	reserve = RESERVE_MAX
+	return true
+
+
 ## Draw, holster and reload.
 func _weapon(delta: float) -> void:
-	if _pressed(PlayerInput.HOLSTER):
-		holstered = not holstered
+	if holster_t > 0.0:
+		holster_t = maxf(holster_t - delta, 0.0)
+		if holster_t <= 0.0 and not drawing:
+			holstered = true
+	var draw_now := holstered and (_pressed(PlayerInput.HOLSTER) or _pressed(PlayerInput.AIM))
+	if draw_now:
+		holstered = false   # aiming draws the gun too
+		drawing = true
+		holster_t = HOLSTER_TIME
+	elif _pressed(PlayerInput.HOLSTER) and holster_t <= 0.0:
+		drawing = false
+		holster_t = HOLSTER_TIME
 		reload_t = 0.0
-	if holstered and _pressed(PlayerInput.AIM):
-		holstered = false   # aiming draws the gun
-	if _pressed(PlayerInput.RELOAD) and not holstered and ammo < MAG and reload_t <= 0.0:
+	if _pressed(PlayerInput.RELOAD) and gun_up() and holster_t <= 0.0 and ammo < MAG and reserve > 0 and reload_t <= 0.0:
 		reload_t = RELOAD_TIME
 	if reload_t > 0.0:
 		reload_t -= delta
 		if reload_t <= 0.0:
 			reload_t = 0.0
-			ammo = MAG
+			var take := mini(MAG - ammo, reserve)
+			ammo += take
+			reserve -= take
 
 
 ## Bullets go where you point, give or take: steady aimed shots are tight,
@@ -605,12 +671,30 @@ func _solid_ray(from: Vector3, to: Vector3, mask: int) -> Dictionary:
 	return {}
 
 
-## Snaps into cover against whatever is just ahead: walls, cars, rubble.
-func _try_cover() -> void:
-	var fwd := Vector3(sin(rotation.y), 0, cos(rotation.y))
-	var hit := _cover_ray(global_position, fwd, 1.2)
-	if not hit.is_empty():
-		_enter_cover(hit.position, hit.normal)
+## Snaps into cover against the nearest wall, car or rubble within reach,
+## any way round (ahead and the way the stick points count first).
+func _try_cover(wish := Vector3.ZERO) -> void:
+	var dirs: Array = []
+	if wish.length() > 0.3:
+		dirs.append(wish.normalized())
+	dirs.append(Vector3(sin(rotation.y), 0, cos(rotation.y)))
+	for i in 16:
+		var a := TAU * i / 16.0
+		dirs.append(Vector3(sin(a), 0, cos(a)))
+	var best := {}
+	var best_d := INF
+	for k in dirs.size():
+		var hit := _cover_ray(global_position, dirs[k], COVER_SNAP)
+		if hit.is_empty():
+			continue
+		var d := Vector2(hit.position.x - global_position.x, hit.position.z - global_position.z).length()
+		if k < dirs.size() - 16:
+			d -= 0.3   # prefer the cover you are facing or heading for
+		if d < best_d:
+			best_d = d
+			best = hit
+	if not best.is_empty():
+		_enter_cover(best.position, best.normal)
 
 
 ## Chest height first, then knee height for low walls. Returns a hit on an
@@ -633,7 +717,7 @@ func _enter_cover(at: Vector3, normal: Vector3) -> void:
 	var top := _solid_ray(Vector3(inside.x, global_position.y + 3.0, inside.z), Vector3(inside.x, global_position.y, inside.z), COVER_MASK)
 	var height := 3.0 if top.is_empty() else float(top.position.y - global_position.y)
 	_cover_low = height < LOW_COVER
-	var p := Vector3(at.x, global_position.y, at.z) + n * 0.45
+	var p := Vector3(at.x, global_position.y, at.z) + n * COVER_GAP
 	# At the end of a wall, shuffle in so the whole body is behind it.
 	var along := Vector3(-n.z, 0, n.x)
 	for side in [-1.0, 1.0]:
@@ -642,8 +726,10 @@ func _enter_cover(at: Vector3, normal: Vector3) -> void:
 			p -= along * side * (BODY_HALF - reach)
 	global_position = p
 	_cover_anchor = p
-	rotation.y = atan2(-n.x, -n.z)
+	rotation.y = atan2(n.x, n.z)   # back to the wall
 	velocity = Vector3.ZERO
+	_cover_lost_t = 0
+	_cover_armed = false
 	_set_state(S.COVER)
 
 
@@ -681,13 +767,24 @@ func _start_dash(at: Vector3, normal: Vector3) -> void:
 
 ## Steering for a run to cover: straight at the spot in front of the face.
 func _dash_wish() -> Vector3:
-	var spot := _cover_anchor + _cover_n * 0.45
+	var spot := _cover_anchor + _cover_n * COVER_GAP
 	var to := spot - global_position
 	to.y = 0.0
 	if to.length() < 0.25:
 		_enter_cover(_cover_anchor, _cover_n)
 		return Vector3.ZERO
 	return to.normalized()
+
+
+## The wall behind the cover spot is no longer there (broken or knocked over).
+func _cover_gone() -> bool:
+	var h := 0.6 if _cover_low else 1.0
+	var o := _cover_anchor + Vector3(0, h, 0)
+	if _solid_ray(o, o - _cover_n * (COVER_GAP + 0.5), COVER_MASK).is_empty():
+		_cover_lost_t += 1
+	else:
+		_cover_lost_t = 0
+	return _cover_lost_t > 6
 
 
 ## How far the cover wall carries on from p in direction dir (up to 1 m).
@@ -814,9 +911,11 @@ func encode_state(b: StreamPeerBuffer) -> void:
 	b.put_float(_cover_anchor.x)
 	b.put_float(_cover_anchor.y)
 	b.put_float(_cover_anchor.z)
-	b.put_u8((1 if _cover_low else 0) | (2 if _dash else 0))
+	b.put_u8((1 if _cover_low else 0) | (2 if _dash else 0) | (4 if _cover_armed else 0))
 	b.put_u8(ammo | (128 if holstered else 0))
+	b.put_u8(reserve)
 	b.put_half(reload_t)
+	b.put_half(holster_t * (-1.0 if drawing else 1.0))
 	b.put_half(_cooldown)
 	b.put_half(bloom)
 	b.put_u8(int(hp))
@@ -834,7 +933,7 @@ func decode_state(b: StreamPeerBuffer) -> Dictionary:
 		"ms": Vector3(b.get_float(), b.get_float(), b.get_float()), "my": b.get_half(), "mr": b.get_half(),
 		"cn": Vector3(b.get_half(), 0.0, b.get_half()), "ca": Vector3(b.get_float(), b.get_float(), b.get_float()),
 		"cl": b.get_u8(),
-		"ammo": b.get_u8(), "rl": b.get_half(), "cd": b.get_half(), "bl": b.get_half(),
+		"ammo": b.get_u8(), "rs": b.get_u8(), "rl": b.get_half(), "ht": b.get_half(), "cd": b.get_half(), "bl": b.get_half(),
 		"hp": b.get_u8(), "rv": b.get_half(), "bg": b.get_u8() == 1, "sg": b.get_half(),
 	}
 
@@ -858,9 +957,13 @@ func apply_state(s: Dictionary) -> void:
 	_cover_anchor = s.ca
 	_cover_low = (s.cl & 1) != 0
 	_dash = (s.cl & 2) != 0
+	_cover_armed = (s.cl & 4) != 0
 	ammo = s.ammo & 127
 	holstered = (s.ammo & 128) != 0
+	reserve = s.rs
 	reload_t = s.rl
+	holster_t = absf(s.ht)
+	drawing = s.ht < 0.0
 	_cooldown = s.cd
 	bloom = s.bl
 	hp = s.hp
@@ -890,7 +993,7 @@ func _process(delta: float) -> void:
 			rig.set_downed(state == S.DOWNED)
 		rig.update_from(self, delta)
 		for g in rig.model.find_children("gun_*", "", true, false):
-			g.visible = not holstered and state not in [S.ROLL, S.VAULT, S.CLIMB, S.SLIDE, S.KICK, S.DOWNED]
+			g.visible = gun_in_hand() and state not in [S.ROLL, S.VAULT, S.CLIMB, S.SLIDE, S.KICK, S.DOWNED]
 		_update_torch()
 
 

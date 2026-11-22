@@ -8,13 +8,37 @@ const OFFICER_DAMAGE := {Officer.Strike.PUNCH: 8.0, Officer.Strike.KICK: 12.0, O
 const SHOVE := {Officer.Strike.PUNCH: 2.5, Officer.Strike.KICK: 4.5, Officer.Strike.BARGE: 6.0}
 
 
+## Friendly fire setting (the host's, since damage is decided on the host).
+static func friendly_fire() -> bool:
+	var ml := Engine.get_main_loop() as SceneTree
+	var st: Node = ml.root.get_node_or_null("/root/Settings") if ml else null
+	return st == null or bool(st.get("values").get("friendly_fire", true))
+
+
+## A bullet's ray. With friendly fire off it passes through other officers.
+static func bullet_ray(space: PhysicsDirectSpaceState3D, origin: Vector3, dir: Vector3, shooter: Officer, length := 60.0) -> Dictionary:
+	var exclude := [shooter.get_rid()]
+	var ff := friendly_fire()
+	for i in 4:
+		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(origin, origin + dir * length, 1 | 2 | 16, exclude))
+		if hit and hit.collider is Officer and not ff:
+			exclude.append((hit.collider as Officer).get_rid())
+			continue
+		return hit
+	return {}
+
+
 static func resolve(attacker: Officer, world: DestructionWorld, origin: Vector3, dir: Vector3, kind: Officer.Strike) -> void:
 	var space := attacker.get_world_3d().direct_space_state
 	var reach: float = REACH[kind]
 	# A short fan of rays: dead ahead and a little either side.
 	for a in [0.0, -0.35, 0.35]:
 		var d := dir.rotated(Vector3.UP, a)
-		var q := PhysicsRayQueryParameters3D.create(origin, origin + d * reach, 1 | 2 | 4 | 16, [attacker.get_rid()])
+		var ex := [attacker.get_rid()]
+		if not friendly_fire():
+			for o in attacker.get_tree().get_nodes_in_group("officers"):
+				ex.append((o as Officer).get_rid())
+		var q := PhysicsRayQueryParameters3D.create(origin, origin + d * reach, 1 | 2 | 4 | 16, ex)
 		var hit := space.intersect_ray(q)
 		if hit.is_empty():
 			continue

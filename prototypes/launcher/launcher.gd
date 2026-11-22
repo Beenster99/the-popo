@@ -26,6 +26,7 @@ var _copy: Button
 
 
 func _ready() -> void:
+	theme = UiTheme.get_theme()
 	var cfg := ConfigFile.new()
 	cfg.load("user://launcher.cfg")
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -47,7 +48,7 @@ func _ready() -> void:
 	left.custom_minimum_size.x = 420
 	root.add_child(left)
 	var title := Label.new()
-	title.text = "THE POPO  ·  v%s" % ProjectSettings.get_setting("application/config/version", "dev")
+	title.text = "ONLINE  ·  v%s" % ProjectSettings.get_setting("application/config/version", "dev")
 	title.add_theme_font_size_override("font_size", 34)
 	left.add_child(title)
 	left.add_child(_label("Your name"))
@@ -69,6 +70,7 @@ func _ready() -> void:
 	buttons.add_child(_button("Host", _on_host))
 	buttons.add_child(_button("Join", _on_join))
 	buttons.add_child(_button("Leave", func(): Net.leave(); _refresh()))
+	buttons.add_child(_button("Back to menu", func(): Net.leave(); get_tree().change_scene_to_file("res://game/ui/main_menu.tscn")))
 	_status = _label("Offline: you can still run every prototype on your own.")
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD
 	left.add_child(_status)
@@ -103,7 +105,7 @@ func _ready() -> void:
 		var b := _button(p[0], func(): _start(p[1]))
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		_list.add_child(b)
-	right.add_child(_label("\nEsc returns here. F3 toggles the network overlay. Q/E rotate the camera, mouse wheel zooms.\nA game controller works too."))
+	right.add_child(_label("\nEsc opens the menu (Settings, Leave). F3 toggles the network overlay. Q/E rotate the camera, mouse wheel zooms.\nA game controller works too."))
 	right.add_child(_button("Controls...", func(): add_child(load("res://prototypes/launcher/controls_screen.gd").new())))
 
 	Net.lobby_changed.connect(_refresh)

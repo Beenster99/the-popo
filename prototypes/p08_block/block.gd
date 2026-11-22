@@ -63,6 +63,9 @@ func _ready() -> void:
 	var reticle := Reticle.new()
 	reticle.pawn_getter = func(): return sync.my_pawn()
 	add_child(reticle)
+	var hud := AmmoHud.new()
+	hud.pawn_getter = func(): return sync.my_pawn()
+	add_child(hud)
 	var overlay := NetOverlay.new()
 	overlay.extra_lines = func():
 		var o: Officer = sync.my_pawn()
@@ -112,7 +115,7 @@ func _on_seed(_from: int, data: PackedByteArray) -> void:
 
 
 func _on_fired(origin: Vector3, dir: Vector3, alt: bool, shooter: Officer) -> void:
-	var hit := get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(origin, origin + dir * 60.0, 1 | 2 | 16, [shooter.get_rid()]))
+	var hit := Melee.bullet_ray(get_world_3d().direct_space_state, origin, dir, shooter)
 	if alt:
 		var at: Vector3 = hit.position if hit else origin + dir * 8.0
 		world.explode(at, 3.5, 200.0, 9.0)
@@ -121,7 +124,7 @@ func _on_fired(origin: Vector3, dir: Vector3, alt: bool, shooter: Officer) -> vo
 			if d < 4.5:
 				(o as Officer).take_damage(110.0 * (1.0 - d / 4.5), ((o as Officer).global_position - at).normalized())
 	elif hit and hit.collider is Officer:
-		# Friendly fire hurts.
+		# Friendly fire (on unless the host turned it off in Settings).
 		(hit.collider as Officer).take_damage(25.0, dir)
 	elif hit:
 		world.bullet_hit(hit.collider, hit.position, hit.normal, dir)
