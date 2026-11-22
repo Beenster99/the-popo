@@ -15,6 +15,10 @@ const FIRE := 512
 const INTERACT := 1024
 const ALT_TOOL := 2048  # weapon slot 2 (demolition charge in the destruction spike)
 const STAND := 4096    # stand up from crouch or prone
+const RELOAD := 8192
+const HOLSTER := 16384
+const TORCH := 32768   # a state, not a press: the torch is switched on
+static var torch_on := false
 
 ## The stance key (Ctrl): tap to crouch or stand back up, hold to lie prone,
 ## hold while running to roll (slide when sprinting). It is turned into the
@@ -37,6 +41,7 @@ const PAD_AIM_RANGE := 10.0
 const _MAP := {
 	"sprint": SPRINT, "jump": JUMP, "crouch": CROUCH, "prone": PRONE, "dive": DIVE,
 	"cover": COVER, "punch": PUNCH, "kick": KICK, "aim": AIM, "fire": FIRE, "interact": INTERACT,
+	"reload": RELOAD, "holster": HOLSTER,
 }
 
 
@@ -50,6 +55,10 @@ static func sample(cam: IsoCamera, from: Node3D) -> Dictionary:
 		if Input.is_action_pressed(a):
 			buttons |= _MAP[a]
 	buttons |= stance_buttons(Input.is_action_pressed("stance"), Time.get_ticks_msec() / 1000.0, from)
+	if Input.is_action_just_pressed("torch"):
+		torch_on = not torch_on
+	if torch_on:
+		buttons |= TORCH
 	if Input.is_action_just_pressed("weapon_1"):
 		alt_tool = false
 	elif Input.is_action_just_pressed("weapon_2"):

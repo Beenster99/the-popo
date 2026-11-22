@@ -133,6 +133,15 @@ func _run() -> void:
 					s.cam.zoom = 12.0
 			await _frames(90)
 			await _save()
+		"yard":
+			var s := await _scene("res://prototypes/p09_yard/yard.tscn")
+			s.find_children("*", "NetOverlay", false, false)[0].queue_free()
+			await _frames(20)
+			s.cam.target = null
+			s.cam.zoom = 30.0
+			s.cam.global_position = Vector3(0, 0, 2)
+			await _frames(90)
+			await _save()
 		_:
 			var s := await _scene(shot)
 			await _frames(90)

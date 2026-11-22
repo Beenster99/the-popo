@@ -18,6 +18,13 @@ var aim_target := Vector3.ZERO
 var slide_rel := Transform3D()
 var have_slide := false
 const MAX_AIM_FIX := 1.0      # radians the chest may turn to line up the barrel
+## Shot kick (0..1, decays) and reload progress (0..1, 0 when not reloading).
+var recoil := 0.0
+var reload_k := 0.0
+## Climbing: both hands grip the real ledge edge (world), whatever its height.
+var ledge_weight := 0.0
+var ledge_point := Vector3.ZERO
+var ledge_right := Vector3.RIGHT
 
 var _legs := [["thigh.L", "shin.L", "foot.L"], ["thigh.R", "shin.R", "foot.R"]]
 var _idx := {}
@@ -31,7 +38,8 @@ func _ready() -> void:
 	for n in ["hips", "spine", "chest_2", "neck_2", "head_2", "thigh.L", "shin.L", "foot.L", "thigh.R", "shin.R", "foot.R",
 			"upper_arm.L", "forearm.L", "hand.L", "hand.R"]:
 		_idx[n] = sk.find_bone(n)
-	_idx["hand.R"] = sk.find_bone("hand.R")
+	for n in ["hand.R", "upper_arm.R", "forearm.R"]:
+		_idx[n] = sk.find_bone(n)
 
 
 func _process_modification() -> void:
@@ -40,11 +48,14 @@ func _process_modification() -> void:
 		return
 	_aim(sk)
 	_line_up_barrel(sk)
+	_kick(sk)
 	if feet_enabled:
 		_feet(sk)
 	else:
 		_hips_drop = lerpf(_hips_drop, 0.0, 0.2)
 	_hand_lock(sk)
+	_reload_hand(sk)
+	_ledge_hands(sk)
 
 
 func _rotate_global(sk: Skeleton3D, bone: int, q: Quaternion) -> void:
@@ -132,6 +143,40 @@ func _hand_lock(sk: Skeleton3D) -> void:
 	var lg := sk.get_bone_global_pose(_idx["hand.L"])
 	lg.basis = want.basis
 	sk.set_bone_global_pose(_idx["hand.L"], lg)
+
+
+## Recoil: the chest and arms kick up for a moment after each shot.
+func _kick(sk: Skeleton3D) -> void:
+	if recoil <= 0.001:
+		return
+	var g := sk.get_bone_global_pose(_idx["chest_2"])
+	# Pitch up about the chest's own side axis.
+	var side := g.basis.x.normalized()
+	_rotate_global(sk, _idx["chest_2"], Quaternion(side, -0.16 * recoil * recoil))
+
+
+## Reloading: the left hand goes down to the belt for a fresh magazine and
+## back up to the gun.
+func _reload_hand(sk: Skeleton3D) -> void:
+	if reload_k <= 0.0:
+		return
+	var w := sin(clampf(reload_k, 0.0, 1.0) * PI)
+	var hips := sk.get_bone_global_pose(_idx["hips"])
+	var belt := hips.origin + hips.basis.x.normalized() * 0.16 + Vector3(0, 0.02, 0) + hips.basis.z.normalized() * 0.06
+	var hand: int = _idx["hand.L"]
+	var cur := sk.get_bone_global_pose(hand).origin
+	_two_bone(sk, _idx["upper_arm.L"], _idx["forearm.L"], hand, cur.lerp(belt, w))
+
+
+func _ledge_hands(sk: Skeleton3D) -> void:
+	if ledge_weight <= 0.001:
+		return
+	var inv := sk.global_transform.affine_inverse()
+	for side in [["L", 1.0], ["R", -1.0]]:
+		var hand: int = _idx["hand." + side[0]]
+		var cur := sk.get_bone_global_pose(hand).origin
+		var grip: Vector3 = inv * (ledge_point + ledge_right * (0.22 * side[1]) + Vector3(0, 0.04, 0))
+		_two_bone(sk, _idx["upper_arm." + side[0]], _idx["forearm." + side[0]], hand, cur.lerp(grip, ledge_weight))
 
 
 ## Analytic two-bone IK in skeleton space. Keeps the joint bending the way
