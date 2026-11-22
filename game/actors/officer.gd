@@ -136,7 +136,7 @@ const RESERVE_MAX := 90
 var reserve := RESERVE_START
 const WEAPON_NAME := "Service pistol"
 var reload_t := 0.0       # seconds of reload left
-var holstered := false
+var holstered := true          # officers start the game with the gun holstered
 var holster_t := 0.0      # seconds of holstering / drawing left
 var drawing := false      # holster_t counts down a draw (else a holster)
 var bloom := 0.0          # grows with rapid fire, widens the spread
@@ -159,7 +159,7 @@ const LOW_COVER := 1.35   # walls lower than this are crouched behind
 const BODY_HALF := 0.35   # half the body's width, kept behind the wall
 const COVER_GAP := 0.36   # body centre to the wall: back pressed against it
 const COVER_SNAP := 1.6   # cover within this reach is snapped to
-const PEEK_OUT := 0.6     # how far the officer leans out past a wall's edge
+const PEEK_OUT := 0.22    # the small side step at a wall's edge; the body leans the rest
 var _shape: CollisionShape3D
 var _visual: Node3D
 
@@ -1112,6 +1112,18 @@ func _wall_reach(p: Vector3, dir: Vector3) -> float:
 	return 1.0
 
 
+## Which way the officer leans out round the end of a tall wall while
+## aiming from cover (world direction along the wall), or zero.
+func peek_dir() -> Vector3:
+	if state != S.COVER or _cover_low or not is_aiming():
+		return Vector3.ZERO
+	var along := Vector3(-_cover_n.z, 0, _cover_n.x)
+	for side in [-1.0, 1.0]:
+		if _wall_reach(_cover_anchor, along * side) < BODY_HALF + 0.15:
+			return along * side
+	return Vector3.ZERO
+
+
 ## Movement while in cover: slide along the wall but not past its end. Aiming
 ## peeks: over a low wall by standing up, round the end of a tall wall by
 ## leaning out, and back in again when the aim is let go.
@@ -1121,11 +1133,9 @@ func _cover_wish(wish: Vector3) -> Vector3:
 	if is_aiming():
 		if _cover_low:
 			return Vector3.ZERO
-		# Lean out past the nearer end of the wall, if there is one close by.
-		var target := _cover_anchor
-		for side in [-1.0, 1.0]:
-			if _wall_reach(_cover_anchor, along * side) < BODY_HALF + 0.15:
-				target = _cover_anchor + along * side * PEEK_OUT
+		# Feet stay put at the end of the wall (a small side step at most)
+		# and the body leans out round it (the rig does the lean).
+		var target := _cover_anchor + peek_dir() * PEEK_OUT
 		var to := target - here
 		to.y = 0.0
 		return to.normalized() * clampf(to.length() * 8.0 / COVER_SPEED, 0.0, 1.0) if to.length() > 0.03 else Vector3.ZERO

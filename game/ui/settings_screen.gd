@@ -12,6 +12,9 @@ var _restart: Button
 var _note: Label
 
 
+const PANEL_WIDTH := 1100.0
+
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	theme = UiTheme.get_theme()
@@ -22,8 +25,14 @@ func _ready() -> void:
 	add_child(bg)
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	for side in ["left", "right"]:
-		margin.add_theme_constant_override("margin_" + side, 80)
+	# A centred panel of fixed width, so labels stay next to their controls
+	# on wide and 4K screens.
+	var centre := func():
+		var side := maxi(40, int((size.x - PANEL_WIDTH) / 2.0))
+		margin.add_theme_constant_override("margin_left", side)
+		margin.add_theme_constant_override("margin_right", side)
+	resized.connect(centre)
+	centre.call()
 	for side in ["top", "bottom"]:
 		margin.add_theme_constant_override("margin_" + side, 36)
 	add_child(margin)

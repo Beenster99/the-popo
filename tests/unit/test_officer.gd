@@ -5,6 +5,8 @@ var t
 func _officer(pos := Vector3.ZERO) -> Officer:
 	ProtoWorld.ground(self, 80.0)
 	var o := Officer.new()
+	t.check(o.holstered, "officers start with the gun holstered")
+	o.holstered = false   # most tests start with the gun out
 	o.position = pos
 	add_child(o)
 	return o
@@ -218,7 +220,11 @@ func test_cover_hides_and_peeks_on_aim() -> void:
 	var hidden_x := o.global_position.x
 	var aim := {"move": Vector2.ZERO, "buttons": PlayerInput.AIM, "aim_yaw": 0.0, "aim_point": Vector3(-1, 1.2, 8)}
 	await _run(o, aim, 40)
-	t.check(o.global_position.x < hidden_x - 0.4, "leans out past the end while aiming: x=%.2f" % o.global_position.x)
+	t.check(o.global_position.x > hidden_x - 0.3, "feet stay at the corner (a small step at most): x=%.2f" % o.global_position.x)
+	t.check(o.rig.procedural.lean.length() > 0.8, "leans out round the corner: %.2f" % o.rig.procedural.lean.length())
+	var mz := o.muzzle_position()
+	print("    muzzle at x=%.2f (wall end at x=0)" % mz.x)
+	t.check(mz.x < -0.05, "the gun comes out past the wall's end: x=%.2f" % mz.x)
 	await _run(o, _cmd(), 40)
 	t.check(absf(o.global_position.x - hidden_x) < 0.1, "back in cover when the aim is let go: x=%.2f" % o.global_position.x)
 	# A low wall: crouch behind it, stand to aim over.

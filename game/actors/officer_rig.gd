@@ -14,6 +14,8 @@ const LOWER_STATES := ["idle", "walk", "run", "crouch_idle", "crouch_walk", "pro
 const UPPER_STATES := ["none", "aim_hold", "ready_hold", "punch", "reload", "holster", "draw", "drive"]
 var RUN_CLIP_SPEED := 3.3    # m/s of the run cycle (2.27 for the mocap run)
 const WALK_CLIP_SPEED := 1.4
+## Upper-body crossfade time (seconds), see _build_tree.
+const UPPER_BLEND := 0.2
 const CROUCH_CLIP_SPEED := 1.0
 const CRAWL_CLIP_SPEED := 0.45
 
@@ -28,6 +30,8 @@ var _upper := ""
 var _spare_mag: Node3D
 var _hit_t := 0.0
 var downed := false
+var _aim_smooth := Vector3.INF
+var _upper_t := 0.0          # seconds in the current upper-body state
 
 
 func _ready() -> void:
@@ -146,9 +150,11 @@ func update_from(o: Officer, delta: float) -> void:
 	if lower != _lower:
 		tree.set("parameters/lower/transition_request", lower)
 		_lower = lower
+	_upper_t += delta
 	if upper != _upper:
 		tree.set("parameters/upper/transition_request", upper)
 		_upper = upper
+		_upper_t = 0.0
 	tree.set("parameters/split/blend_amount", 0.0 if upper == "none" else 1.0)
 	var hs := Vector2(o.velocity.x, o.velocity.z).length()
 	tree.set("parameters/ts_run/scale", clampf(hs / RUN_CLIP_SPEED, 0.6, 1.7))
@@ -173,14 +179,28 @@ func update_from(o: Officer, delta: float) -> void:
 		# A wounded arm can't hold the gun still.
 		var tt := Time.get_ticks_msec() / 1000.0
 		to += Vector3(sin(tt * 7.3) + sin(tt * 13.1) * 0.4, sin(tt * 5.1) * 0.6, cos(tt * 6.7)) * 0.035 * maxf(horiz, 1.0)
-	procedural.aim_target = chest_p + to
+	# Smoothed, so the mouse sweeping over edges (the aim point jumping
+	# between a near wall and the ground behind it) does not jolt the arms.
+	var want_aim := chest_p + to
+	if not procedural.aim_active or _aim_smooth == Vector3.INF:
+		_aim_smooth = want_aim
+	else:
+		_aim_smooth = _aim_smooth.lerp(want_aim, 1.0 - exp(-12.0 * delta))
+	procedural.aim_target = _aim_smooth
+	if not procedural.aim_active:
+		_aim_smooth = Vector3.INF
 	if not procedural.have_slide:
 		var sl := model.find_child("gun_slide", true, false) as Node3D
 		if sl and sl.get_parent() is BoneAttachment3D:
 			procedural.slide_rel = (sl.get_parent() as Node3D).global_transform.affine_inverse() * sl.global_transform
 			procedural.have_slide = true
+	# Peeking round a corner: lean the body out over planted feet.
+	var lean_to := o.peek_dir()
+	procedural.lean = procedural.lean.lerp(lean_to, 1.0 - exp(-10.0 * delta))
 	procedural.feet_enabled = o.state in [Officer.S.MOVE, Officer.S.CROUCH, Officer.S.COVER]
-	procedural.hand_lock = o.is_aiming() and not o.is_reloading()
+	# The support hand locks onto the grip once the aim pose has fully blended
+	# in (after a reload or draw too), so it locks where the clip puts it.
+	procedural.hand_lock = o.is_aiming() and not o.is_reloading() and upper == "aim_hold" and _upper_t > UPPER_BLEND
 	procedural.recoil = o.recoil
 	# The reload is a hand-keyed clip now; the old procedural hand is off.
 	procedural.reload_k = 0.0
@@ -221,7 +241,7 @@ func _lower_state(o: Officer) -> String:
 		Officer.S.VEHICLE: return "sit"
 		Officer.S.COVER:
 			if o.is_aiming():
-				return "walk" if hs > 0.2 else "idle"
+				return "idle"   # feet planted; the body leans out (procedural)
 			if o._cover_low:
 				return "crouch_walk" if hs > 0.2 else "cover_low_idle"
 			return "crouch_walk" if hs > 0.2 else "cover_idle"

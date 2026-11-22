@@ -30,6 +30,10 @@ static var _stance_down_at := -1.0
 static var _stance_used := false
 
 static var alt_tool := false
+## Walk toggle (Alt): moves at a walk instead of a run. A controller walks
+## by tilting the stick part of the way.
+static var walk_on := false
+const WALK_SCALE := 0.42        # of the run speed: about 1.5 m/s
 ## Where the local player is aiming, for the reticle.
 static var aim_point := Vector3.ZERO
 static var aim_normal := Vector3.UP
@@ -56,6 +60,10 @@ static func sample(cam: IsoCamera, from: Node3D) -> Dictionary:
 		return {"move": Vector2.ZERO, "buttons": tb, "aim_yaw": yaw, "aim_point": Vector3.ZERO}
 	var raw := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var world := cam.view_relative(raw) if cam else Vector3(raw.x, 0, raw.y)
+	if InputMap.has_action("walk") and Input.is_action_just_pressed("walk"):
+		walk_on = not walk_on
+	if walk_on and not Input.is_action_pressed("sprint"):
+		world = world.limit_length(WALK_SCALE)
 	var buttons := 0
 	for a in _MAP:
 		if Input.is_action_pressed(a):

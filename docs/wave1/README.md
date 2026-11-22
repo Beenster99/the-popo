@@ -140,3 +140,26 @@ city block. It is built phase by phase; each phase ends with a build.
 ![Leaning out](img/patrol_leanout.png)
 ![Wrecked](img/patrol_wrecked.png)
 ![City block with police cars](img/block_overview_v0_2_4.png)
+
+### v0.2.5: playtest fixes (beenster)
+
+- Police car wheels stood flat; they now keep the model's turn and sit
+  upright in the arches.
+- Officers start with the gun holstered.
+- Walk: Alt toggles walking pace (about 1.5 m/s, the walk clip); a light
+  tilt of a controller stick walks too.
+- Cutaway (`game/render/roof_fader.gd`): walls between the officer and the
+  camera on their floor turn see-through instead of vanishing, so doorways
+  show; anything over the officer's head or hiding them from the camera
+  fades out, inside or out.
+- The reticle looks through hidden ceilings, roofs and walls.
+- Hold the middle mouse and drag to turn the camera; a click still pings.
+- Corner peek: the feet stay at the wall's end (a small side step at most)
+  and the body leans out round it (`OfficerProcedural._lean`).
+- Steadier aim: the aim target is smoothed and the aim loop barely breathes.
+- The support hand locks back onto the grip once the aim pose has blended
+  in after a reload or draw.
+- Settings sit in a centred panel 1100 px wide, and the UI scales with the
+  window (stretch mode canvas items), so 4K is readable.
+
+![Inside, v0.2.5](img/inside_v0_2_5.png)

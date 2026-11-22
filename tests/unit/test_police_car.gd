@@ -20,6 +20,7 @@ func _setup() -> PoliceCar:
 func _officer(pos: Vector3, id := 1) -> Officer:
 	var o := Officer.new()
 	o.peer_id = id
+	o.holstered = false
 	o.position = pos
 	add_child(o)
 	return o

@@ -1,9 +1,12 @@
 class_name RoofFader
 extends Node
-## Cutaway view for the isometric camera. While the watched officer is inside
+## Cutaway view for the isometric camera. Anything over the watched officer's
+## head or between them and the camera fades out, inside or out (walls on
+## their floor turn see-through instead). While they are inside
 ## a building, everything that would hide any part of the floor they stand
-## on fades out completely: the floors and roof above, the walls on the
-## camera side, and any neighbouring building or street piece in the way.
+## on goes: the floors and roof above fade out, and the walls on the camera
+## side (theirs or a neighbour's) turn see-through, so the room outline and
+## its doorways still show.
 ## Interior walls and the far walls stay, so rooms still read. It follows the
 ## camera, so it works at any rotation. Faded pieces keep casting their
 ## shadows (through a shadow-only copy), so interiors stay shaded.
@@ -20,6 +23,8 @@ var _state := {}    # MeshInstance3D -> current fade
 var _shadow := {}   # MeshInstance3D -> shadow-only copy
 var _all: Array = []          # every registered mesh (all buildings and street)
 var _seen := {}               # MeshInstance3D -> true (no duplicates)
+## How much of a see-through wall still shows (screen-door dither).
+const GHOST := 0.3
 
 
 ## Registers every piece of a DestructionWorld that lies inside bounds as one
@@ -72,6 +77,9 @@ func _process(delta: float) -> void:
 	if not home.is_empty():
 		for m in home.meshes:
 			home_meshes[m] = true
+	var cutaway: bool = Settings.values.get("cutaway", true)
+	var eye := -view
+	var probes := [p + Vector3(0, 0.3, 0), p + Vector3(0, 1.0, 0), p + Vector3(0, 1.75, 0)]
 	for m in _all:
 		# Pieces that broke or fell are gone; skip them (no typed loop
 		# variable, which would choke on a freed mesh).
@@ -79,12 +87,54 @@ func _process(delta: float) -> void:
 			continue
 		var mi := m as MeshInstance3D
 		var target := 1.0
-		if not home.is_empty() and Settings.values.get("cutaway", true):
-			if home_meshes.has(mi) and float(mi.get_meta("bottom_y")) > floor_y + 2.0:
+		var kind: String = mi.get_meta("kind")
+		var bottom: float = mi.get_meta("bottom_y")
+		if cutaway and not home.is_empty():
+			if home_meshes.has(mi) and bottom > floor_y + 2.0:
 				target = 0.0   # the floors and roof above
 			elif _in_the_way(mi, floor_y, foot, view, home_meshes.has(mi)):
-				target = 0.0
+				# Walls standing on this floor turn see-through, so the room
+				# and its doorways still show; anything else in the way goes.
+				target = GHOST if _on_floor(kind, bottom, floor_y) else 0.0
+		if cutaway and target > GHOST and _hides(mi, p, probes, eye):
+			target = GHOST if _on_floor(kind, bottom, floor_y) else 0.0
 		_fade(mi, target, delta)
+		# Hidden pieces are not aimed at (the reticle looks through them).
+		var body := mi.get_parent()
+		if body is CollisionObject3D:
+			body.set_meta("see_through", target < GHOST)
+
+
+## A wall, door, window or pillar standing on the officer's floor.
+static func _on_floor(kind: String, bottom: float, floor_y: float) -> bool:
+	return absf(bottom - floor_y) < 0.6 and _is_wall(kind)
+
+
+static func _is_wall(kind: String) -> bool:
+	for k in ["wall", "int_wall", "column", "glass", "door", "garage"]:
+		if kind.begins_with(k):
+			return true
+	return false
+
+
+## Is this piece over the officer's head, or between them and the camera?
+func _hides(mi: MeshInstance3D, p: Vector3, probes: Array, eye: Vector3) -> bool:
+	var box: AABB = mi.get_meta("box")
+	if box.end.y < p.y + 0.4:
+		return false   # the ground and floor underfoot
+	var c := box.get_center()
+	if absf(c.x - p.x) > 40.0 or absf(c.z - p.z) > 40.0:
+		return false
+	# Overhead: an upper floor, roof, awning or balcony right above them.
+	if box.position.y > p.y + 1.95:
+		var r := Rect2(box.position.x, box.position.z, box.size.x, box.size.z).grow(0.6)
+		if r.has_point(Vector2(p.x, p.z)):
+			return true
+	var grown := box.grow(0.15)
+	for q in probes:
+		if grown.intersects_segment(q, q + eye * 45.0):
+			return true
+	return false
 
 
 ## Does this piece hide part of the floor (foot, at floor_y) from a camera
@@ -117,6 +167,7 @@ func _in_the_way(mi: MeshInstance3D, floor_y: float, foot: Rect2, view: Vector3,
 func _fade(mi: MeshInstance3D, target: float, delta: float) -> void:
 	var cur: float = _state.get(mi, 1.0)
 	if is_equal_approx(cur, target):
+		_set_shadow_copy(mi, cur < 0.999)
 		return
 	cur = move_toward(cur, target, delta * fade_speed)
 	_state[mi] = cur
