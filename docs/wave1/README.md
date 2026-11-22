@@ -271,6 +271,14 @@ and a knocked chair in the same place to the centimetre.
 ![A shelf on fire](img/mayhem_fire.png)
 ![A car after it went up](img/mayhem_car.png)
 
+### v0.2.10: heal your friends (beenster)
+
+- First aid now restores health as well as treating wounds: holding F on
+  a hurt teammate gives 45 health (25 on yourself), one pouch use each.
+  It works on any teammate who has lost health, wounded or not.
+- Teammates who are hurt, wounded or down show their health (or DOWN) over
+  their heads; your own HUD keeps showing yours.
+
 ### v0.2.9: respawn (beenster)
 
 - Downed officers can respawn: after 3 s, R puts you back where you came

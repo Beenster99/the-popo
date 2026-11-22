@@ -58,6 +58,11 @@ Driver: WASD drive, Space handbrake, H horn, T lights, then lights and wail,
 then yelp, then off. Passengers: hold right mouse to lean out of the window
 and shoot. Windows shatter when shot; doors, bonnet, boot, bumpers and
 mirrors come off in big crashes. Hold F at the boot for ammo and first aid.
+HEALING YOUR FRIENDS (0.2.10)
+Stand next to a hurt teammate and hold F: your first aid patches a wound
+and gives back 45 health (25 when you use it on yourself). You carry 3;
+refill at a police car's boot. Hurt teammates show their health above
+their heads; a downed one says so (hold F on them to revive).
 GOING DOWN AND RESPAWNING (0.2.9)
 When you go down, wait 3 seconds and press R to respawn where you started,
 healed, with full ammo. Or a teammate can hold F on you to get you up

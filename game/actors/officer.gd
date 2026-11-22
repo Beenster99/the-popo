@@ -95,6 +95,11 @@ const BLEED_RATE := 1.2       # hp a second
 const POUCH_MAX := 3          # field dressings in the first aid pouch
 const TREAT_SELF := 3.0       # s to treat yourself
 const TREAT_MATE := 1.5       # s for a teammate to treat you
+## Health first aid gives back (beenster, v0.2.10: heal your friends). A
+## teammate does a better job than you can on yourself.
+const HEAL_SELF := 25.0
+const HEAL_MATE := 45.0
+const HURT_MARGIN := 5.0
 var injuries := 0
 var pouch := POUCH_MAX
 var treat_t := 0.0
@@ -606,17 +611,27 @@ func body_part_at(p: Vector3) -> String:
 
 ## Treats the worst wound: bleeding (bandage), then the leg (splint), then
 ## the arm (sling). Returns what was used.
-func treat_one() -> String:
+func treat_one(heal := HEAL_SELF) -> String:
+	var used := ""
 	if injuries & BLEED:
 		injuries &= ~BLEED
-		return "bandage"
-	if injuries & LEG:
+		used = "bandage"
+	elif injuries & LEG:
 		injuries &= ~LEG
-		return "splint"
-	if injuries & ARM:
+		used = "splint"
+	elif injuries & ARM:
 		injuries &= ~ARM
-		return "sling"
-	return ""
+		used = "sling"
+	elif hp < MAX_HP - 1.0:
+		used = "dressing"
+	if used != "" and Net.is_host():
+		hp = minf(hp + heal, MAX_HP)
+	return used
+
+
+## Lost health or a wound: first aid will help.
+func needs_aid() -> bool:
+	return injuries != 0 or hp < MAX_HP - HURT_MARGIN
 
 
 static func injury_names(bits: int) -> PackedStringArray:
@@ -677,7 +692,7 @@ func _boot_and_treat(delta: float) -> void:
 	treat_t += delta
 	if treat_t >= (TREAT_SELF if target == self else TREAT_MATE):
 		treat_t = 0.0
-		if target.treat_one() != "":
+		if target.treat_one(HEAL_SELF if target == self else HEAL_MATE) != "":
 			pouch -= 1
 
 
@@ -748,10 +763,10 @@ func _try_seat_prisoner() -> bool:
 func treat_target() -> Officer:
 	for n in get_tree().get_nodes_in_group("officers"):
 		var o := n as Officer
-		if o and o != self and o.injuries != 0 and o.state in [S.MOVE, S.CROUCH, S.COVER, S.PRONE] \
+		if o and o != self and o.needs_aid() and o.state in [S.MOVE, S.CROUCH, S.COVER, S.PRONE] \
 				and o.global_position.distance_to(global_position) < REVIVE_RANGE:
 			return o
-	return self if injuries != 0 else null
+	return self if needs_aid() else null
 
 
 func treat_time() -> float:
@@ -951,6 +966,36 @@ func respawn() -> void:
 	holstered = true
 	collision_mask = 1 | 4 | 16
 	_set_state(S.MOVE)
+
+
+var _tag: Label3D
+
+## Over a teammate's head (never your own): their health when they are
+## hurt, wounded or down, so you can see who needs first aid.
+func _health_tag() -> void:
+	var show := peer_id != Net.my_id() and state != S.VEHICLE and (needs_aid() or state == S.DOWNED)
+	if not show:
+		if _tag:
+			_tag.visible = false
+		return
+	if _tag == null:
+		_tag = Label3D.new()
+		_tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		_tag.no_depth_test = true
+		_tag.fixed_size = true
+		_tag.pixel_size = 0.0012
+		_tag.font_size = 26
+		_tag.outline_size = 8
+		_tag.position = Vector3(0, 2.25, 0)
+		add_child(_tag)
+	_tag.visible = true
+	if state == S.DOWNED:
+		_tag.text = "DOWN - hold F to revive"
+		_tag.modulate = Color(1.0, 0.35, 0.3)
+	else:
+		var w := injury_names(injuries)
+		_tag.text = "+ %d%%%s" % [roundi(hp), ("  " + " ".join(w)) if not w.is_empty() else ""]
+		_tag.modulate = Color(1.0, 0.45, 0.4) if hp < 40.0 or not w.is_empty() else Color(1.0, 0.85, 0.45)
 
 
 ## Seconds until R respawns (0 once it can).
@@ -1542,6 +1587,7 @@ func set_visual_offset(v: Vector3) -> void:
 
 
 func _process(delta: float) -> void:
+	_health_tag()
 	if rig and rig.tree:
 		if rig.downed != (state == S.DOWNED):
 			rig.set_downed(state == S.DOWNED)
