@@ -55,3 +55,18 @@ city block. It is built phase by phase; each phase ends with a build.
 - Ladders are left for later: none of the kit pieces needs one yet.
 
 ![Training yard](img/yard.png)
+
+### v0.2.2: officer model fixes (beenster's playtest)
+
+- Arms and legs are now single skinned tubes (`skinned_limb` in
+  `tools/blender/officer/officer.py`), with weights blended across the
+  elbow and knee, so the ball joints are gone. The torso and vest are
+  lofted, skinned shells, narrow under the arms so the arms hang clear.
+- Navy baseball cap with a curved peak and yellow lettering replaces the
+  police hat.
+- Prone: elbows down, both hands forward on the pistol, barrel level.
+- Aiming at the ground near the feet no longer folds the body over (the
+  barrel line-up ignores points closer than 1 m and limits the pitch).
+- Kicked-in doors come off their frame and fall in.
+
+![Officer v0.2.2](img/officer_v0_2_2.png)

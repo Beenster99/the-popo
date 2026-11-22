@@ -134,6 +134,17 @@ def crouch_walk(rig, A):
     return (1, N + 1)
 
 
+def _prone_arms(A, f, sway=0.0):
+    """Elbows on the ground ahead of the shoulders, forearms forward, both
+    hands together on the pistol, barrel level and pointing ahead."""
+    A.rot('upper_arm.L', f, -138 + sway, -22, 0)
+    A.rot('upper_arm.R', f, -138 - sway, 22, 0)
+    A.rot('forearm.L', f, -32, 0, -30)
+    A.rot('forearm.R', f, -28, 0, 30)
+    A.rot('hand.L', f, 30, 0, -10)
+    A.rot('hand.R', f, 28, 0, 10)
+
+
 def prone_idle(rig, A):
     K.gun_visible(rig, True)
     for s in 'LR':
@@ -145,10 +156,7 @@ def prone_idle(rig, A):
         A.rot('chest', f, -10 - b, 0, 0)
         A.rot('neck', f, -35, 0, 0)
         A.rot('head', f, -30, 0, 0)
-        A.rot('upper_arm.L', f, -150, -25, 0)
-        A.rot('upper_arm.R', f, -150, 25, 0)
-        A.rot('forearm.L', f, -70, 0, 0)
-        A.rot('forearm.R', f, -60, 0, 0)
+        _prone_arms(A, f)
         A.rot('thigh.L', f, 0, -8, 0)
         A.rot('thigh.R', f, 0, 8, 0)
         A.rot('shin.L', f, 4, 0, 0)

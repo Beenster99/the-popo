@@ -159,8 +159,15 @@ func update_from(o: Officer, delta: float) -> void:
 	tree.set("parameters/ts_climb/scale", Officer.CLIMB_PLAYBACK)
 	tree.set("parameters/ts_slide/scale", 1.2)
 	procedural.aim_yaw_offset = angle_difference(o.rotation.y, o.aim_yaw) if o.is_aiming() and o.state != Officer.S.PRONE else 0.0
-	procedural.aim_active = o.is_aiming() and o.aim_point != Vector3.ZERO
-	procedural.aim_target = o.aim_point
+	# Line the barrel up with the aim point, but never fold the body over
+	# to aim at the ground at the officer's feet: the target's pitch from
+	# the chest is held within 50 degrees, and points closer than 1 m are ignored.
+	var chest_p := o.global_position + Vector3(0, 0.4 if o.state == Officer.S.PRONE else 1.35, 0)
+	var to := o.aim_point - chest_p
+	var horiz := Vector2(to.x, to.z).length()
+	procedural.aim_active = o.is_aiming() and o.aim_point != Vector3.ZERO and horiz > 1.0
+	to.y = clampf(to.y, -horiz * 1.19, horiz * 1.19)
+	procedural.aim_target = chest_p + to
 	if not procedural.have_slide:
 		var sl := model.find_child("gun_slide", true, false) as Node3D
 		if sl and sl.get_parent() is BoneAttachment3D:
