@@ -338,3 +338,32 @@ played them). beenster chose to do all of Phase 1.6 before finishing 1.5.
   maker for checking levels.
 - Not yet: footsteps for metal stairs (no metal floors in the kit yet),
   gun sounds for the enemy shotgun model (Phase 1.5 brings the gun).
+
+## Phase 1.7: polish, and beenster's playtest of v0.2.10 (v0.2.11)
+
+- Drop-in: a friend joining mid-shift catches up on everything (lost wall
+  pieces and where loose rubble lies, broken props, cars with their dents,
+  glass and fires) via `BlockState` (messages 95/96). The block saves every
+  20 s and on exit; the menu offers Continue. A client whose host drops
+  goes back to the menu with a note.
+- Third person is the only view (isometric removed at beenster's ask).
+- Outlines: the black middle distance was the outline hull drawn in front
+  (reversed-Z: the nudge had the wrong sign). Fixed, faded with distance,
+  with an Outline strength slider.
+- Debris detail setting (Coarse to Ultra): `ChunkSplit` cuts the kit's
+  chunks into smaller convex pieces at load, seeded, the same everywhere.
+- Gore slider (Off, Some, Lots, Extreme): spray, wall and floor splats,
+  wounds, head holes, pools, a bone out on Extreme, bodies jerk when shot.
+- Crime level removed: the game is dispatch calls and what happens.
+- Car fix: the host's own parked input no longer overrides a driver.
+- Sound pass: every gun, impact, glass, breakage, debris, explosion,
+  whoosh, casing and gore sound rebuilt from real recordings in the Sonniss
+  GDC Game Audio Bundles (`tools/audio/import_sonniss.py`, sources in
+  `assets/audio/manifest.csv`). Still made for the game: ricochet whine,
+  fire loop, room tone, ear ring, horn, ping.
+- Falls: the ragdoll joints sat in the middle of each limb, which folded
+  bodies into a heap. Joints now sit at the bone roots with limits, the
+  body keeps its momentum and starts stiff then goes limp.
+- Drag: hold G (Y on a controller) by a downed teammate to drag them by
+  the collar, bent over and backing off at a walk; the body follows on the
+  ground, leaving a smear.

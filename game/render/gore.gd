@@ -148,15 +148,19 @@ static func _person_near(tree: SceneTree, at: Vector3) -> Node3D:
 
 
 static func _ragdoll_near(tree: SceneTree, at: Vector3) -> Node3D:
+	# The body with a bone nearest the hit (bodies can lie on each other).
+	var best: Node3D = null
+	var bd := 0.45
 	for g in ["suspects", "officers"]:
 		for n in tree.get_nodes_in_group(g):
 			var rig := _rig_of(n)
-			if rig == null or not rig.downed:
+			if rig == null or not rig.downed or n.is_queued_for_deletion():
 				continue
 			for c in rig.physics.get_children():
-				if c is PhysicalBone3D and (c as Node3D).global_position.distance_to(at) < 0.45:
-					return n as Node3D
-	return null
+				if c is PhysicalBone3D and (c as Node3D).global_position.distance_to(at) < bd:
+					bd = (c as Node3D).global_position.distance_to(at)
+					best = n as Node3D
+	return best
 
 
 static func _rig_of(who: Node) -> OfficerRig:

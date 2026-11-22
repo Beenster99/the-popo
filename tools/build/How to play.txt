@@ -53,6 +53,8 @@ Left mouse fire (at the reticle), R reload (15 rounds), H holster / draw,
 T torch, middle mouse ping a spot for everyone.
 V punch (while sprinting: shoulder barge), B kick (kicks doors in).
 F use; hold F next to a downed teammate for 2 seconds to get them up.
+G (hold) next to a downed teammate: grab their collar and drag them, walking
+backwards, into cover. Let go of G to drop them.
 Mouse looks round, mouse wheel moves the camera in and out, middle mouse pings a spot, F3 network overlay, Esc menu.
 Ammo: bottom right shows rounds in the gun and spare rounds.
 Health: shots (friendly fire, can be turned off in Settings), blasts and long falls hurt. At zero
@@ -69,6 +71,12 @@ Stand next to a hurt teammate and hold F: your first aid patches a wound
 and gives back 45 health (25 when you use it on yourself). You carry 3;
 refill at a police car's boot. Hurt teammates show their health above
 their heads; a downed one says so (hold F on them to revive).
+GOING DOWN, DRAGGING AND SOUND (0.2.11)
+Bodies now fall the way they were going and lie stretched out instead of in
+a heap. Hold G (Y on a controller) by a downed teammate to drag them by the
+collar. Every gun, impact, glass, breakage, debris, explosion and gore sound
+is now a real recording (Sonniss GDC game audio bundles).
+
 GOING DOWN AND RESPAWNING (0.2.9)
 When you go down, wait 3 seconds and press R to respawn where you started,
 healed, with full ammo. Or a teammate can hold F on you to get you up
@@ -121,7 +129,8 @@ Look scene: N day / night.
 GAME CONTROLLER (Xbox names, PlayStation in brackets)
 Left stick move, right stick aim, LT (L2) aim, RT (R2) fire,
 A (Cross) jump / handbrake, B (Circle) crouch (hold: prone), X (Square)
-reload, Y (Triangle) holster / horn, LB (L1) cover, RB (R1) punch,
+reload, Y (Triangle) holster / horn (hold by a downed teammate: drag them),
+LB (L1) cover, RB (R1) punch,
 R3 kick, L3 sprint, View (Share) use / revive, D-pad left/right rotate
 camera, D-pad up zoom in, D-pad down torch, touchpad ping (PlayStation),
 Start menu.

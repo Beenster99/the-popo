@@ -52,9 +52,11 @@ func test_the_fallen_bleed_and_are_thrown() -> void:
 	# Shooting the body moves it.
 	var at := hips.global_position
 	Gore.hit(self, at + Vector3(0, 0.3, 3), at)
-	await get_tree().physics_frame
-	await get_tree().physics_frame
-	t.check(hips.global_position.distance_to(at) > 0.01, "a body on the floor jerks when shot")
+	# Joined to the rest of the body, the hip moves with all of it: give it
+	# a few frames.
+	for i in 6:
+		await get_tree().physics_frame
+	t.check(hips.global_position.distance_to(at) > 0.01, "a body on the floor jerks when shot (moved %.3f m)" % hips.global_position.distance_to(at))
 
 
 func test_gore_off_is_clean() -> void:
