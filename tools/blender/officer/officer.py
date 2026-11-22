@@ -62,7 +62,7 @@ def mats():
     MATS['trousers'] = toon_mat('trousers', (0.07, 0.10, 0.22), shadow=0.55)
     MATS['boots'] = toon_mat('boots', (0.04, 0.04, 0.04), shadow=0.7)
     MATS['skin'] = toon_mat('skin', (0.93, 0.68, 0.52), shadow=0.62)
-    MATS['cap'] = toon_mat('cap', (0.06, 0.08, 0.18), shadow=0.6)
+    MATS['cap'] = toon_mat('cap', (0.05, 0.06, 0.13), shadow=0.6)
     MATS['band'] = toon_mat('band', (0.95, 0.95, 0.95), shadow=0.7)
     MATS['metal'] = toon_mat('metal', (0.75, 0.75, 0.70), shadow=0.5)
     MATS['gun'] = toon_mat('gun', (0.12, 0.12, 0.13), shadow=0.6)
@@ -170,6 +170,174 @@ def cyl(name, loc, r, depth, mat, rot=(0, 0, 0), outline=0.01, verts=24):
 
 
 # ---------------------------------------------------------------- rig
+# ------------------------------------------------- skinned (bending) parts
+def _skin(o, rig, groups, mat_names, outline):
+    """Armature-deformed mesh: groups is {bone: [(vert index, weight)]}."""
+    for b, vw in groups.items():
+        vg = o.vertex_groups.new(name=b)
+        for i, w in vw:
+            if w > 0.0:
+                vg.add([i], w, 'REPLACE')
+    o.parent = rig
+    m = o.modifiers.new('armature', 'ARMATURE')
+    m.object = rig
+    for n in mat_names:
+        o.data.materials.append(MATS[n])
+    o.data.materials.append(MATS['outline'])
+    for poly in o.data.polygons:
+        poly.use_smooth = True
+    if outline:
+        so = o.modifiers.new('outline', 'SOLIDIFY')
+        so.thickness = outline
+        so.offset = 1
+        so.use_flip_normals = True
+        so.material_offset = len(mat_names)
+        so.use_rim = False
+    return o
+
+
+def _smooth01(t):
+    t = min(1.0, max(0.0, t))
+    return t * t * (3 - 2 * t)
+
+
+def skinned_limb(name, rig, pts, radii, bones, mats_per_seg, blend=0.1, outline=0.012, verts=16, rings=6):
+    """One continuous tube through the joint points pts (radius radii[i] at
+    each), bent by bones[i] along segment i, with weights blended across each
+    joint so elbows and knees bend smoothly instead of needing a ball."""
+    pts = [Vector(p) for p in pts]
+    n = len(pts) - 1
+    seg_len = [(pts[i + 1] - pts[i]).length for i in range(n)]
+    dirs = [(pts[i + 1] - pts[i]).normalized() for i in range(n)]
+    rings_all = []   # (centre, axis, radius, segment, distance along it)
+    for i in range(n):
+        for k in range(0 if i == 0 else 1, rings + 1):
+            t = k / rings
+            r = (radii[i] + (radii[i + 1] - radii[i]) * t) * (1.0 + 0.08 * math.sin(math.pi * t))
+            if k == rings and i < n - 1:
+                axis = (dirs[i] + dirs[i + 1]).normalized()
+            elif k == 0 and i > 0:
+                axis = (dirs[i - 1] + dirs[i]).normalized()
+            else:
+                axis = dirs[i]
+            rings_all.append((pts[i].lerp(pts[i + 1], t), axis, r, i, t * seg_len[i]))
+    # rounded ends
+    c, ax, r, i, d = rings_all[0]
+    head = [(c - ax * r * 0.8, ax, r * 0.45, i, d), (c - ax * r * 0.45, ax, r * 0.8, i, d)]
+    c, ax, r, i, d = rings_all[-1]
+    tail = [(c + ax * r * 0.45, ax, r * 0.8, i, d), (c + ax * r * 0.8, ax, r * 0.45, i, d)]
+    rings_all = head + rings_all + tail
+    bm = bmesh.new()
+    weights = {}
+    ring_verts = []
+    vi = 0
+    for c, axis, r, i, along in rings_all:
+        ref = Vector((0, -1, 0))
+        side = ref - axis * ref.dot(axis)
+        if side.length < 1e-3:
+            side = Vector((1, 0, 0)) - axis * axis.x
+        side.normalize()
+        up = axis.cross(side)
+        w_next = 0.5 * _smooth01(1.0 - (seg_len[i] - along) / blend) if i < n - 1 else 0.0
+        w_prev = 0.5 * _smooth01(1.0 - along / blend) if i > 0 else 0.0
+        ws = {bones[i]: 1.0 - w_next - w_prev}
+        if w_next > 0:
+            ws[bones[i + 1]] = ws.get(bones[i + 1], 0) + w_next
+        if w_prev > 0:
+            ws[bones[i - 1]] = ws.get(bones[i - 1], 0) + w_prev
+        vs = []
+        for j in range(verts):
+            a = 2 * math.pi * j / verts
+            vs.append(bm.verts.new(c + side * math.cos(a) * r + up * math.sin(a) * r))
+            for b, w in ws.items():
+                weights.setdefault(b, []).append((vi, w))
+            vi += 1
+        ring_verts.append((vs, i))
+    uniq = []
+    for m_ in mats_per_seg:
+        if m_ not in uniq:
+            uniq.append(m_)
+    for k in range(len(ring_verts) - 1):
+        a, ia = ring_verts[k]
+        b, ib = ring_verts[k + 1]
+        mi = uniq.index(mats_per_seg[ib])
+        for j in range(verts):
+            f = bm.faces.new((a[j], b[j], b[(j + 1) % verts], a[(j + 1) % verts]))
+            f.material_index = mi
+    f0 = bm.faces.new(ring_verts[0][0])
+    f0.material_index = uniq.index(mats_per_seg[0])
+    f1 = bm.faces.new(list(reversed(ring_verts[-1][0])))
+    f1.material_index = uniq.index(mats_per_seg[-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    me = D.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    o = D.objects.new(name, me)
+    C.collection.objects.link(o)
+    return _skin(o, rig, weights, uniq, outline)
+
+
+def skinned_loft(name, rig, sections, bone_at, mat_at, outline=0.012, verts=24, power=3.0):
+    """A body shell lofted through rounded-rectangle sections (z, half width,
+    half depth, y offset), skinned by bone_at(z) -> {bone: weight}."""
+    bm = bmesh.new()
+    weights = {}
+    rings = []
+    vi = 0
+    for z, w, d, yo in sections:
+        vs = []
+        for j in range(verts):
+            a = 2 * math.pi * j / verts
+            ca, sa = math.cos(a), math.sin(a)
+            # superellipse: squarer than an ellipse, rounder than a box
+            x = w * math.copysign(abs(ca) ** (2 / power), ca)
+            y = d * math.copysign(abs(sa) ** (2 / power), sa)
+            vs.append(bm.verts.new((x, y + yo, z)))
+            for b, wt in bone_at(z).items():
+                weights.setdefault(b, []).append((vi, wt))
+            vi += 1
+        rings.append((vs, z))
+    uniq = []
+    def mi(z):
+        m_ = mat_at(z)
+        if m_ not in uniq:
+            uniq.append(m_)
+        return uniq.index(m_)
+    for k in range(len(rings) - 1):
+        a, za = rings[k]
+        b, zb = rings[k + 1]
+        m = mi(0.5 * (za + zb))
+        for j in range(verts):
+            f = bm.faces.new((a[j], a[(j + 1) % verts], b[(j + 1) % verts], b[j]))
+            f.material_index = m
+    fb = bm.faces.new(list(reversed(rings[0][0])))
+    fb.material_index = mi(rings[0][1])
+    ft = bm.faces.new(rings[-1][0])
+    ft.material_index = mi(rings[-1][1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    me = D.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    o = D.objects.new(name, me)
+    C.collection.objects.link(o)
+    return _skin(o, rig, weights, uniq, outline)
+
+
+def torso_bones(z):
+    """hips below the belt, spine at the waist, chest above, blended."""
+    if z <= 1.05:
+        return {'hips': 1.0}
+    if z <= 1.13:
+        t = _smooth01((z - 1.05) / 0.08)
+        return {'hips': 1 - t, 'spine': t}
+    if z <= 1.24:
+        return {'spine': 1.0}
+    if z <= 1.32:
+        t = _smooth01((z - 1.24) / 0.08)
+        return {'spine': 1 - t, 'chest': t}
+    return {'chest': 1.0}
+
+
 J = {  # joint positions (character faces -Y, left = +X)
     'root': (0, 0, 0),
     'hips': (0, 0, 0.98), 'spine': (0, 0.0, 1.12), 'chest': (0, 0.0, 1.30), 'neck': (0, 0.0, 1.53),
@@ -285,17 +453,26 @@ def build_body(rig):
         parts.append(o)
 
     # torso
-    add(rbox('pelvis', (0, 0.0, 0.97), (0.34, 0.22, 0.20), 'trousers', bevel=0.07), 'hips')
-    add(rbox('belt', (0, 0.0, 1.02), (0.36, 0.24, 0.07), 'boots', bevel=0.03), 'hips')
-    add(rbox('buckle', (0, -0.122, 1.02), (0.06, 0.01, 0.045), 'metal', bevel=0.005, outline=0.004), 'hips')
-    add(rbox('holster', (-0.20, 0.0, 0.95), (0.06, 0.10, 0.16), 'boots', bevel=0.02), 'hips')
-    add(rbox('pouch', (0.19, -0.04, 1.0), (0.05, 0.08, 0.08), 'boots', bevel=0.015), 'hips')
-    add(rbox('abdomen', (0, 0.0, 1.16), (0.32, 0.20, 0.20), 'shirt', bevel=0.07), 'spine')
-    add(rbox('chest', (0, 0.0, 1.36), (0.42, 0.25, 0.30), 'shirt', bevel=0.09), 'chest')
-    add(rbox('vest', (0, 0.0, 1.30), (0.45, 0.285, 0.36), 'vest', bevel=0.06), 'chest')
-    add(rbox('vest_band', (0, -0.006, 1.37), (0.452, 0.285, 0.05), 'hivis', bevel=0.02, outline=0.004), 'chest')
-    add(rbox('badge', (0.09, -0.146, 1.44), (0.05, 0.01, 0.06), 'metal', bevel=0.01, outline=0.004), 'chest')
-    add(rbox('radio', (-0.11, -0.15, 1.42), (0.05, 0.03, 0.09), 'boots', bevel=0.01, outline=0.005), 'chest')
+    add(rbox('pelvis', (0, 0.0, 0.965), (0.31, 0.21, 0.19), 'trousers', bevel=0.07), 'hips')
+    add(rbox('belt', (0, 0.0, 1.02), (0.33, 0.235, 0.065), 'boots', bevel=0.03), 'hips')
+    add(rbox('buckle', (0, -0.12, 1.02), (0.06, 0.01, 0.045), 'metal', bevel=0.005, outline=0.004), 'hips')
+    add(rbox('holster', (-0.185, 0.0, 0.95), (0.06, 0.10, 0.16), 'boots', bevel=0.02), 'hips')
+    add(rbox('pouch', (0.175, -0.04, 1.0), (0.05, 0.08, 0.08), 'boots', bevel=0.015), 'hips')
+    # Torso: one smooth shell (shirt), skinned to hips, spine and chest, and
+    # (named 'chest' as before, which keeps the game's bone names chest_2 etc.)
+    # narrow under the arms so they hang clear of it.
+    shirt = [(1.00, 0.150, 0.105, 0.0), (1.06, 0.150, 0.108, 0.0), (1.14, 0.143, 0.110, 0.0),
+             (1.24, 0.145, 0.118, 0.0), (1.33, 0.150, 0.125, 0.0), (1.41, 0.160, 0.120, 0.0),
+             (1.47, 0.150, 0.105, 0.005), (1.515, 0.110, 0.085, 0.01), (1.535, 0.07, 0.06, 0.01)]
+    parts.append(skinned_loft('chest', rig, shirt, torso_bones, lambda z: 'shirt'))
+    # Vest over it, a little bigger, same shape.
+    vest = [(1.08, 0.158, 0.120, 0.0), (1.14, 0.155, 0.124, 0.0), (1.24, 0.157, 0.132, 0.0),
+            (1.33, 0.162, 0.140, 0.0), (1.40, 0.160, 0.134, 0.0), (1.455, 0.140, 0.118, 0.005),
+            (1.48, 0.110, 0.10, 0.008)]
+    parts.append(skinned_loft('vest', rig, vest, torso_bones, lambda z: 'hivis' if 1.345 < z < 1.385 else 'vest', power=3.4))
+    vest_front = -0.142
+    add(rbox('badge', (0.075, vest_front - 0.004, 1.43), (0.045, 0.01, 0.055), 'metal', bevel=0.01, outline=0.004), 'chest')
+    add(rbox('radio', (-0.09, vest_front - 0.01, 1.415), (0.045, 0.03, 0.085), 'boots', bevel=0.01, outline=0.005), 'chest')
     add(taper('neck', P('neck') + Vector((0, 0, -0.06)), P('head') + Vector((0, 0, 0.06)), 0.078, 0.07, 'skin'), 'neck')
     # head
     hc = P('head') + Vector((0, -0.01, 0.12))
@@ -305,23 +482,45 @@ def build_body(rig):
         add(ellipsoid('eye', hc + Vector((0.045 * x, -0.112, 0.02)), (0.014, 0.01, 0.02), 'eye', outline=0), 'head')
         add(ellipsoid('ear', hc + Vector((0.115 * x, 0.0, 0.0)), (0.02, 0.03, 0.04), 'skin', outline=0.004), 'head')
         add(rbox('brow', hc + Vector((0.045 * x, -0.118, 0.055)), (0.04, 0.012, 0.012), 'boots', bevel=0.004, outline=0), 'head')
-    # cap
-    add(cyl('cap', hc + Vector((0, 0.0, 0.10)), 0.13, 0.09, 'cap', outline=0.01), 'head')
-    add(cyl('capband', hc + Vector((0, 0.0, 0.075)), 0.132, 0.035, 'band', outline=0.0), 'head')
-    add(rbox('brim', hc + Vector((0, -0.12, 0.06)), (0.2, 0.12, 0.015), 'boots', bevel=0.01, rot=(math.radians(-12), 0, 0), outline=0.006), 'head')
-    add(cyl('capbadge', hc + Vector((0, -0.132, 0.085)), 0.018, 0.01, 'metal', rot=(math.radians(90), 0, 0), outline=0.003), 'head')
+    # Baseball cap: navy crown, curved peak, yellow lettering on the front.
+    crown = ellipsoid('cap', hc + Vector((0, 0.008, 0.06)), (0.127, 0.135, 0.11), 'cap', outline=0.01)
+    # keep the dome: cut the ellipsoid just below its middle (local coords)
+    bmc = bmesh.new()
+    bmc.from_mesh(crown.data)
+    bmesh.ops.bisect_plane(bmc, geom=bmc.verts[:] + bmc.edges[:] + bmc.faces[:], plane_co=(0, 0, -0.01), plane_no=(0, 0, 1), clear_inner=True)
+    bmc.to_mesh(crown.data)
+    bmc.free()
+    add(crown, 'head')
+    peak = ellipsoid('cap_peak', hc + Vector((0, -0.145, 0.062)), (0.105, 0.085, 0.011), 'cap', rot=(math.radians(-14), 0, 0), outline=0.006)
+    add(peak, 'head')
+    add(ellipsoid('cap_button', hc + Vector((0, 0.008, 0.168)), (0.016, 0.016, 0.009), 'cap', outline=0.003), 'head')
+    bpy.ops.object.text_add(location=hc + Vector((0, -0.118, 0.112)), rotation=(math.radians(66), 0, 0))
+    txt = C.active_object
+    txt.data.body = 'POPO'
+    txt.data.size = 0.042
+    txt.data.extrude = 0.003
+    txt.data.align_x = 'CENTER'
+    txt.data.align_y = 'CENTER'
+    txt.data.font = D.fonts.load(_bold_font()) if _bold_font() else txt.data.font
+    bpy.ops.object.convert(target='MESH')
+    txt = C.active_object
+    txt.name = 'cap_letters'
+    add(finish(txt, 'hivis', outline=0, smooth=False), 'head')
     for s, x in (('L', 1), ('R', -1)):
-        add(ellipsoid('shoulder.' + s, P('shoulder.' + s) + Vector((0.02 * x, 0, 0)), (0.08, 0.08, 0.075), 'shirt'), 'chest')
-        add(taper('upperarm.' + s, P('shoulder.' + s), P('elbow.' + s), 0.072, 0.058, 'shirt'), 'upper_arm.' + s)
-        add(ellipsoid('elbow.' + s, P('elbow.' + s), (0.056, 0.056, 0.056), 'shirt', outline=0.006), 'upper_arm.' + s)
-        add(taper('forearm.' + s, P('elbow.' + s), P('wrist.' + s), 0.056, 0.045, 'skin'), 'forearm.' + s)
+        # Arm: one tube from inside the shoulder to the wrist (short sleeve,
+        # bare forearm), skinned so the elbow bends smoothly.
+        sh = P('shoulder.' + s)
+        parts.append(skinned_limb('arm.' + s, rig,
+            [sh + Vector((-0.06 * x, 0.0, 0.025)), sh + Vector((0.005 * x, 0, -0.01)), P('elbow.' + s), P('wrist.' + s) + Vector((0, 0, 0.015))],
+            [0.068, 0.072, 0.054, 0.042], ['chest', 'upper_arm.' + s, 'forearm.' + s], ['shirt', 'shirt', 'skin'], blend=0.07))
         # hand: mitten + thumb
         w = P('wrist.' + s)
         add(rbox('hand.' + s, w + Vector((0, 0, -0.06)), (0.045, 0.085, 0.11), 'boots', bevel=0.02, subsurf=1, outline=0.008), 'hand.' + s)
         add(ellipsoid('thumb.' + s, w + Vector((0, -0.05, -0.04)), (0.018, 0.02, 0.035), 'boots', outline=0.005), 'hand.' + s)
-        add(taper('thigh.' + s, P('hip.' + s) + Vector((0, 0, 0.04)), P('knee.' + s), 0.095, 0.068, 'trousers'), 'thigh.' + s)
-        add(ellipsoid('knee.' + s, P('knee.' + s), (0.066, 0.068, 0.066), 'trousers', outline=0.006), 'thigh.' + s)
-        add(taper('shin.' + s, P('knee.' + s), P('ankle.' + s) + Vector((0, 0, 0.06)), 0.066, 0.05, 'trousers'), 'shin.' + s)
+        # Leg: one tube hip to ankle, skinned so the knee bends smoothly.
+        parts.append(skinned_limb('leg.' + s, rig,
+            [P('hip.' + s) + Vector((0, 0, 0.07)), P('knee.' + s), P('ankle.' + s) + Vector((0, 0, 0.07))],
+            [0.092, 0.064, 0.050], ['thigh.' + s, 'shin.' + s], ['trousers', 'trousers'], blend=0.09))
         a = P('ankle.' + s)
         add(rbox('boot.' + s, a + Vector((0, -0.045, -0.045)), (0.11, 0.27, 0.11), 'boots', bevel=0.035, subsurf=1, outline=0.01), 'foot.' + s)
         add(rbox('bootcuff.' + s, a + Vector((0, 0.0, 0.04)), (0.11, 0.12, 0.08), 'boots', bevel=0.025, outline=0.008), 'shin.' + s)
@@ -471,6 +670,15 @@ def ground_tiles(size=14, tile=1.0, offset=(0, 0)):
     g = C.active_object
     g.data.materials.append(toon_mat('grout', (0.3, 0.3, 0.32)))
     return o
+
+
+def _bold_font():
+    import os
+    for f in ("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+              "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"):
+        if os.path.exists(f):
+            return f
+    return None
 
 
 def build_officer():
