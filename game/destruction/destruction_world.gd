@@ -348,9 +348,15 @@ func _spawn_chunks(p: Dictionary, xf: Transform3D, lin: Vector3, ang: Vector3, o
 			_debris.append([rb, now])
 		var full_mask := rb.collision_mask | FALLING_LAYER
 		rb.collision_mask &= ~FALLING_LAYER
-		get_tree().create_timer(CRUSH_TIME, true, true).timeout.connect(func():
-			if is_instance_valid(rb): rb.collision_mask = full_mask)
+		# By id, not by reference: the chunk may be gone when the timer fires.
+		get_tree().create_timer(CRUSH_TIME, true, true).timeout.connect(_restore_mask.bind(rb.get_instance_id(), full_mask))
 		add_child(rb)
+
+
+static func _restore_mask(id: int, mask: int) -> void:
+	var rb := instance_from_id(id) as RigidBody3D
+	if rb:
+		rb.collision_mask = mask
 
 
 func _spawn_released(p: Dictionary) -> void:
