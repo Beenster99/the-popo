@@ -109,6 +109,8 @@ const TURN_STOP := 0.12
 const TURN_RATE := 7.0    # rad/s
 var _turn_active := false
 var _slide_node: Node3D
+var _shown_gun := -1
+var _pellet_rng := RandomNumberGenerator.new()
 var buttons := 0
 var punch_t := 0.0
 var rig: OfficerRig
@@ -139,6 +141,12 @@ const RESERVE_START := 60
 const RESERVE_MAX := 90
 var reserve := RESERVE_START
 const WEAPON_NAME := "Service pistol"
+## Phase 1.5: a gun picked up off the floor (EnemyGuns.PISTOL or SHOTGUN),
+## or EnemyGuns.NONE for the service pistol. It has only the rounds that
+## were in it: no reloading. Empty, or H, drops it.
+var gun := EnemyGuns.NONE
+var gun_ammo := 0
+const PICK_RANGE := 1.4
 var reload_t := 0.0       # seconds of reload left
 var holstered := true          # officers start the game with the gun holstered
 var holster_t := 0.0      # seconds of holstering / drawing left
@@ -336,6 +344,8 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 		wish = Vector3.ZERO
 	if state in [S.MOVE, S.CROUCH] and _pressed(PlayerInput.INTERACT) and not is_reviving() and _try_seat_prisoner():
 		pass
+	elif state in [S.MOVE, S.CROUCH] and _pressed(PlayerInput.INTERACT) and not is_reviving() and cuff_target() == null and _try_pick_gun():
+		pass
 	elif state in [S.MOVE, S.CROUCH] and _pressed(PlayerInput.INTERACT) and not is_reviving() and _try_enter_car():
 		return
 	_boot_and_treat(delta)
@@ -430,7 +440,23 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 
 
 func _fire_step() -> void:
-	if buttons & PlayerInput.FIRE and (is_aiming() or is_blind_firing()) and _cooldown <= 0.0 and reload_t <= 0.0:
+	if buttons & PlayerInput.FIRE and (is_aiming() or is_blind_firing()) and _cooldown <= 0.0 and reload_t <= 0.0 and gun != EnemyGuns.NONE:
+		_cooldown = EnemyGuns.GAP[gun]
+		if gun_ammo <= 0:
+			_drop_gun()   # empty: back to the service pistol
+		else:
+			gun_ammo -= 1
+			recoil = 1.0 if gun == EnemyGuns.PISTOL else 1.6
+			var blind := is_blind_firing()
+			if blind:
+				blind_t = 0.4
+			if Net.is_host():
+				var muzzle := muzzle_position()
+				var d := _spread(shot_direction(muzzle), blind)
+				for pd in EnemyGuns.pellet_dirs(gun, d, _pellet_rng):
+					fired.emit(muzzle, pd, false)
+			bloom = minf(bloom + (0.8 if gun == EnemyGuns.PISTOL else 2.0), 4.0)
+	elif buttons & PlayerInput.FIRE and (is_aiming() or is_blind_firing()) and _cooldown <= 0.0 and reload_t <= 0.0:
 		_cooldown = FIRE_GAP
 		if ammo <= 0:
 			if reserve > 0:
@@ -451,8 +477,63 @@ func _fwd() -> Vector3:
 	return Vector3(sin(rotation.y), 0, cos(rotation.y))
 
 
+## Damage of one bullet (or pellet) from the gun in hand.
+func shot_damage() -> float:
+	return Gunfire.BULLET_DAMAGE if gun == EnemyGuns.NONE else float(EnemyGuns.DAMAGE[gun])
+
+
+func weapon_name() -> String:
+	return WEAPON_NAME if gun == EnemyGuns.NONE else String(EnemyGuns.NAMES[gun])
+
+
+## The nearest gun on the floor within reach, or null.
+func gun_on_floor() -> DroppedGun:
+	var best: DroppedGun = null
+	var bd := PICK_RANGE
+	for n in get_tree().get_nodes_in_group("dropped_guns"):
+		var g := n as DroppedGun
+		var d := g.global_position.distance_to(global_position)
+		if d < bd:
+			bd = d
+			best = g
+	return best
+
+
+## Use next to a dropped gun: take it (host decides; clients are corrected).
+func _try_pick_gun() -> bool:
+	var g := gun_on_floor()
+	if g == null:
+		return false
+	if Net.is_host():
+		var disp := get_tree().get_first_node_in_group("dispatcher")
+		if gun != EnemyGuns.NONE:
+			_drop_gun()
+		gun = g.kind
+		gun_ammo = g.rounds
+		holstered = false
+		reload_t = 0.0
+		if disp:
+			disp.take_gun(g)
+		else:
+			g.queue_free()
+	return true
+
+
+## Lets go of the picked-up gun (left on the floor with what is left in it).
+func _drop_gun() -> void:
+	if gun == EnemyGuns.NONE:
+		return
+	if Net.is_host():
+		var disp := get_tree().get_first_node_in_group("dispatcher")
+		if disp and gun_ammo > 0:
+			disp.drop_gun(global_position + _fwd() * 0.4, gun, gun_ammo)
+	gun = EnemyGuns.NONE
+	gun_ammo = 0
+	_shown_gun = -1
+
+
 ## Host only: bullets, blasts, falls and blows. At 0 hp the officer is downed.
-## where: "leg", "arm", "torso", "blast", "fall", "bleed" or "" (unknown),
+## where: "leg", "arm", "torso", "blast", "fall", "burn", "bleed" or "" (unknown),
 ## for the wound it may leave.
 func take_damage(amount: float, dir := Vector3.ZERO, where := "") -> void:
 	if not Net.is_host() or state == S.DOWNED or amount <= 0.0:
@@ -495,6 +576,8 @@ func _wound(amount: float, where: String) -> void:
 		"fall":
 			if amount >= 15.0:
 				injuries |= LEG
+		"burn":
+			pass
 		_:
 			if r < 0.3:
 				injuries |= BLEED
@@ -874,11 +957,13 @@ func _weapon(delta: float) -> void:
 		holstered = false   # aiming draws the gun too
 		drawing = true
 		holster_t = HOLSTER_TIME
+	elif _pressed(PlayerInput.HOLSTER) and holster_t <= 0.0 and gun != EnemyGuns.NONE:
+		_drop_gun()   # H with a picked-up gun drops it
 	elif _pressed(PlayerInput.HOLSTER) and holster_t <= 0.0:
 		drawing = false
 		holster_t = HOLSTER_TIME
 		reload_t = 0.0
-	if _pressed(PlayerInput.RELOAD) and gun_up() and holster_t <= 0.0 and ammo < MAG and reserve > 0 and reload_t <= 0.0:
+	if _pressed(PlayerInput.RELOAD) and gun == EnemyGuns.NONE and gun_up() and holster_t <= 0.0 and ammo < MAG and reserve > 0 and reload_t <= 0.0:
 		reload_t = RELOAD_TIME
 	if reload_t > 0.0:
 		reload_t -= delta
@@ -943,7 +1028,7 @@ func muzzle_position() -> Vector3:
 		# The slide is a box 19 cm long along its local Y; the muzzle is its
 		# far end, away from the grip.
 		var xf := _slide_node.global_transform
-		return xf.origin - xf.basis.y.normalized() * 0.095
+		return xf.origin - xf.basis.y.normalized() * float(EnemyGuns.MUZZLE[gun])
 	return global_position + Vector3(0, 1.35 if state != S.CROUCH else 0.95, 0)
 
 
@@ -1332,6 +1417,8 @@ func encode_state(b: StreamPeerBuffer) -> void:
 	b.put_half(treat_t)
 	b.put_half(_boot_t)
 	b.put_half(cuff_t)
+	b.put_u8(gun)
+	b.put_u8(gun_ammo)
 
 
 func decode_state(b: StreamPeerBuffer) -> Dictionary:
@@ -1346,6 +1433,7 @@ func decode_state(b: StreamPeerBuffer) -> Dictionary:
 		"ammo": b.get_u8(), "rs": b.get_u8(), "rl": b.get_half(), "ht": b.get_half(), "cd": b.get_half(), "bl": b.get_half(),
 		"hp": b.get_u8(), "rv": b.get_half(), "bg": b.get_u8() == 1, "sg": b.get_half(),
 		"car": b.get_8(), "seat": b.get_u8() - 1, "inj": b.get_u8(), "tr": b.get_half(), "bt": b.get_half(), "cf": b.get_half(),
+		"gn": b.get_u8(), "ga": b.get_u8(),
 	}
 
 
@@ -1372,6 +1460,8 @@ func apply_state(s: Dictionary) -> void:
 	ammo = s.ammo & 127
 	holstered = (s.ammo & 128) != 0
 	reserve = s.rs
+	gun = s.gn
+	gun_ammo = s.ga
 	reload_t = s.rl
 	holster_t = absf(s.ht)
 	drawing = s.ht < 0.0
@@ -1418,8 +1508,17 @@ func _process(delta: float) -> void:
 			_place_in_seat()   # stay in the seat between ticks (and on remote copies)
 			car.set_window_down(PoliceCar.SEAT_WINDOW[seat], is_aiming())
 		rig.update_from(self, delta)
-		for g in rig.model.find_children("gun_*", "", true, false):
-			g.visible = gun_in_hand() and state not in [S.ROLL, S.VAULT, S.CLIMB, S.SLIDE, S.KICK, S.DOWNED] and not (state == S.VEHICLE and seat == 0)
+		if _shown_gun != gun:
+			_shown_gun = gun
+			EnemyGuns.show_in_hand(rig.model, EnemyGuns.PISTOL if gun == EnemyGuns.NONE else gun)
+		var show := gun_in_hand() and state not in [S.ROLL, S.VAULT, S.CLIMB, S.SLIDE, S.KICK, S.DOWNED] and not (state == S.VEHICLE and seat == 0)
+		var hand := rig.model.find_child("gun_slide", true, false) as Node3D
+		if hand and hand.get_parent():
+			(hand.get_parent() as Node3D).visible = true
+			for g in hand.get_parent().get_children():
+				if g is Node3D and (g.name.begins_with("gun_") or g.name == "shotgun"):
+					var right: bool = (g.name == "shotgun") == (gun == EnemyGuns.SHOTGUN)
+					(g as Node3D).visible = show and right
 		_update_torch()
 
 

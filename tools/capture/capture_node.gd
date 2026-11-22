@@ -133,6 +133,40 @@ func _run() -> void:
 					s.cam.zoom = 12.0
 			await _frames(90)
 			await _save()
+		"mayhem_inside", "mayhem_fire", "mayhem_car":
+			# Phase 1.5: furniture indoors, a fire spreading, a car burning.
+			var s := await _scene("res://prototypes/p08_block/block.tscn")
+			s.find_children("*", "NetOverlay", false, false)[0].queue_free()
+			await _frames(20)
+			var o: Officer = s.sync.my_pawn()
+			var b: Dictionary = s.gen.buildings.filter(func(x): return x.enterable)[0]
+			var mid: Vector3 = b.origin + b.u * (b.w * 2.0) + b.v * (b.d * 2.0)
+			match shot:
+				"mayhem_inside":
+					o.global_position = b.origin + b.u * 2.0 + b.v * 2.0 + Vector3(0, 0.05, 0)
+					s.cam.zoom = 14.0
+				"mayhem_fire":
+					o.global_position = b.origin + b.u * 2.0 + b.v * 1.5 + Vector3(0, 0.05, 0)
+					s.cam.zoom = 14.0
+					await _frames(30)
+					var near: Array = s.props.intact().filter(func(p): return PropWorld.KINDS[p.kind].get("flammable", false))
+					near.sort_custom(func(x, y): return (x.body as Node3D).global_position.distance_to(o.global_position) < (y.body as Node3D).global_position.distance_to(o.global_position))
+					print("igniting ", near[0].kind, " id ", s.fire.ignite((near[0].body as Node3D).global_position, 0.6, 30.0, near[0].id))
+					s.fire.ignite(o.global_position + Vector3(2.5, 0, 0), 1.0, 30.0)
+					await _frames(25)
+					print("fires ", s.fire.fires.size(), " visuals ", s.fire._visuals.size())
+				"mayhem_car":
+					var c: Car = s.cars.cars[0]
+					o.global_position = c.global_position + Vector3(-6, 0, 4)
+					s.cam.target = null
+					s.cam.global_position = c.global_position
+					s.cam.zoom = 14.0
+					s.cars.damage_car(c, 30.0 + 50.0)
+					await _frames(60)
+					s.cars.damage_car(c, 100.0)
+					await _frames(40)
+			await _frames(30)
+			await _save()
 		"prone_side":
 			# Side-on views of prone idle, prone aiming and crawling.
 			var s := await _scene("res://prototypes/p06_movement/movement.tscn")

@@ -104,7 +104,10 @@ func _play_bullet(b: StreamPeerBuffer) -> void:
 	var surface: String = Sfx.SURFACES[mini(b.get_u8(), Sfx.SURFACES.size() - 1)]
 	var what := b.get_u8()
 	var shooter := b.get_u32()
-	Sfx.bullet(self, a, e, surface, what, shooter != 0 and shooter == Net.my_id())
+	var mine := shooter != 0 and shooter == Net.my_id()
+	Sfx.bullet(self, a, e, surface, what, mine)
+	if mine and what == 1:
+		Feel.hit_marker(get_tree())
 
 
 ## Host: a blow landed at pos. what: 0 a person, else the surface index + 1.

@@ -320,15 +320,22 @@ func _officer_foley(o: Officer, _delta: float) -> void:
 	var st: Dictionary = _officers.get(id, {})
 	if st.is_empty():
 		_officers[id] = {"rounds": rounds, "gun": gun, "reload": o.reload_t, "holster": o.holster_t,
-			"punch": o.punch_t, "state": o.state, "fire": fire}
+			"punch": o.punch_t, "state": o.state, "fire": fire, "hp": o.hp}
 		return
 	var parent := o.get_parent()
 	var own := o == _pawn()
+	# Phase 1.5: getting hurt jolts your camera.
+	if own and o.hp < float(st.get("hp", o.hp)) - 0.5:
+		Feel.shake(get_tree(), clampf((float(st.hp) - o.hp) / 40.0, 0.2, 0.7))
+	st.hp = o.hp
 	# A shot: fewer rounds in the same gun, and not reloading.
 	if gun == st.gun and rounds < st.rounds and o.reload_t <= 0.0:
 		var muzzle := o.muzzle_position()
 		Sfx.shot(parent, muzzle, maxi(gun, 0), own)
 		eject_casing(o)
+		Feel.muzzle(parent, muzzle, gun == Sfx.SHOTGUN)
+		if own:
+			Feel.shake(get_tree(), 0.22 if gun == Sfx.SHOTGUN else 0.07)
 	# Dry: the trigger pulled on an empty gun.
 	if fire and not st.fire and rounds == 0 and o.gun_up() and o.reload_t <= 0.0:
 		Sfx.play(parent, "dry_fire", o.muzzle_position(), -8.0, 12.0, 0.05)

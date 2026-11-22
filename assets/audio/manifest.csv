@@ -162,3 +162,7 @@ sfx/room_tone_1.wav,Made by tools/audio/make_layers.py,Project's own (no third-p
 sfx/explosion_1.wav,100-CC0-SFX_0/explosion.ogg (https://opengameart.org/content/100-cc0-sfx),CC0 1.0 (public domain),explosion
 sfx/explosion_body_1.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),explosion rumble layer
 sfx/explosion_body_2.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),explosion rumble layer
+sfx/fire_loop_1.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),"fire roaring and crackling, loops"
+sfx/fire_whoomph_1.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),flames catching
+sfx/fire_whoomph_2.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),flames catching
+sfx/gas_hiss_1.wav,Made by tools/audio/make_layers.py,Project's own (no third-party audio),fire extinguisher bursting

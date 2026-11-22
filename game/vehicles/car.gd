@@ -40,6 +40,8 @@ var horn := false
 var _horn_player: AudioStreamPlayer3D
 
 var net_id := 0
+## Phase 1.5: burnt out after it went up. No engine, charred black.
+var wrecked := false
 var bumper_attached := true
 var _wheels: Array = []     # [{pos: local mount, front: bool, rear: bool, node: Node3D, compress: float}]
 var _steer_smooth := 0.0
@@ -330,6 +332,30 @@ func detach_part(part_name: String, push := Vector3.ZERO) -> void:
 
 
 ## Deepest dent in metres.
+func wreck() -> void:
+	if wrecked:
+		return
+	wrecked = true
+	throttle = 0.0
+	horn = false
+	var char_mat := Cel.material(Color("1c1a19"), true, 0.02)
+	var stack: Array = [self]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		for c in n.get_children():
+			stack.append(c)
+			if c is MeshInstance3D:
+				var mi := c as MeshInstance3D
+				for i in mi.get_surface_override_material_count():
+					mi.set_surface_override_material(i, null)
+				mi.material_override = char_mat
+			elif c is Light3D:
+				(c as Light3D).visible = false
+	if get("lights") != null:
+		set("lights", false)
+		set("siren", 0)
+
+
 func dent_amount() -> float:
 	var deepest := 0.0
 	for e in _deform:

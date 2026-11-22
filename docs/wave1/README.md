@@ -195,6 +195,82 @@ city block. It is built phase by phase; each phase ends with a build.
 ![Cuffed suspect following](img/dispatch_arrest.png)
 ![Custody bay](img/dispatch_bay.png)
 
+## Phase 1.5: enemies that fight, and a fight that makes a mess (v0.2.8)
+
+Enemies:
+
+- Fighters (armed suspects, "Shots fired" gangs) look for cover facing the
+  officers: a spot on the walkable floor hidden when crouched, with
+  something solid close in front and a way to shoot from it (stand up over
+  low cover or lean out round a corner). From cover they duck, peek and fire
+  in bursts, blind fire over the top, and reload in cover. Cover search now
+  samples 7 rings of 20 points (it found cover about half the time before;
+  now nearly always).
+- Bullets passing within 1.8 m pin them down for a moment (no shots back).
+- Roles: some pin you down with fire at where you were last seen, others go
+  round the side (flank). They retreat to cover further back when hurt or
+  outnumbered, and call backup once per call: two more arrive about 9 s
+  later from somewhere no officer can see.
+- Unarmed fighters pick up loose things (chairs, crates, bins, bottles, gas
+  bottles) and throw them at you; a thrown thing hurts whoever it hits
+  while it is flying fast.
+- Guns: street pistol (12 rounds) and sawn-off pump shotgun (5 shells, 7
+  pellets). A suspect who gives up tosses the gun a couple of metres away.
+  Officers pick it up with F and get only its loaded rounds (the HUD shows
+  the gun's name and "no spare"); H drops it, and an empty one is dropped
+  for the service pistol.
+- New call: "Shots fired", 3 or 4 armed, one with the shotgun.
+
+The mess (`game/world/props.gd`, `game/world/fire.gd`, `game/world/blast.gd`):
+
+- Props from the block's seed, the same on every machine: tables with
+  chairs, shelves with bottles in shops, crates, the odd gas bottle
+  indoors; bins, crates, bottles, red barrels and gas bottles in the yards;
+  benches on the pavement; a fire extinguisher inside each enterable
+  building's door. The host simulates them and streams the moving ones
+  (20 a second, 80 a packet, every prop refreshed at least every 1.5 s);
+  a late joiner asks what has already broken.
+- They break from bullets (14 a round), kicks, blasts, fire and hard knocks
+  (a chair thrown at a wall, a bottle dropped): wood splinters, glass
+  smashes, metal clangs, each with its sound.
+- Red barrels (3 rounds) and gas bottles go up: a blast that hurts people,
+  breaks things, dents and damages cars, and leaves a fire.
+- Fire burns for a while, catches wooden things within 1.3 m (and wooden
+  doors), burns people standing in it, cooks off barrels, and leaves
+  embers where something burnt away. Flames, smoke, flickering light, a
+  crackle loop and a whoomph as it catches. A shot extinguisher bursts into
+  a white cloud that puts out every fire within 4.5 m.
+- Cars take damage from bullets (3 a round, 12 in the fuel tank low at the
+  back), crashes, blasts and fire. Below 40 they smoke; at 0 they catch
+  fire and 7 s later go up, ending as a charred wreck that will not drive.
+- One `Blast.go` for every explosion (the demolition charge too): the
+  world, people, cars, props and the camera.
+
+Feel (`game/render/feel.gd`):
+
+- Camera shake: your shots (more for the shotgun), rounds cracking past,
+  getting hit, blasts by distance. Settings > Gameplay > Camera shake.
+- Hit marker: the reticle flares white when your bullet lands on someone,
+  with a 45 ms hit-stop when playing alone (never online).
+- Muzzle flash light on every officer shot; sparks off metal, splinters off
+  wood, glints off glass and a puff of dust off concrete.
+- Sounds made for this phase: fire crackle loop, whoomph, extinguisher
+  hiss (`tools/audio/make_layers.py`).
+
+Checks: `tests/unit/test_combat.gd` (cover and shooting from it, pinned
+down, gang call with flankers and backup, flank spot, throwing, guns
+dropped and picked up, shotgun spread) and `tests/unit/test_mayhem.gd`
+(furnished block with nothing in a wall, shooting and kicking furniture,
+thrown things breaking, a barrel going up and starting a fire, fire
+spreading and burning out, an extinguisher, cars smoking, burning and going
+up, the camera). `tools/capture/net_check.gd` runs a host and a client on
+one machine: the same props, the same breaks, fires and car state on both,
+and a knocked chair in the same place to the centimetre.
+
+![Furniture indoors](img/mayhem_inside.png)
+![A shelf on fire](img/mayhem_fire.png)
+![A car after it went up](img/mayhem_car.png)
+
 ## Phase 1.6: sound that hits hard (v0.2.7, pulled forward)
 
 beenster heard nothing in v0.2.5: the officers' own gunshots and bullet

@@ -23,9 +23,14 @@ const DRAG_DEG_PER_PX := 0.35
 const DRAG_START_PX := 6.0
 static var drag_px := 0.0      # how far the mouse moved since the middle button went down
 var _dragging := false
+## Phase 1.5: camera shake, 0..1, eased off over about half a second.
+var trauma := 0.0
+var _shake_t := 0.0
+const SHAKE_MAX := 0.55        # m of sideways jolt at full trauma
 
 
 func _ready() -> void:
+	add_to_group(Feel.CAMERA_GROUP)
 	camera = Camera3D.new()
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
 	camera.size = zoom
@@ -34,6 +39,10 @@ func _ready() -> void:
 	add_child(camera)
 	camera.make_current()
 	_apply()
+
+
+func shake(amount: float) -> void:
+	trauma = clampf(trauma + amount * float(Settings.values.get("camera_shake", 1.0)), 0.0, 1.0)
 
 
 func yaw_rad() -> float:
@@ -119,6 +128,8 @@ func _process(delta: float) -> void:
 	if target and is_instance_valid(target):
 		global_position = global_position.lerp(target.global_position, 1.0 - exp(-follow_sharpness * delta))
 	camera.size = lerp(camera.size, zoom, 1.0 - exp(-10.0 * delta))
+	trauma = maxf(trauma - delta * 1.8, 0.0)
+	_shake_t += delta
 	_apply()
 
 
@@ -126,4 +137,8 @@ func _apply() -> void:
 	if camera == null:
 		return
 	var b := Basis(Vector3.UP, deg_to_rad(_yaw)) * Basis(Vector3.RIGHT, deg_to_rad(pitch_deg))
-	camera.transform = Transform3D(b, b * Vector3(0, 0, distance))
+	var jolt := Vector3.ZERO
+	if trauma > 0.0:
+		var k := trauma * trauma * SHAKE_MAX
+		jolt = b * Vector3(sin(_shake_t * 61.0) + sin(_shake_t * 37.0) * 0.5, sin(_shake_t * 53.0 + 1.0) + sin(_shake_t * 29.0) * 0.5, 0) * k * 0.66
+	camera.transform = Transform3D(b, b * Vector3(0, 0, distance) + jolt)

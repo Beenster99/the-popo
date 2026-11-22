@@ -50,6 +50,14 @@ func _process(_delta: float) -> void:
 	var x := up.cross(n).normalized()
 	global_transform.basis = Basis(x, n, x.cross(n).normalized())
 	_mat.albedo_color = Color(1.0, 0.35, 0.3) if _blocked(pawn) else Color(1.0, 0.95, 0.6)
+	# Phase 1.5: hit marker, a quick white flare of the ring.
+	var since := Time.get_ticks_msec() - Feel.last_hit_ms
+	if since < 180:
+		var k := 1.0 - since / 180.0
+		_ring.scale = Vector3.ONE * (1.0 + k * 0.8)
+		_mat.albedo_color = Color(1, 1, 1)
+	else:
+		_ring.scale = Vector3.ONE
 
 
 func _blocked(pawn: Node3D) -> bool:

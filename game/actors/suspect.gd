@@ -11,10 +11,22 @@ extends CharacterBody3D
 ## suspect kneels with their hands up; an officer holding interact next to
 ## them cuffs them, and they follow that officer until they are put in a
 ## police car and driven to the custody bay. Armed suspects shoot back now
-## and then while they run (real combat behaviour is Phase 1.5).
+## and then while they run.
+##
+## Phase 1.5: fighters (gang members, armed suspects) stand and fight. They
+## find cover between them and the officers (low walls they can pop up over,
+## corners they can lean out of), peek and shoot in short bursts, blind fire
+## over the top when pinned down by fire, reload behind cover, move to new
+## cover when flanked, retreat when hurt or outnumbered, and push forward
+## when they lose sight of the police. In a group one pins the officers down
+## while another works round the side, and they call for backup. Without a
+## gun (or out of ammo) they grab loose things and throw them. Guns are
+## dropped on surrender or when they go down; officers can pick them up.
 ## Same skeleton and clips as the officers, dressed as civilians.
 
-enum S { LOITER, ROB, FLEE, HIDE, SHOOT, STAGGER, SURRENDER, CUFFED, IN_CAR, DOWN, BOOKED, DRIVE }
+enum S { LOITER, ROB, FLEE, HIDE, SHOOT, STAGGER, SURRENDER, CUFFED, IN_CAR, DOWN, BOOKED, DRIVE, COVER, SEEK_COVER, THROW }
+## What a fighter is doing in cover (synced, for the pose).
+enum C { HIDE, PEEK, BLIND, RELOAD }
 
 const WALK := 1.4
 const RUN := 4.4              # officers sprint at 5.6, so they can catch one
@@ -28,12 +40,33 @@ const SURRENDER_AT := 1.6     # pressure that makes them give up
 const SHOT_GAP := 0.9         # s between an armed suspect's shots
 const SHOOT_RANGE := 16.0
 const FOLLOW_GAP := 1.1       # m behind the officer escorting them
+const COVER_IDEAL := 9.0      # m from the officers a fighter likes to fight at
+const SUPPRESS_TIME := 1.6    # s pinned down after a bullet passes close
+const THROW_REACH := 3.0      # m: loose things this close can be grabbed
+const THROW_SPEED := 11.0
+const ROLE_PIN := 0
+const ROLE_FLANK := 1
 
 signal state_changed(s: Suspect)
 
 var net_id := 0
 var look := 0
-var armed := false
+## What they carry (EnemyGuns.NONE, PISTOL or SHOTGUN). armed is the old flag.
+var weapon := EnemyGuns.NONE
+var armed: bool:
+	get:
+		return weapon != EnemyGuns.NONE
+	set(v):
+		if v != (weapon != EnemyGuns.NONE):
+			weapon = EnemyGuns.PISTOL if v else EnemyGuns.NONE
+			mag = EnemyGuns.MAG[weapon]
+var mag := 0                   # rounds in the gun
+## Fights from cover instead of running for it (Phase 1.5).
+var fighter := false
+var role := ROLE_PIN
+## Fighters: where they are taking cover, and what they are doing there.
+var cover_spot := Vector3.INF
+var cphase := C.HIDE
 var hp := MAX_HP
 var state := S.LOITER
 var state_t := 0.0
@@ -65,6 +98,23 @@ var _alone_t := 0.0
 var _check_t := 0.0
 var _last_spot := Vector3.INF
 var _rng := RandomNumberGenerator.new()
+var _ct := 0.0                  # time left in this cover phase
+var _burst := 0
+var _peek_off := Vector3.ZERO   # sideways step to lean out (zero: stand up)
+var _cycles := 0
+var _eval_t := 0.0
+var _suppressed_t := 0.0
+var _last_seen := Vector3.INF   # where an officer was last seen
+var _unseen_t := 0.0
+var _flanked := false
+var _called_backup := false
+var _seek_t := 0.0
+var _held: RigidBody3D
+var _throw_t := 0.0
+var _grab: RigidBody3D
+var _retreated := false
+## Clients: holding something over their head (for the pose).
+var holding := false
 
 
 func _init() -> void:
@@ -93,7 +143,7 @@ func is_host_side() -> bool:
 
 
 func is_free() -> bool:
-	return state in [S.LOITER, S.ROB, S.FLEE, S.HIDE, S.SHOOT, S.STAGGER]
+	return state in [S.LOITER, S.ROB, S.FLEE, S.HIDE, S.SHOOT, S.STAGGER, S.COVER, S.SEEK_COVER, S.THROW]
 
 
 ## Dealt with: no longer part of the call's trouble.
@@ -109,8 +159,15 @@ func set_state(s: S) -> void:
 	_path = PackedVector3Array()
 	_goal = Vector3.INF
 	if s in [S.SURRENDER, S.CUFFED, S.IN_CAR, S.DOWN, S.BOOKED]:
-		armed = false   # the gun is dropped (picked up in a later phase)
+		# The gun goes on the floor, for an officer to pick up.
+		if weapon != EnemyGuns.NONE and s != S.BOOKED and is_host_side() and dispatcher and dispatcher.has_method("drop_gun") and is_inside_tree():
+			dispatcher.drop_gun(_toss_spot(), weapon, mag)
+		weapon = EnemyGuns.NONE
 		aim_at = Vector3.ZERO
+		_drop_held(Vector3.ZERO)
+	if s not in [S.COVER, S.SEEK_COVER]:
+		cover_spot = Vector3.INF
+	cphase = C.HIDE
 	if s == S.DOWN:
 		collision_layer = 0
 		collision_mask = 1
@@ -127,13 +184,23 @@ func set_state(s: S) -> void:
 	state_changed.emit(self)
 
 
+## Where a gun lands when they give up: tossed away a couple of metres in
+## front, so the officer can cuff them without picking it up by mistake (and
+## short of any wall).
+func _toss_spot() -> Vector3:
+	var fwd := Vector3(sin(rotation.y), 0, cos(rotation.y))
+	var from := global_position + Vector3(0, 0.6, 0)
+	var to := from + fwd * 1.9
+	var hit := get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(from, to, 1 | 4, [get_rid()]))
+	if hit:
+		to = (hit.position as Vector3) - fwd * 0.3
+	return Vector3(to.x, global_position.y, to.z)
+
+
 func _show_gun() -> void:
 	if rig == null or rig.model == null:
 		return
-	for n in ["gun_grip", "gun_slide"]:
-		var g := rig.model.find_child(n, true, false) as Node3D
-		if g:
-			g.visible = armed
+	EnemyGuns.show_in_hand(rig.model, weapon)
 
 
 # --- host: hits ----------------------------------------------------------------
@@ -148,7 +215,8 @@ func take_damage(amount: float, dir := Vector3.ZERO, _where := "") -> void:
 		velocity = dir * 3.0
 		set_state(S.DOWN)
 		return
-	pressure += 1.0 if hp > MAX_HP * 0.5 else 2.0
+	pressure += (0.4 if fighter else 1.0) if hp > MAX_HP * 0.5 else (1.0 if fighter else 2.0)
+	_suppressed_t = SUPPRESS_TIME
 
 
 ## A punch, kick or barge: knocked off balance, and much keener to give up.
@@ -195,6 +263,7 @@ func _physics_process(delta: float) -> void:
 		return
 	state_t += delta
 	_shoot_t -= delta
+	_suppressed_t -= delta
 	pressure = maxf(0.0, pressure - 0.2 * delta)
 	if state == S.IN_CAR:
 		if car == null or not is_instance_valid(car):
@@ -205,15 +274,22 @@ func _physics_process(delta: float) -> void:
 	if state in [S.DOWN, S.BOOKED, S.DRIVE]:
 		return
 	var t := _threat()
+	if t.o and t.los:
+		_last_seen = (t.o as Officer).global_position
+		_unseen_t = 0.0
+	else:
+		_unseen_t += delta
 	if is_free():
 		_feel_pressure(delta)
+		if not is_free():
+			return
 	var wish := Vector3.ZERO
 	var speed := 0.0
 	aim_at = Vector3.ZERO
 	match state:
 		S.LOITER:
 			if _notices(t):
-				_bolt(t)
+				_react(t)
 			elif armed:
 				_wander_t -= delta
 				if _wander_t <= 0.0 or _goal == Vector3.INF:
@@ -224,7 +300,7 @@ func _physics_process(delta: float) -> void:
 		S.ROB:
 			# Turning the place over until officers show up or they have it.
 			if _notices(t) or state_t > 70.0:
-				_bolt(t)
+				_react(t)
 		S.SHOOT:
 			if t.o:
 				_face(t.o.global_position)
@@ -245,7 +321,9 @@ func _physics_process(delta: float) -> void:
 				set_state(S.HIDE)
 		S.HIDE:
 			_check_t -= delta
-			if t.o and t.los and _check_t <= 0.0:
+			if fighter and t.o and t.los and t.d < 16.0 and (armed or _throwable_near() != null):
+				_engage(t)
+			elif t.o and t.los and _check_t <= 0.0:
 				_check_t = 1.5
 				if t.d < 4.0:
 					if _rng.randf() < 0.7:
@@ -256,10 +334,22 @@ func _physics_process(delta: float) -> void:
 					_bolt(t)
 		S.STAGGER:
 			if state_t > 1.0:
-				if pressure >= 1.0 or not armed:
+				if pressure >= (2.0 if fighter else 1.0) or (not armed and not fighter):
 					set_state(S.SURRENDER)
 				else:
-					_bolt(t)
+					_react(t)
+		S.SEEK_COVER:
+			var r := _seek_cover_step(t, delta)
+			wish = r[0]
+			speed = r[1]
+		S.COVER:
+			var r := _cover_step(t, delta)
+			wish = r[0]
+			speed = r[1]
+		S.THROW:
+			var r := _throw_step(t, delta)
+			wish = r[0]
+			speed = r[1]
 		S.SURRENDER:
 			# Nobody watching for a while: some get up and run again.
 			_alone_t = _alone_t + delta if (t.o == null or t.d > 18.0) else 0.0
@@ -283,6 +373,7 @@ func _physics_process(delta: float) -> void:
 	var target := wish * speed
 	velocity.x = move_toward(velocity.x, target.x, ACCEL * delta)
 	velocity.z = move_toward(velocity.z, target.z, ACCEL * delta)
+	_carry_held()
 	if state == S.STAGGER:
 		velocity.x = move_toward(velocity.x, 0.0, 8.0 * delta)
 		velocity.z = move_toward(velocity.z, 0.0, 8.0 * delta)
@@ -340,13 +431,25 @@ func _feel_pressure(delta: float) -> void:
 		var q := PhysicsRayQueryParameters3D.create(from, chest, 1, [get_rid()])
 		if not get_world_3d().direct_space_state.intersect_ray(q).is_empty():
 			continue
-		pressure += delta * (0.5 if armed else 1.0) * (1.5 if d < 6.0 else 1.0)
+		pressure += delta * (0.25 if fighter else (0.5 if armed else 1.0)) * (1.5 if d < 6.0 else 1.0)
 	if pressure >= SURRENDER_AT:
-		if not armed or _rng.randf() < 0.6:
+		if fighter and hp > MAX_HP * 0.35 and _rng.randf() < 0.75:
+			# Not giving up yet: get out of the line of fire.
+			pressure = 0.8
+			_retreat(_threat())
+		elif not armed or _rng.randf() < 0.6:
 			set_state(S.SURRENDER)
 		else:
 			pressure = 0.6
 			set_state(S.SHOOT)
+
+
+## Seen the police: fighters fight, the rest run.
+func _react(t: Dictionary) -> void:
+	if fighter:
+		_engage(t)
+	else:
+		_bolt(t)
 
 
 ## Off they go: armed ones sometimes stand and shoot first.
@@ -440,13 +543,468 @@ func _face(p: Vector3) -> void:
 
 
 func _fire(o: Officer) -> void:
-	_shoot_t = SHOT_GAP * _rng.randf_range(0.8, 1.5)
-	if dispatcher and dispatcher.has_method("suspect_shot"):
-		var muzzle := global_position + Vector3(0, 1.4, 0) + Vector3(sin(rotation.y), 0, cos(rotation.y)) * 0.5
-		var target := o.global_position + Vector3(0, 1.1, 0)
-		var spread := target.distance_to(muzzle) * 0.09
-		target += Vector3(_rng.randf_range(-1, 1), _rng.randf_range(-0.6, 0.6), _rng.randf_range(-1, 1)) * spread
-		dispatcher.suspect_shot(self, muzzle, (target - muzzle).normalized())
+	if mag <= 0 and not fighter and armed:
+		mag = EnemyGuns.MAG[weapon]   # runners reload on the move
+	_fire_at(o.global_position + Vector3(0, 1.1, 0), 0.09)
+
+
+## One trigger pull at target; spread_k is metres of scatter per metre.
+func _fire_at(target: Vector3, spread_k: float) -> void:
+	if weapon == EnemyGuns.NONE or mag <= 0:
+		return
+	mag -= 1
+	if fighter:
+		_shoot_t = EnemyGuns.GAP[weapon] * _rng.randf_range(0.9, 1.3)
+	else:
+		_shoot_t = maxf(SHOT_GAP, EnemyGuns.GAP[weapon]) * _rng.randf_range(0.8, 1.5)
+	if dispatcher == null or not dispatcher.has_method("suspect_shot"):
+		return
+	var muzzle := muzzle_position()
+	var spread := target.distance_to(muzzle) * spread_k
+	target += Vector3(_rng.randf_range(-1, 1), _rng.randf_range(-0.6, 0.6), _rng.randf_range(-1, 1)) * spread
+	var dir := (target - muzzle).normalized()
+	var dmg: float = EnemyGuns.DAMAGE[weapon] * 0.7
+	var first := true
+	for d in EnemyGuns.pellet_dirs(weapon, dir, _rng):
+		dispatcher.suspect_shot(self, muzzle, d, dmg, first)
+		first = false
+
+
+func muzzle_position() -> Vector3:
+	var fwd := Vector3(sin(rotation.y), 0, cos(rotation.y))
+	if state == S.COVER and cphase == C.BLIND:
+		# The gun held up over the top of the cover.
+		return global_position + Vector3(0, 1.3, 0) + fwd * 0.45
+	var sl := rig.model.find_child("gun_slide", true, false) as Node3D if rig and rig.model else null
+	if sl:
+		var xf := sl.global_transform
+		var m := xf.origin - xf.basis.y.normalized() * float(EnemyGuns.MUZZLE[weapon])
+		if m.distance_to(global_position + Vector3(0, 1.2, 0)) < 1.2:
+			return m
+	return global_position + Vector3(0, 1.4, 0) + fwd * 0.5
+
+
+## A bullet went past close by: keep heads down for a moment.
+func suppress() -> void:
+	if not is_free():
+		return
+	_suppressed_t = SUPPRESS_TIME
+	pressure += 0.06 if fighter else 0.25
+
+
+# --- host: fighting ------------------------------------------------------------------
+
+## Into the fight: find cover facing the officers (or grab something to throw).
+func _engage(t: Dictionary) -> void:
+	if not armed:
+		var th := _throwable_near()
+		if th and _threat_pos(t) != Vector3.INF:
+			_start_throw(th)
+			return
+		_run_to_hide(t)
+		return
+	if not _called_backup and dispatcher and dispatcher.has_method("call_backup"):
+		_called_backup = true
+		dispatcher.call_backup(self)
+	_take_cover(t, "near")
+
+
+func _retreat(t: Dictionary) -> void:
+	if not fighter or not armed or not _take_cover(t, "retreat"):
+		_run_to_hide(t)
+
+
+## Picks cover of this kind and runs to it. False if there is none.
+func _take_cover(t: Dictionary, mode: String) -> bool:
+	var tp := _threat_pos(t)
+	if tp == Vector3.INF:
+		return false
+	var c := _find_cover(tp, mode)
+	if c.is_empty():
+		if mode == "near":
+			# No cover about: stand and shoot, then think again.
+			if armed and t.o and t.los:
+				set_state(S.SHOOT)
+			else:
+				_run_to_hide(t)
+			return true
+		return false
+	set_state(S.SEEK_COVER)
+	cover_spot = c.p
+	_peek_off = c.peek
+	_goal = c.p
+	_path = PackedVector3Array()
+	_seek_t = 0.0
+	return true
+
+
+func _threat_pos(t: Dictionary) -> Vector3:
+	if t.o:
+		return (t.o as Officer).global_position
+	return _last_seen
+
+
+func _chest(o: Officer) -> Vector3:
+	return o.global_position + Vector3(0, 1.1, 0)
+
+
+const COVER_MASK := 1 | 4    # the static world and cars
+
+## Somewhere to fight from: a spot on the walkable floor that is hidden from
+## the officers when crouched, with something solid close in front, and
+## (unless retreating) a way to shoot from it: standing up over low cover,
+## or leaning out a step to the side round a corner.
+## mode: "near" (about COVER_IDEAL from them, close by), "advance" (closer),
+## "flank" (round the side of them), "retreat" (far away).
+## Returns {p, peek} (peek: the lean-out step, zero to stand up), or {}.
+func _find_cover(threat_p: Vector3, mode: String) -> Dictionary:
+	if nav == null or not nav.ready_to_use:
+		return {}
+	var space := get_world_3d().direct_space_state
+	var eye := threat_p + Vector3(0, 1.4, 0)
+	var me := global_position
+	var centre := me
+	var radii := [1.5, 3.0, 4.5, 6.0, 7.5, 9.0, 11.0]
+	if mode == "advance":
+		centre = me.lerp(threat_p, 0.5)
+		radii = [1.5, 2.5, 3.5, 5.0, 6.5]
+	elif mode == "flank":
+		centre = threat_p
+		radii = [5.0, 6.5, 8.0, 9.5, 11.0, 12.5]
+	elif mode == "retreat":
+		radii = [5.0, 7.0, 9.0, 11.0, 13.0, 15.0, 17.0]
+	var from_threat := me - threat_p
+	from_threat.y = 0.0
+	var others := []
+	for n in get_tree().get_nodes_in_group("suspects"):
+		var o := n as Suspect
+		if o != self and o.cover_spot != Vector3.INF:
+			others.append(o.cover_spot)
+	var best := {}
+	var best_score := -INF
+	for r in radii:
+		var steps := 20
+		for k in steps:
+			var a := TAU * (float(k) + _rng.randf() * 0.6) / steps
+			var sample: Vector3 = centre + Vector3(cos(a) * r, 0, sin(a) * r)
+			sample.y = me.y
+			var p := nav.closest(sample)
+			if Vector2(p.x - sample.x, p.z - sample.z).length() > 1.0 or absf(p.y - me.y) > 1.6:
+				continue
+			var d_threat := Vector2(p.x - threat_p.x, p.z - threat_p.z).length()
+			if d_threat < 4.0:
+				continue
+			var crowded := false
+			for q in others:
+				if (q as Vector3).distance_to(p) < 1.5:
+					crowded = true
+			if crowded:
+				continue
+			var low := p + Vector3(0, 0.85, 0)
+			var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(low, eye, COVER_MASK, [get_rid()]))
+			if hit.is_empty():
+				continue
+			var blocker_d := low.distance_to(hit.position)
+			if blocker_d > 2.5 and mode != "retreat":
+				continue
+			var peek := _peek_from(space, p, eye)
+			var can_peek := peek != Vector3.INF
+			if not can_peek and mode != "retreat":
+				continue
+			var score := 0.0
+			match mode:
+				"near":
+					score = -absf(d_threat - COVER_IDEAL) * 0.6 - me.distance_to(p) * 0.5
+				"advance":
+					score = -absf(d_threat - 6.0) * 0.6 - me.distance_to(p) * 0.3
+				"flank":
+					var v := p - threat_p
+					v.y = 0.0
+					var ang := rad_to_deg(v.angle_to(from_threat)) if from_threat.length() > 0.1 else 0.0
+					score = ang * 0.12 - absf(d_threat - 8.0) * 0.4 - me.distance_to(p) * 0.15
+				"retreat":
+					score = d_threat * 0.5 - me.distance_to(p) * 0.2 + (2.0 if can_peek else 0.0)
+			score += (1.5 if blocker_d < 1.2 else 0.0) + _rng.randf()
+			if score <= best_score:
+				continue
+			if not nav.reaches(me, p):
+				continue
+			best_score = score
+			best = {"p": p, "peek": peek if can_peek else Vector3.ZERO}
+	return best
+
+
+## How to shoot from cover at p: Vector3.ZERO (stand up over it), a step to
+## the side (lean out round the corner), or Vector3.INF (no way).
+func _peek_from(space: PhysicsDirectSpaceState3D, p: Vector3, eye: Vector3) -> Vector3:
+	var up := p + Vector3(0, 1.45, 0)
+	if space.intersect_ray(PhysicsRayQueryParameters3D.create(up, eye, COVER_MASK, [get_rid()])).is_empty():
+		return Vector3.ZERO
+	var to := eye - p
+	to.y = 0.0
+	to = to.normalized()
+	var side := Vector3(-to.z, 0, to.x)
+	for sgn in [1.0, -1.0]:
+		var off: Vector3 = side * 0.75 * sgn
+		var mid := p + Vector3(0, 1.0, 0)
+		if not space.intersect_ray(PhysicsRayQueryParameters3D.create(mid, mid + off * 1.4, COVER_MASK, [get_rid()])).is_empty():
+			continue
+		var q := p + off + Vector3(0, 1.4, 0)
+		if space.intersect_ray(PhysicsRayQueryParameters3D.create(q, eye, COVER_MASK, [get_rid()])).is_empty():
+			return off
+	return Vector3.INF
+
+
+func _seek_cover_step(t: Dictionary, delta: float) -> Array:
+	_seek_t += delta
+	var wish := _steer(cover_spot, delta)
+	# The one pinning them down shoots on the move.
+	if armed and mag > 0 and t.o and t.los and t.d < SHOOT_RANGE and _shoot_t <= 0.0 and role == ROLE_PIN and _rng.randf() < 0.5:
+		aim_at = _chest(t.o)
+		_fire_at(aim_at, 0.14)
+	if (wish == Vector3.ZERO and _arrived()) or _seek_t > 9.0:
+		set_state(S.COVER)
+		_ct = _rng.randf_range(0.4, 1.0)
+		_eval_t = 0.8
+		return [Vector3.ZERO, 0.0]
+	return [wish, RUN]
+
+
+func _cover_step(t: Dictionary, delta: float) -> Array:
+	var wish := Vector3.ZERO
+	var speed := 0.0
+	if cover_spot == Vector3.INF:
+		cover_spot = global_position
+	var want := cover_spot + (_peek_off if cphase == C.PEEK else Vector3.ZERO)
+	var to := want - global_position
+	to.y = 0.0
+	if to.length() > 0.12:
+		wish = to.normalized()
+		speed = minf(WALK * 1.8, to.length() * 6.0)
+	var tp := _threat_pos(t)
+	_ct -= delta
+	_eval_t -= delta
+	if _eval_t <= 0.0:
+		_eval_t = 1.0
+		if _re_evaluate(t):
+			return [Vector3.ZERO, 0.0]
+	match cphase:
+		C.HIDE:
+			if _ct <= 0.0:
+				_next_move(t)
+		C.RELOAD:
+			if _ct <= 0.0:
+				mag = EnemyGuns.MAG[weapon]
+				_hide(0.2)
+		C.PEEK:
+			if tp != Vector3.INF:
+				aim_at = tp + Vector3(0, 1.1, 0)
+			if _ct < 1.35 and _burst > 0 and _shoot_t <= 0.0 and mag > 0:
+				if t.o and t.los:
+					aim_at = _chest(t.o)
+					_burst -= 1
+					_fire_at(aim_at, 0.045 + (0.05 if _cycles == 0 else 0.0))
+				elif role == ROLE_PIN and _last_seen != Vector3.INF:
+					# Suppressing fire at where they were last seen.
+					_burst -= 1
+					_fire_at(_last_seen + Vector3(0, 1.0, 0), 0.12)
+			if _ct <= 0.0 or (_burst <= 0 and _shoot_t <= -0.15) or mag <= 0:
+				_hide(0.0)
+		C.BLIND:
+			if tp != Vector3.INF:
+				aim_at = tp + Vector3(0, 1.0, 0)
+				if _burst > 0 and _shoot_t <= 0.0 and _ct < 1.1 and mag > 0:
+					_burst -= 1
+					_fire_at(aim_at, 0.3)
+			if _ct <= 0.0 or (_burst <= 0 and _shoot_t <= -0.2) or mag <= 0:
+				_hide(0.0)
+	return [wish, speed]
+
+
+func _hide(extra: float) -> void:
+	cphase = C.HIDE
+	_cycles += 1
+	_ct = _rng.randf_range(0.9, 2.0) * (0.6 if role == ROLE_PIN else 1.0) + extra
+	if _suppressed_t > 0.0:
+		_ct += 1.0
+
+
+## Out of the hide: reload, shoot, move, throw something.
+func _next_move(t: Dictionary) -> void:
+	if armed and mag <= 0:
+		cphase = C.RELOAD
+		_ct = EnemyGuns.RELOAD[weapon]
+		return
+	var tp := _threat_pos(t)
+	if not armed:
+		var th := _throwable_near()
+		if th and tp != Vector3.INF:
+			_start_throw(th)
+		else:
+			_retreat(t)
+		return
+	if tp == Vector3.INF:
+		set_state(S.LOITER)
+		home = global_position
+		return
+	if _unseen_t > 7.0:
+		# Lost them: push up to where they were.
+		_unseen_t = 0.0
+		if _take_cover({"o": null, "d": INF, "los": false}, "advance"):
+			return
+	if role == ROLE_FLANK and _cycles >= 2 and not _flanked:
+		_flanked = true
+		if _take_cover(t, "flank"):
+			return
+	var th := _throwable_near()
+	if th and t.o and t.d < 14.0 and _rng.randf() < 0.12:
+		_start_throw(th)
+		return
+	var shotgun := weapon == EnemyGuns.SHOTGUN
+	if _suppressed_t > 0.0 or _rng.randf() < 0.22:
+		cphase = C.BLIND
+		_burst = 1 if shotgun else _rng.randi_range(2, 3)
+		_ct = 1.4
+	else:
+		cphase = C.PEEK
+		_burst = 1 if shotgun else _rng.randi_range(2, 4) + (1 if role == ROLE_PIN else 0)
+		_ct = 1.9
+		_shoot_t = maxf(_shoot_t, 0.0)
+
+
+## Every second in cover: is it still any good? True if they moved on.
+func _re_evaluate(t: Dictionary) -> bool:
+	if t.o == null:
+		return false
+	if hp < MAX_HP * 0.4 and not _retreated:
+		_retreated = true
+		_retreat(t)
+		return true
+	if t.d < 3.0:
+		if pressure > 0.8 and _rng.randf() < 0.5:
+			set_state(S.SURRENDER)
+		else:
+			_bolt(t)
+		return true
+	# Flanked: an officer can see them even crouched.
+	if cphase in [C.HIDE, C.RELOAD] and t.d < 22.0:
+		var eye := (t.o as Officer).global_position + Vector3(0, 1.4, 0)
+		var q := PhysicsRayQueryParameters3D.create(eye, global_position + Vector3(0, 0.85, 0), COVER_MASK, [get_rid()])
+		if get_world_3d().direct_space_state.intersect_ray(q).is_empty():
+			_take_cover(t, "near")
+			return true
+	# Outnumbered: back off.
+	var officers := 0
+	for n in get_tree().get_nodes_in_group("officers"):
+		var o := n as Officer
+		if o and o.state != Officer.S.DOWNED and o.global_position.distance_to(global_position) < 20.0:
+			officers += 1
+	var allies := 0
+	for n in get_tree().get_nodes_in_group("suspects"):
+		var s2 := n as Suspect
+		if s2 != self and s2.fighter and s2.is_free() and s2.global_position.distance_to(global_position) < 15.0:
+			allies += 1
+	if officers >= allies + 3 and not _retreated and _rng.randf() < 0.3:
+		_retreated = true
+		_retreat(t)
+		return true
+	return false
+
+
+# --- host: throwing things -------------------------------------------------------------
+
+## Loose things close by that can be picked up and thrown (bottles, chairs,
+## bins: rigid bodies in the "throwable" group).
+func _throwable_near() -> RigidBody3D:
+	var best: RigidBody3D = null
+	var bd := THROW_REACH
+	for n in get_tree().get_nodes_in_group("throwable"):
+		var rb := n as RigidBody3D
+		if rb == null or rb.has_meta("held") or rb.mass > 25.0 or not rb.is_inside_tree():
+			continue
+		var d := rb.global_position.distance_to(global_position)
+		if d < bd and absf(rb.global_position.y - global_position.y) < 1.5:
+			bd = d
+			best = rb
+	return best
+
+
+func _start_throw(rb: RigidBody3D) -> void:
+	set_state(S.THROW)
+	_grab = rb
+	_held = null
+	_throw_t = 0.0
+
+
+func _throw_step(t: Dictionary, delta: float) -> Array:
+	var tp := _threat_pos(t)
+	if _held == null:
+		if _grab == null or not is_instance_valid(_grab) or _grab.has_meta("held") or state_t > 5.0:
+			_after_throw(t)
+			return [Vector3.ZERO, 0.0]
+		var to := _grab.global_position - global_position
+		to.y = 0.0
+		if to.length() > 0.9:
+			return [_steer(_grab.global_position, delta), RUN]
+		_held = _grab
+		_held.set_meta("held", true)
+		_held.freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
+		_held.freeze = true
+		holding = true
+		_throw_t = 0.6
+		return [Vector3.ZERO, 0.0]
+	if tp != Vector3.INF:
+		_face(tp)
+	_throw_t -= delta
+	if _throw_t <= 0.0:
+		if tp != Vector3.INF:
+			var lead := Vector3.ZERO
+			if t.o:
+				lead = (t.o as Officer).velocity * 0.3
+			_drop_held(Thrown.launch_velocity(_held.global_position, tp + lead + Vector3(0, 1.0, 0), THROW_SPEED))
+		else:
+			_drop_held(Vector3.ZERO)
+		_after_throw(t)
+	return [Vector3.ZERO, 0.0]
+
+
+func _after_throw(t: Dictionary) -> void:
+	_grab = null
+	if fighter and armed:
+		_take_cover(t, "near")
+	elif fighter and _throwable_near() and t.o and t.d < 16.0:
+		_start_throw(_throwable_near())
+	else:
+		_run_to_hide(t)
+
+
+## Host: keeps a held thing over their head.
+func _carry_held() -> void:
+	if _held == null:
+		return
+	if not is_instance_valid(_held):
+		_held = null
+		holding = false
+		return
+	var fwd := Vector3(sin(rotation.y), 0, cos(rotation.y))
+	_held.global_position = global_position + Vector3(0, 2.05, 0) - fwd * 0.1
+	_held.linear_velocity = Vector3.ZERO
+
+
+## Lets go of what they hold, at velocity v (zero just drops it).
+func _drop_held(v: Vector3) -> void:
+	holding = false
+	if _held == null or not is_instance_valid(_held):
+		_held = null
+		return
+	var rb := _held
+	_held = null
+	rb.remove_meta("held")
+	rb.freeze = false
+	rb.linear_velocity = v
+	if v != Vector3.ZERO:
+		rb.angular_velocity = Vector3(_rng.randf_range(-6, 6), _rng.randf_range(-6, 6), _rng.randf_range(-6, 6))
+		Thrown.arm(rb, self)
 
 
 ## Kerbs and stair treads: hop up small steps the capsule catches on.
@@ -474,6 +1032,23 @@ func _process(delta: float) -> void:
 	match state:
 		S.HIDE, S.STAGGER:
 			lower = "crouch_walk" if hs > 0.3 else "crouch_idle"
+		S.COVER:
+			match cphase:
+				C.PEEK:
+					lower = "idle" if hs < 0.2 else "walk"
+					upper = "aim_hold"
+				C.BLIND:
+					lower = "crouch_idle"
+					upper = "aim_hold"
+				C.RELOAD:
+					lower = "crouch_idle"
+					upper = "reload"
+				_:
+					lower = "crouch_walk" if hs > 0.3 else "crouch_idle"
+					upper = "ready_hold" if armed else "none"
+		S.THROW:
+			lower = "idle" if hs < 0.2 else ("walk" if hs < 2.2 else "run")
+			upper = "hands_up" if holding else "none"
 		S.SURRENDER:
 			lower = "kneel"
 			upper = "hands_up"
@@ -497,7 +1072,8 @@ func _process(delta: float) -> void:
 func encode(b: StreamPeerBuffer) -> void:
 	b.put_u16(net_id)
 	b.put_u8(look)
-	b.put_u8(state | (128 if armed else 0))
+	b.put_u8(state)
+	b.put_u8(cphase | (weapon << 2) | (16 if holding else 0) | (32 if fighter else 0))
 	b.put_float(global_position.x)
 	b.put_float(global_position.y)
 	b.put_float(global_position.z)
@@ -516,9 +1092,13 @@ static func decode(b: StreamPeerBuffer) -> Dictionary:
 	var d := {}
 	d.id = b.get_u16()
 	d.look = b.get_u8()
-	var st := b.get_u8()
-	d.state = st & 127
-	d.armed = (st & 128) != 0
+	d.state = b.get_u8()
+	var fl := b.get_u8()
+	d.cphase = fl & 3
+	d.weapon = (fl >> 2) & 3
+	d.holding = (fl & 16) != 0
+	d.fighter = (fl & 32) != 0
+	d.armed = d.weapon != EnemyGuns.NONE
 	d.pos = Vector3(b.get_float(), b.get_float(), b.get_float())
 	d.yaw = b.get_half()
 	d.speed = b.get_half()
@@ -532,11 +1112,14 @@ static func decode(b: StreamPeerBuffer) -> Dictionary:
 
 ## Clients: take the host's word for everything but the smoothed position.
 func apply_net(d: Dictionary) -> void:
-	armed = d.armed
+	if d.state != state:
+		set_state(d.state)
+	weapon = d.weapon
+	cphase = d.cphase
+	holding = d.holding
+	fighter = d.fighter
 	aim_at = d.aim
 	hp = d.hp
 	seat = d.seat
 	escort_peer = d.escort
-	if d.state != state:
-		set_state(d.state)
 	_show_gun()

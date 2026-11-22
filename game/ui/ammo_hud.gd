@@ -83,15 +83,20 @@ func _process(_delta: float) -> void:
 	_panel.visible = o != null
 	if o == null:
 		return
-	_name.text = Officer.WEAPON_NAME.to_upper()
-	_mag.text = str(o.ammo)
-	_mag.add_theme_color_override("font_color", Color(1.0, 0.4, 0.35) if o.ammo <= 3 else Color.WHITE)
-	_spare.text = "  / %d" % o.reserve
+	# Phase 1.5: a picked-up gun shows its own rounds, with no spare.
+	var picked := o.gun != EnemyGuns.NONE
+	var rounds: int = o.gun_ammo if picked else o.ammo
+	_name.text = o.weapon_name().to_upper()
+	_mag.text = str(rounds)
+	_mag.add_theme_color_override("font_color", Color(1.0, 0.4, 0.35) if rounds <= 3 else Color.WHITE)
+	_spare.text = ("  no spare   %s drop" % Controls.describe(Controls.pc_event("holster"))) if picked else ("  / %d" % o.reserve)
 	var s := ""
 	if o.is_reloading():
 		s = "RELOADING"
 	elif o.holstered:
 		s = "HOLSTERED"
+	elif picked:
+		s = "" if rounds > 0 else "EMPTY"
 	elif o.ammo == 0 and o.reserve == 0:
 		s = "OUT OF AMMO"
 	elif o.ammo == 0:
@@ -128,6 +133,9 @@ func _prompt(o: Officer) -> String:
 		return ""
 	if o.cuff_target():
 		return "Hold %s: cuff the suspect" % use
+	var fg := o.gun_on_floor()
+	if fg:
+		return "%s pick up the %s (%d rounds)" % [use, String(EnemyGuns.NAMES[fg.kind]).to_lower(), fg.rounds]
 	var pr := o.prisoner()
 	for c in o.get_tree().get_nodes_in_group("police_cars"):
 		var pc := c as PoliceCar

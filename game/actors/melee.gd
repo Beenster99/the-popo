@@ -60,4 +60,6 @@ static func resolve(attacker: Officer, world: DestructionWorld, origin: Vector3,
 		elif c is RigidBody3D:
 			var rb := c as RigidBody3D
 			rb.apply_impulse(d * minf(rb.mass, 120.0) * SHOVE[kind] * 0.5, hit.position - rb.global_position)
+			if rb.has_meta("prop_id") and PropWorld.current:
+				PropWorld.current.damage_prop(int(rb.get_meta("prop_id")), PIECE_DAMAGE[kind] * 0.6, hit.position, d)
 		return

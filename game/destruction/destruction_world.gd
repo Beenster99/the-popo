@@ -258,6 +258,8 @@ func bullet_hit(collider: Object, point: Vector3, normal: Vector3, dir: Vector3)
 	_send_fx(1, point, normal)
 	if collider is Node and (collider as Node).has_meta("piece_id"):
 		damage_piece((collider as Node).get_meta("piece_id"), 12.0, point - dir * 0.3, 2.0)
+	elif PropWorld.current and PropWorld.current.bullet_hit(collider, point, dir):
+		pass
 	elif collider is RigidBody3D:
 		(collider as RigidBody3D).apply_impulse(dir * 40.0, point - (collider as RigidBody3D).global_position)
 
