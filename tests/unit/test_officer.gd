@@ -431,6 +431,41 @@ func test_kick_door_open_and_shove() -> void:
 	t.check(p.hp < hp0 and p.global_position.z > 1.0, "punched and shoved: hp %.0f z=%.2f" % [p.hp, p.global_position.z])
 
 
+## v0.2.11: holding drag next to a downed teammate pulls them along by the
+## collar, at a walk, the body following on the ground.
+func test_drag_a_downed_teammate() -> void:
+	var a := _officer(Vector3(0, 0, 0))
+	var b := _officer(Vector3(0.8, 0, 0))
+	await _run(a, _cmd(), 5)
+	a.take_damage(150.0, Vector3.BACK)
+	t.check(a.state == Officer.S.DOWNED, "downed")
+	for i in 60:
+		a.sim_step(_cmd(), 1.0 / 60.0)
+		b.sim_step(_cmd(), 1.0 / 60.0)
+		await get_tree().physics_frame
+	var gun_was := b.holstered
+	# A controller's Y is both holster and drag: next to them it only drags.
+	for i in 180:
+		a.sim_step(_cmd(), 1.0 / 60.0)
+		b.sim_step(_cmd(Vector2(1, 0), PlayerInput.DRAG | (PlayerInput.HOLSTER if i == 0 else 0)), 1.0 / 60.0)
+		await get_tree().physics_frame
+	t.check(b.holstered == gun_was and b.holster_t <= 0.0, "Y next to a downed teammate drags, it doesn't holster")
+	t.check(b.global_position.x > 3.0 and b.global_position.x < 6.0, "dragger backs off at a walk: x=%.2f" % b.global_position.x)
+	t.check(a.state == Officer.S.DOWNED, "still down")
+	t.check(a.global_position.distance_to(b.global_position) < 1.2, "they come too: %.2f m apart" % a.global_position.distance_to(b.global_position))
+	t.check(a.global_position.x > 2.0, "pulled %.2f m" % a.global_position.x)
+	var chest := a.rig.bone_body("chest_2")
+	t.check(chest.global_position.distance_to(b.global_position) < 1.5, "the body follows, not just the marker: chest %.2f m from the dragger" % chest.global_position.distance_to(b.global_position))
+	t.check(chest.global_position.y > 0.2, "collar lifted off the floor: chest at %.2f m" % chest.global_position.y)
+	# Let go: they stay where they were left.
+	var left_at := a.global_position
+	for i in 60:
+		a.sim_step(_cmd(), 1.0 / 60.0)
+		b.sim_step(_cmd(Vector2(1, 0)), 1.0 / 60.0)
+		await get_tree().physics_frame
+	t.check(a.global_position.distance_to(left_at) < 0.3, "let go, they stay put")
+
+
 ## At 0 hp an officer is downed; a teammate holding interact gets them up.
 func test_downed_and_revived() -> void:
 	var a := _officer(Vector3(0, 0, 0))

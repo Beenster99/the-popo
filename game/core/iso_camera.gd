@@ -31,7 +31,10 @@ const SHAKE_MAX := 0.55        # m of sideways jolt at full trauma
 ## Third-person test view (Tab): the camera sits behind the officer's right
 ## shoulder, the mouse turns it, and shots go where the centre dot points.
 ## Static, so it carries over from scene to scene.
-static var third_person := false
+## beenster (v0.2.11): the game is third person only; the isometric view is
+## gone from the game. The flag stays so old tests can still check the
+## overhead maths.
+static var third_person := true
 const TP_FOV := 70.0
 const TP_SHOULDER := 0.55      # m to the right of the officer
 const TP_PITCH_MIN := -65.0
@@ -140,8 +143,6 @@ func _centre_on_world(exclude: Array[RID]) -> Dictionary:
 
 
 func _input(event: InputEvent) -> void:
-	if event.is_action_pressed("toggle_view") and not PlayerInput.blocked:
-		third_person = not third_person
 	if third_person:
 		var m := event as InputEventMouseMotion
 		if m and not PlayerInput.blocked and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:

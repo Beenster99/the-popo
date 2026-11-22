@@ -13,6 +13,7 @@ var rounds := 0
 
 func _ready() -> void:
 	add_to_group("dropped_guns")
+	add_to_group(RoofFader.CUTAWAY_GROUP)
 	var model: Node3D
 	if kind == EnemyGuns.SHOTGUN:
 		model = EnemyGuns.make_shotgun()

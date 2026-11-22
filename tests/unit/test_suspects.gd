@@ -1,7 +1,7 @@
 extends Node
 ## Phase 1.4: suspects run and hide, give up, get cuffed, go in the car and
 ## are booked at the custody bay; the dispatcher's calls, the speeding car
-## and the crime level.
+## and the calls (no crime meter since v0.2.11).
 var t
 var cars: CarSync
 var dispatch: Dispatcher
@@ -147,7 +147,6 @@ func test_prisoner_goes_in_the_car_and_is_booked() -> void:
 	t.check(s.state == Suspect.S.IN_CAR and s.car == pc and s.seat in [2, 3], "in the back of the car (seat %d)" % s.seat)
 	t.check(pc.occupants().get(s.seat) == s, "the seat is taken")
 	t.check(o.state != Officer.S.VEHICLE, "the officer stayed outside")
-	var before := dispatch.crime
 	# Drive (place) the car on the bay and stop.
 	pc.global_position = Vector3(bay.x, 1.0, bay.z)
 	pc.linear_velocity = Vector3.ZERO
@@ -156,13 +155,11 @@ func test_prisoner_goes_in_the_car_and_is_booked() -> void:
 		if s.state == Suspect.S.BOOKED:
 			break
 	t.check(s.state == Suspect.S.BOOKED, "booked into custody at the bay: %s" % Suspect.S.keys()[s.state])
-	t.check(dispatch.crime < before, "crime level down: %.1f -> %.1f" % [before, dispatch.crime])
 	t.check(not pc.occupants().has(s.seat), "the seat is free again")
 
 
-func test_calls_and_crime_level() -> void:
+func test_calls() -> void:
 	await _block()
-	var c0 := dispatch.crime
 	var id := dispatch.start_call(Dispatcher.Kind.ROBBERY)
 	t.check(id > 0 and dispatch.calls[id].suspects.size() == 2, "a robbery call with two suspects")
 	var s1: Suspect = dispatch.suspects[dispatch.calls[id].suspects[0]]
@@ -174,14 +171,11 @@ func test_calls_and_crime_level() -> void:
 	t.check(inside, "the robbery is inside a building")
 	for i in 60:
 		await get_tree().physics_frame
-	t.check(dispatch.crime > c0, "crime level rises with an open call: %.2f -> %.2f" % [c0, dispatch.crime])
-	var c1 := dispatch.crime
 	for sid in dispatch.calls[id].suspects:
 		(dispatch.suspects[sid] as Suspect).take_damage(500.0, Vector3.FORWARD)
 	for i in 3:
 		await get_tree().physics_frame
 	t.check(dispatch.calls[id].state == Dispatcher.CallState.CLOSED, "call closed when both suspects are dealt with")
-	t.check(dispatch.crime < c1 - 15.0, "crime level drops: %.2f -> %.2f" % [c1, dispatch.crime])
 	var aid := dispatch.start_call(Dispatcher.Kind.ARMED)
 	var a: Suspect = dispatch.suspects[dispatch.calls[aid].suspects[0]]
 	t.check(a.armed and a.state == Suspect.S.LOITER, "an armed suspect out on the street")

@@ -1,6 +1,6 @@
 class_name Dispatcher
 extends Node
-## Phase 1.4: dispatch, crimes and the crime level for one city block.
+## Phase 1.4: dispatch calls and crimes for one city block.
 ##
 ## The host runs it all and tells the clients. Every so often a call comes in
 ## from one of three templates:
@@ -18,14 +18,13 @@ extends Node
 ## out with the police from cover, who call in backup once the shooting
 ## starts. Guns that suspects drop lie on the floor for officers to take.
 ##
-## The crime level (0 to 100) creeps up all the time, faster for every open
-## call, and drops for each suspect dealt with and each call closed. Arrests
-## and suspects shot count the same: there is no conduct score.
+## No crime meter (beenster, v0.2.11): the job is the calls and whatever
+## turns up. Arrests and suspects shot count the same: no conduct score.
 
 enum Kind { ROBBERY, ARMED, TRAFFIC, GANG }
 enum CallState { ACTIVE, CLOSED, LOST }
 
-const MSG_STATE := 80        # host -> all: crime, calls, suspects (10 a second)
+const MSG_STATE := 80        # host -> all: calls, suspects, dropped guns (10 a second)
 const MSG_RADIO := 81        # host -> all: a line of radio chatter
 const MSG_SHOT := 82         # host -> all: a suspect fired (origin, end)
 const BACKUP_DELAY := 9.0    # s after the first fighter takes cover
@@ -34,12 +33,6 @@ const FIRST_CALL := 20.0     # s after the block loads
 const CALL_GAP := Vector2(25.0, 50.0)
 const MAX_CALLS := 2
 const CALL_TIMEOUT := 300.0
-const CRIME_START := 35.0
-const CRIME_DRIFT := 0.04    # per second, always
-const CRIME_PER_CALL := 0.12 # per second, for each open call
-const CRIME_DEALT := 5.0     # each suspect booked or down
-const CRIME_CLOSED := 10.0   # each call closed
-const CRIME_LOST := 8.0      # each call lost
 const SHOT_DAMAGE := 16.0
 ## The custody bay: drive prisoners here (east road, half way along).
 const BAY := Vector3(56.5, 0.0, 24.0)
@@ -57,7 +50,6 @@ var cars: CarSync
 var nav: BlockNav
 ## The civilian car the traffic stop uses (its index in cars).
 var civ_car: Car
-var crime := CRIME_START
 ## id -> {id, kind, state, pos, marker, t, suspects: Array[int], text}
 var calls := {}
 var suspects := {}           # net id -> Suspect
@@ -127,8 +119,6 @@ func _physics_process(delta: float) -> void:
 		if _next_call_t <= 0.0 and _active_count() < MAX_CALLS:
 			_next_call_t = _rng.randf_range(CALL_GAP.x, CALL_GAP.y)
 			start_call(_pick_kind())
-	# Crime creeps up.
-	crime = clampf(crime + (CRIME_DRIFT + CRIME_PER_CALL * _active_count()) * delta, 0.0, 100.0)
 	_traffic_step(delta)
 	_backup_step(delta)
 	_booking(delta)
@@ -552,7 +542,6 @@ func book(s: Suspect) -> void:
 		return
 	s.set_state(Suspect.S.BOOKED)
 	s.car = null
-	crime = maxf(0.0, crime - CRIME_DEALT)
 	say("CUSTODY: suspect booked in. Good work.")
 
 
@@ -570,7 +559,6 @@ func _check_calls() -> void:
 				continue
 			if s.state == Suspect.S.DOWN and not s.has_meta("counted"):
 				s.set_meta("counted", true)
-				crime = maxf(0.0, crime - CRIME_DEALT)
 				say("DISPATCH: suspect down.")
 			if not s.is_done():
 				all_done = false
@@ -585,13 +573,11 @@ func _check_calls() -> void:
 					break
 		if all_done:
 			c.state = CallState.CLOSED
-			crime = maxf(0.0, crime - CRIME_CLOSED)
 			say("DISPATCH: %s call closed. Thanks, units." % KIND_NAMES[c.kind].to_lower())
 			if c.kind == Kind.TRAFFIC:
 				_traffic.clear()
 		elif c.t > CALL_TIMEOUT:
 			c.state = CallState.LOST
-			crime = minf(100.0, crime + CRIME_LOST)
 			for id in c.suspects:
 				var s: Suspect = suspects.get(id)
 				if s and s.is_free():
@@ -751,7 +737,6 @@ func _traffic_bail(_why: String) -> void:
 func _encode_state() -> PackedByteArray:
 	var b := StreamPeerBuffer.new()
 	b.put_double(_clock)
-	b.put_half(crime)
 	var act := calls.values().filter(func(c): return c.state == CallState.ACTIVE)
 	b.put_u8(act.size())
 	for c in act:
@@ -782,7 +767,6 @@ func _on_state(_from: int, data: PackedByteArray) -> void:
 	var b := StreamPeerBuffer.new()
 	b.data_array = data
 	var t := b.get_double()
-	crime = b.get_half()
 	var n := b.get_u8()
 	var keep := {}
 	for i in n:

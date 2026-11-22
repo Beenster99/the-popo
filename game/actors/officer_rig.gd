@@ -29,6 +29,13 @@ var _lower := ""
 var _upper := ""
 var _spare_mag: Node3D
 var _hit_t := 0.0
+## Seconds since the body went down: the joints start stiff (a person
+## topples rather than folds) and go slack over LIMP_TIME.
+var _limp_t := 99.0
+## Downed and dragged by the collar: the point the chest is pulled to.
+var drag_point := Vector3.INF
+var _smear_at := Vector3.INF
+const LIMP_TIME := 1.2
 var downed := false
 var _aim_smooth := Vector3.INF
 var _upper_t := 0.0          # seconds in the current upper-body state
@@ -106,6 +113,67 @@ func _build_tree() -> void:
 	tree.active = true
 
 
+# Every physics tick, so the pull holds even when frames are slow.
+func _physics_process(_delta: float) -> void:
+	if not downed:
+		return
+	var o := _owner_officer()
+	var d: Officer = o._dragger() if o else null
+	# Being dragged: the collar is in the dragger's hand, just behind them.
+	drag_point = Vector3.INF if d == null else d.global_position + (o.global_position - d.global_position).normalized() * 0.35 + Vector3(0, 0.6, 0)
+	_drag_pull()
+	# A smear of blood along the ground behind a dragged body.
+	var hips := bone_body("hips")
+	if d and hips and Gore.level() > 0:
+		if _smear_at == Vector3.INF or hips.global_position.distance_to(_smear_at) > 0.35:
+			_smear_at = hips.global_position
+			Gore.splat(o.get_parent(), Vector3(_smear_at.x, o.global_position.y + 0.01, _smear_at.z), Vector3.UP, 0.35 + 0.1 * Gore.level(), true)
+	elif d == null:
+		_smear_at = Vector3.INF
+
+
+func _owner_officer() -> Officer:
+	var n := get_parent()
+	while n and not n is Officer:
+		n = n.get_parent()
+	return n as Officer
+
+
+func _drag_pull() -> void:
+	if not downed or drag_point == Vector3.INF:
+		return
+	var chest := bone_body("chest_2")
+	var neck := bone_body("neck_2")
+	if chest == null:
+		return
+	# A body that has come to rest is asleep: wake it all, or it won't move.
+	for c in physics.get_children():
+		if c is PhysicalBone3D:
+			PhysicsServer3D.body_set_state((c as PhysicalBone3D).get_rid(), PhysicsServer3D.BODY_STATE_SLEEPING, false)
+	var grip: Vector3 = neck.global_position if neck else chest.global_position
+	var want := ((drag_point - grip) * 8.0).limit_length(5.0)
+	chest.linear_velocity = chest.linear_velocity.lerp(want, 0.5)
+	if neck:
+		neck.linear_velocity = neck.linear_velocity.lerp(want, 0.5)
+
+
+func _go_limp(delta: float) -> void:
+	if not downed or _limp_t > LIMP_TIME:
+		return
+	_limp_t += delta
+	var damp := lerpf(9.0, 1.5, clampf(_limp_t / LIMP_TIME, 0.0, 1.0))
+	for c in physics.get_children():
+		if c is PhysicalBone3D:
+			(c as PhysicalBone3D).angular_damp = damp
+
+
+## Ragdoll joint limits in degrees: cone joints (swing, twist), hinges
+## (lower, upper).
+const JOINT_LIMITS := {"hips": Vector2(10, 5), "spine": Vector2(20, 10), "chest_2": Vector2(20, 10),
+	"neck_2": Vector2(30, 25), "head_2": Vector2(25, 20), "upper_arm": Vector2(75, 40), "hand": Vector2(40, 20),
+	"thigh": Vector2(55, 15), "foot": Vector2(25, 10), "shin": Vector2(-120, 0), "forearm": Vector2(-130, 0)}
+
+
 func _build_ragdoll() -> void:
 	physics = PhysicalBoneSimulator3D.new()
 	skeleton.add_child(physics)
@@ -117,7 +185,7 @@ func _build_ragdoll() -> void:
 		if idx < 0:
 			continue
 		var pb := PhysicalBone3D.new()
-		pb.name = "PB_" + b
+		pb.name = ("PB_" + b).validate_node_name()
 		pb.bone_name = b
 		var length := 0.2
 		for c in skeleton.get_bone_children(idx):
@@ -130,20 +198,50 @@ func _build_ragdoll() -> void:
 		cap.height = max(length, radii[b] * 2.0 + 0.01)
 		cs.shape = cap
 		pb.add_child(cs)
-		# Bones point along +Y; centre the capsule along the bone.
-		pb.body_offset = Transform3D(Basis(), Vector3(0, -length * 0.5, 0))
+		# Bones point along +Y: the body sits halfway along the bone and the
+		# joint at the bone's root (relative to the body). Joints twist about
+		# their X axis and hinges turn about Z, so both are turned to the bone.
+		pb.body_offset = Transform3D(Basis(), Vector3(0, length * 0.5, 0))
+		var hinge: bool = b.begins_with("shin") or b.begins_with("forearm")
+		var jb := Basis(Vector3.UP, PI * 0.5) if hinge else Basis(Vector3.BACK, PI * 0.5)
+		pb.joint_offset = Transform3D(jb, Vector3(0, -length * 0.5, 0))
 		pb.joint_type = PhysicalBone3D.JOINT_TYPE_CONE if not (b.begins_with("shin") or b.begins_with("forearm")) else PhysicalBone3D.JOINT_TYPE_HINGE
+		# Joints that only bend as far as a body does, so it can't fold
+		# into a pile (beenster: "Players collapse in a heap").
+		var lim: Vector2 = JOINT_LIMITS.get(b.trim_suffix(".L").trim_suffix(".R"), Vector2(40, 20))
+		if pb.joint_type == PhysicalBone3D.JOINT_TYPE_CONE:
+			pb.set("joint_constraints/swing_span", lim.x)
+			pb.set("joint_constraints/twist_span", lim.y)
+		else:
+			pb.set("joint_constraints/angular_limit_enabled", true)
+			pb.set("joint_constraints/angular_limit_lower", lim.x)
+			pb.set("joint_constraints/angular_limit_upper", lim.y)
 		pb.mass = 4.0 if b in ["hips", "chest_2", "spine"] else 1.5
 		pb.collision_layer = 0
-		pb.collision_mask = 1 | 16
+		pb.collision_mask = 1 | 4 | 16
 		pb.friction = 0.8
 		physics.add_child(pb)
 	physics.active = false
 
 
+## The ragdoll body of a skeleton bone ("thigh.L"), or null. Node names
+## can't hold dots, so they are swapped for underscores.
+func bone_body(bone: String) -> PhysicalBone3D:
+	return physics.get_node_or_null(("PB_" + bone).validate_node_name()) as PhysicalBone3D
+
+
+## A body on the floor can be shot (it jerks and bleeds): bullets look for
+## Gore.RAGDOLL_LAYER. Standing, the capsule takes the hits instead.
+func _set_ragdoll_layer(on: bool) -> void:
+	for c in physics.get_children():
+		if c is PhysicalBone3D:
+			(c as PhysicalBone3D).collision_layer = Gore.RAGDOLL_LAYER if on else 0
+
+
 ## Called every frame with the officer's current state.
 func update_from(o: Officer, delta: float) -> void:
 	if downed:
+		_go_limp(delta)
 		return
 	var lower := _lower_state(o)
 	var upper := _upper_state(o)
@@ -218,6 +316,13 @@ func update_from(o: Officer, delta: float) -> void:
 		procedural.ledge_weight = 1.0 - smoothstep(0.7, 0.95, k)
 	else:
 		procedural.ledge_weight = 0.0
+	# Dragging: the left hand reaches back into the teammate's collar.
+	var dragged := o.drag_target()
+	var neck: PhysicalBone3D = dragged.rig.bone_body("neck_2") if dragged and dragged.rig else null
+	procedural.collar_weight = move_toward(procedural.collar_weight, 1.0 if neck else 0.0, delta * 5.0)
+	if neck:
+		procedural.collar_point = neck.global_position
+	_go_limp(delta)
 	if _hit_t > 0.0:
 		_hit_t -= delta
 		physics.influence = clampf(_hit_t / 0.5, 0.0, 1.0) * 0.55
@@ -228,6 +333,8 @@ func update_from(o: Officer, delta: float) -> void:
 
 func _lower_state(o: Officer) -> String:
 	var hs := Vector2(o.velocity.x, o.velocity.z).length()
+	if o.state in [Officer.S.MOVE, Officer.S.CROUCH] and o.drag_target():
+		return "crouch_walk" if hs > 0.3 else "crouch_idle"   # bent over, backing off
 	match o.state:
 		Officer.S.ROLL: return "roll"
 		Officer.S.SLIDE: return "slide"
@@ -310,6 +417,7 @@ func update_pose(lower: String, upper: String, hs: float, delta: float, aim_at :
 	procedural.lean = Vector3.ZERO
 	if root:
 		procedural.ground_y = root.global_position.y
+	_go_limp(delta)
 	if _hit_t > 0.0:
 		_hit_t -= delta
 		physics.influence = clampf(_hit_t / 0.5, 0.0, 1.0) * 0.55
@@ -337,21 +445,34 @@ func hit_reaction(world_dir: Vector3, strength := 6.0) -> void:
 	physics.physical_bones_start_simulation(["spine", "chest_2", "neck_2", "head_2", "upper_arm.L", "forearm.L", "hand.L", "upper_arm.R", "forearm.R", "hand.R"])
 	physics.influence = 0.55
 	_hit_t = 0.5
-	var chest := physics.get_node_or_null("PB_chest_2") as PhysicalBone3D
+	var chest := bone_body("chest_2")
 	if chest:
 		chest.apply_central_impulse(world_dir.normalized() * strength)
 
 
 ## Full ragdoll when downed; standing up again blends back to animation.
-func set_downed(on: bool, push := Vector3.ZERO) -> void:
+func set_downed(on: bool, push := Vector3.ZERO, carry := Vector3.ZERO) -> void:
 	downed = on
 	physics.active = on
+	_set_ragdoll_layer(on)
 	if on:
 		physics.influence = 1.0
 		physics.physical_bones_start_simulation()
-		var chest := physics.get_node_or_null("PB_chest_2") as PhysicalBone3D
+		_limp_t = 0.0
+		# The whole body keeps the way it was moving, so a runner falls
+		# forward and a body goes down rather than dropping on the spot.
+		for c in physics.get_children():
+			if c is PhysicalBone3D:
+				(c as PhysicalBone3D).linear_velocity = carry
+		var chest := bone_body("chest_2")
 		if chest:
 			chest.apply_central_impulse(push)
+			# The legs go too, so a body is thrown rather than folding up.
+			for b in ["hips", "thigh.L", "thigh.R"]:
+				var pb := bone_body(b)
+				if pb:
+					pb.apply_central_impulse(push * 0.5)
+		Gore.downed(self)
 	else:
 		physics.physical_bones_stop_simulation()
 		physics.influence = 0.0

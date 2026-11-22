@@ -28,7 +28,7 @@ static func resolve(world: DestructionWorld, cars: CarSync, origin: Vector3, dir
 		world.bullet_hit(hit.collider, hit.position, hit.normal, dir)
 	var end: Vector3 = hit.position if hit else origin + dir * 60.0
 	if not alt and not (hit and hit.collider is Car):
-		var what := 2 if not hit else (1 if (hit.collider is Officer or hit.collider is Suspect) else 0)
+		var what := 2 if not hit else (1 if (hit.collider is Officer or hit.collider is Suspect or hit.collider is PhysicalBone3D) else 0)
 		_sound(origin, end, Sfx.surface_of(hit.collider) if hit else "concrete", what, shooter)
 	if not alt:
 		whizz(shooter.get_tree(), origin, end, shooter)

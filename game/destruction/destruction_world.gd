@@ -21,6 +21,9 @@ const MSG_SETTLE := 21
 const MSG_FX := 22
 
 const BIG_CHUNK_VOLUME := 0.12   # m^3; at or above this a chunk is synced
+## With finer debris (KitLibrary.detail) smaller pieces are still solid and
+## synced, so a broken wall still leaves rubble you bump into.
+const SYNC_VOLUME := [0.12, 0.07, 0.035, 0.018]
 const DENSITY := 1400.0          # kg/m^3, lighter than concrete for game feel
 const RELEASED_BIT := 63         # net id suffix for a whole falling piece
 const DEBRIS_LIFETIME := 25.0
@@ -32,6 +35,8 @@ const FALLING_LAYER := 32
 ## broken wall made.
 const CRUSH_TIME := 0.6
 const MAX_LOCAL_DEBRIS := 700
+## Finer debris (KitLibrary.detail) keeps more small pieces about.
+const DEBRIS_CAP := [700, 1000, 1600, 2200]
 
 const HP := {"wall": 120.0, "wall_window": 80.0, "wall_door": 90.0, "slab": 220.0, "column": 160.0,
 	"wall_half": 80.0, "wall_half_window": 60.0, "wall_shopfront": 70.0, "wall_shopdoor": 70.0, "wall_garage": 70.0,
@@ -100,7 +105,7 @@ func add_piece(kind: String, xform: Transform3D, bears := true, tint := Color(0,
 	mi.mesh = kit.mesh
 	KitLibrary.tint(mi, kit.surfaces, tint)
 	body.add_child(mi)
-	for ch in kit.chunks:
+	for ch in kit.solid:
 		var cs := CollisionShape3D.new()
 		cs.shape = ch.shape
 		cs.position = ch.offset
@@ -348,7 +353,7 @@ func _physics_process(delta: float) -> void:
 		_interpolate()
 	# Retire old cosmetic debris.
 	var now := Time.get_ticks_msec() / 1000.0
-	while not _debris.is_empty() and (now - _debris[0][1] > DEBRIS_LIFETIME or _debris.size() > MAX_LOCAL_DEBRIS):
+	while not _debris.is_empty() and (now - _debris[0][1] > DEBRIS_LIFETIME or _debris.size() > DEBRIS_CAP[clampi(KitLibrary.detail, 0, 3)]):
 		var d: Array = _debris.pop_front()
 		if is_instance_valid(d[0]):
 			d[0].queue_free()
@@ -383,7 +388,7 @@ func _spawn_chunks(p: Dictionary, xf: Transform3D, lin: Vector3, ang: Vector3, o
 	var now := Time.get_ticks_msec() / 1000.0
 	for k in kit.chunks.size():
 		var ch: Dictionary = kit.chunks[k]
-		var big: bool = ch.volume >= BIG_CHUNK_VOLUME
+		var big: bool = ch.volume >= SYNC_VOLUME[clampi(KitLibrary.detail, 0, 3)]
 		var pos: Vector3 = xf * (ch.offset as Vector3)
 		var rb := _make_body(ch.mesh, [[ch.shape, Vector3.ZERO]], ch.volume * DENSITY)
 		KitLibrary.tint(rb.get_child(0), ch.surfaces, p.tint)
@@ -431,7 +436,7 @@ func _spawn_released(p: Dictionary) -> void:
 	var kit := KitLibrary.get_piece(p.kind)
 	var shapes: Array = []
 	var vol := 0.0
-	for ch in kit.chunks:
+	for ch in kit.solid:
 		shapes.append([ch.shape, ch.offset])
 		vol += ch.volume
 	var rb := _make_body(kit.mesh, shapes, vol * DENSITY)
@@ -603,6 +608,88 @@ func _on_settle_msg(_from: int, data: PackedByteArray) -> void:
 	_buffers.erase(nid)
 	if bodies.has(nid) and is_instance_valid(bodies[nid]):
 		bodies[nid].global_transform = xf
+
+
+# --- Catch-up and saving (Phase 1.7) -------------------------------------------
+
+## The block's damage as it is now: every piece no longer standing, and where
+## each big chunk and falling piece is. Sent to a friend who joins late, and
+## what the host saves. Small cosmetic chunks are not kept.
+func write_state(b: StreamPeerBuffer) -> void:
+	var lost: Array = pieces.values().filter(func(p): return p.state != "intact")
+	b.put_u32(lost.size())
+	for p in lost:
+		b.put_u32(p.id)
+	var live: Array = bodies.keys().filter(func(n): return is_instance_valid(bodies[n]))
+	b.put_u32(live.size())
+	for nid in live:
+		b.put_u32(nid)
+		_put_xform(b, (bodies[nid] as RigidBody3D).global_transform)
+
+
+## Brings this machine's block to a written state. On the host (loading a
+## save) the chunks are real bodies, asleep where they lay; on a client they
+## are proxies the host's snapshots move.
+func read_state(b: StreamPeerBuffer) -> void:
+	for i in b.get_u32():
+		var id := b.get_u32()
+		var p: Dictionary = pieces.get(id, {})
+		if p.is_empty() or p.state != "intact":
+			continue
+		p.state = "gone"
+		if is_instance_valid(p.node):
+			p.node.queue_free()
+		piece_broken.emit(id)
+		_stability_dirty = true
+	for i in b.get_u32():
+		var nid := b.get_u32()
+		var xf := _get_xform(b)
+		if bodies.has(nid) and is_instance_valid(bodies[nid]):
+			_buffers.erase(nid)
+			bodies[nid].global_transform = xf
+			continue
+		var p: Dictionary = pieces.get(nid / 64, {})
+		if p.is_empty():
+			continue
+		_restore_body(p, nid % 64, xf)
+
+
+func _restore_body(p: Dictionary, k: int, xf: Transform3D) -> void:
+	var kit := KitLibrary.get_piece(p.kind)
+	var rb: RigidBody3D
+	var nid: int = p.id * 64 + k
+	if k == RELEASED_BIT:
+		var shapes: Array = []
+		var vol := 0.0
+		for ch in kit.solid:
+			shapes.append([ch.shape, ch.offset])
+			vol += ch.volume
+		rb = _make_body(kit.mesh, shapes, vol * DENSITY)
+		KitLibrary.tint(rb.get_child(0), kit.surfaces, p.tint)
+		rb.collision_layer = FALLING_LAYER
+		rb.set_meta("released_piece", p.id)
+		p.state = "released"
+		if Net.is_host():
+			rb.contact_monitor = true
+			rb.max_contacts_reported = 6
+			rb.body_entered.connect(_on_released_hit.bind(rb, p.id))
+			rb.set_meta("age", SHATTER_GRACE_STEPS)
+	else:
+		if k >= kit.chunks.size():
+			return
+		var ch: Dictionary = kit.chunks[k]
+		rb = _make_body(ch.mesh, [[ch.shape, Vector3.ZERO]], ch.volume * DENSITY)
+		KitLibrary.tint(rb.get_child(0), ch.surfaces, p.tint)
+	rb.set_meta("surface", surface_for(p.kind))
+	rb.set_meta("net_id", nid)
+	rb.transform = xf
+	bodies[nid] = rb
+	if not Net.is_host():
+		_make_proxy(rb)
+	add_child(rb)
+	if Net.is_host():
+		rb.sleeping = true
+		_watch_sleep(rb, nid)
 
 
 ## Final resting transforms of every synced body, for tests and debugging.

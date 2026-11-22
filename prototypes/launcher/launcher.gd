@@ -94,6 +94,16 @@ func _ready() -> void:
 	start.custom_minimum_size = Vector2(320, 56)
 	start.add_theme_font_size_override("font_size", 22)
 	_list.add_child(start)
+	var saved := BlockState.peek()
+	if not saved.is_empty():
+		start.text = "Start on a new block"
+		var cont := _button("Continue the saved block (%d)" % saved.seed, func():
+			Block.resume = true
+			_start(Scenes.GAME))
+		cont.custom_minimum_size = Vector2(320, 56)
+		cont.add_theme_font_size_override("font_size", 22)
+		_list.add_child(cont)
+		_list.move_child(cont, 0)
 	right.add_child(_label("\nEsc opens the menu (Settings, Leave). F3 toggles the network overlay. Q/E rotate the camera, mouse wheel zooms.\nA game controller works too."))
 	right.add_child(_button("Controls...", func(): add_child(load("res://prototypes/launcher/controls_screen.gd").new())))
 

@@ -52,6 +52,11 @@ const LIMP_SPEED := 2.0       # m/s top speed with a leg wound
 ## Hold interact this long next to a downed teammate to get them up.
 const REVIVE_TIME := 2.0
 const REVIVE_RANGE := 1.6
+## v0.2.11 (beenster: "grab my downed friend by the collar on the back of his
+## neck and drag him into cover"): hold drag next to a downed teammate.
+const DRAG_RANGE := 1.6
+const DRAG_SPEED := 1.5       # m/s, walking backwards with them
+const DRAG_LEASH := 0.9       # m from the dragger's feet to theirs
 ## Alone, a downed officer gets up by themselves after this long.
 const SELF_REVIVE := 30.0
 ## Downed: after this long R respawns you back where you started, healed,
@@ -376,6 +381,9 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 				speed = SPRINT
 	if injuries & LEG:
 		speed = minf(speed, LIMP_SPEED)
+	var dragged := drag_target()
+	if dragged:
+		speed = minf(speed, DRAG_SPEED)
 	if state == S.COVER:
 		# Moving away from the cover leaves it; so does the cover being
 		# shot or blown away.
@@ -440,8 +448,12 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 					turning = true
 					if absf(off) < TURN_STOP:
 						_turn_active = false
-		elif wish.length() > 0.1:
+		elif wish.length() > 0.1 and not dragged:
 			rotation.y = lerp_angle(rotation.y, atan2(wish.x, wish.z), 14.0 * delta)
+	if dragged and not is_aiming():
+		# Backing away, facing them, a hand in their collar.
+		var to := dragged.global_position - global_position
+		rotation.y = lerp_angle(rotation.y, atan2(to.x, to.z), 10.0 * delta)
 	var before := global_position
 	move_and_slide()
 	if on_floor and state in [S.MOVE, S.CROUCH, S.COVER]:
@@ -560,7 +572,7 @@ func take_damage(amount: float, dir := Vector3.ZERO, where := "") -> void:
 		collision_mask = 1 | 4 | 16
 		_set_state(S.DOWNED)
 		if rig:
-			rig.set_downed(true, (dir + Vector3.UP * 0.3) * 30.0)
+			rig.set_downed(true, (dir + Vector3.UP * 0.3) * 14.0, Vector3(velocity.x, 0.0, velocity.z))
 	elif rig:
 		rig.hit_reaction(dir, clampf(amount * 0.25, 2.0, 10.0))
 
@@ -795,6 +807,10 @@ func _try_enter_car() -> bool:
 		return false
 	var taken := best.occupants()
 	var s := best_door
+	# Whoever gets in first drives, whichever door they used (Phase 1.7: it
+	# was too easy to end up a passenger and wonder why WASD did nothing).
+	if not taken.has(0) and (best_door in [0, 1] or taken.is_empty()):
+		s = 0
 	if taken.has(s):
 		s = -1
 		var dd := INF
@@ -925,6 +941,16 @@ func _downed_step(delta: float) -> void:
 	velocity.x = move_toward(velocity.x, 0, ACCEL * 0.3 * delta)
 	velocity.z = move_toward(velocity.z, 0, ACCEL * 0.3 * delta)
 	velocity.y -= GRAVITY * delta
+	var d := _dragger()
+	if d:
+		# Pulled along by the collar, a step behind whoever has hold.
+		var away := Vector3(global_position.x - d.global_position.x, 0.0, global_position.z - d.global_position.z)
+		if away.length() > DRAG_LEASH:
+			var to := d.global_position + away.normalized() * DRAG_LEASH
+			var pull := Vector3(to.x - global_position.x, 0.0, to.z - global_position.z) / maxf(delta, 0.001)
+			pull = pull.limit_length(4.0)
+			velocity.x = pull.x
+			velocity.z = pull.z
 	move_and_slide()
 	if _reviver() != null:
 		revive_t += delta
@@ -990,7 +1016,7 @@ func _health_tag() -> void:
 		add_child(_tag)
 	_tag.visible = true
 	if state == S.DOWNED:
-		_tag.text = "DOWN - hold F to revive"
+		_tag.text = "DOWN - hold %s to revive, %s to drag" % [Controls.describe(Controls.pc_event("interact")), Controls.describe(Controls.pc_event("drag"))]
 		_tag.modulate = Color(1.0, 0.35, 0.3)
 	else:
 		var w := injury_names(injuries)
@@ -1009,6 +1035,32 @@ func _reviver() -> Officer:
 		var o := n as Officer
 		if o and o != self and o.state in [S.MOVE, S.CROUCH] and (o.buttons & PlayerInput.INTERACT) != 0 \
 				and o.global_position.distance_to(global_position) < REVIVE_RANGE:
+			return o
+	return null
+
+
+## The downed teammate this officer has by the collar (holding drag, up,
+## and close enough), or null.
+func drag_target() -> Officer:
+	if state not in [S.MOVE, S.CROUCH] or (buttons & PlayerInput.DRAG) == 0 or not is_inside_tree():
+		return null
+	var best: Officer = null
+	var best_d := DRAG_RANGE
+	for n in get_tree().get_nodes_in_group("officers"):
+		var o := n as Officer
+		if o and o != self and o.state == S.DOWNED:
+			var dd := o.global_position.distance_to(global_position)
+			if dd < best_d:
+				best = o
+				best_d = dd
+	return best
+
+
+## Who is dragging this downed officer, or null.
+func _dragger() -> Officer:
+	for n in get_tree().get_nodes_in_group("officers"):
+		var o := n as Officer
+		if o and o != self and o.drag_target() == self:
 			return o
 	return null
 
@@ -1038,14 +1090,17 @@ func _weapon(delta: float) -> void:
 		holster_t = maxf(holster_t - delta, 0.0)
 		if holster_t <= 0.0 and not drawing:
 			holstered = true
-	var draw_now := holstered and (_pressed(PlayerInput.HOLSTER) or _pressed(PlayerInput.AIM))
+	# On a controller, Y both holsters and drags: next to a downed teammate
+	# it drags.
+	var hol := _pressed(PlayerInput.HOLSTER) and drag_target() == null
+	var draw_now := holstered and (hol or _pressed(PlayerInput.AIM))
 	if draw_now:
 		holstered = false   # aiming draws the gun too
 		drawing = true
 		holster_t = HOLSTER_TIME
-	elif _pressed(PlayerInput.HOLSTER) and holster_t <= 0.0 and gun != EnemyGuns.NONE:
+	elif hol and holster_t <= 0.0 and gun != EnemyGuns.NONE:
 		_drop_gun()   # H with a picked-up gun drops it
-	elif _pressed(PlayerInput.HOLSTER) and holster_t <= 0.0:
+	elif hol and holster_t <= 0.0:
 		drawing = false
 		holster_t = HOLSTER_TIME
 		reload_t = 0.0
@@ -1474,7 +1529,7 @@ func encode_state(b: StreamPeerBuffer) -> void:
 	b.put_half(aim_yaw)
 	b.put_u8(state)
 	b.put_half(state_t)
-	b.put_u16(buttons)
+	b.put_u32(buttons)
 	b.put_half(punch_t)
 	b.put_float(_move_start.x)
 	b.put_float(_move_start.y)
@@ -1512,7 +1567,7 @@ func decode_state(b: StreamPeerBuffer) -> Dictionary:
 		"pos": Vector3(b.get_float(), b.get_float(), b.get_float()),
 		"vel": Vector3(b.get_half(), b.get_half(), b.get_half()),
 		"yaw": b.get_half(), "aim": b.get_half(), "state": b.get_u8(), "st": b.get_half(),
-		"buttons": b.get_u16(), "punch": b.get_half(),
+		"buttons": b.get_u32(), "punch": b.get_half(),
 		"ms": Vector3(b.get_float(), b.get_float(), b.get_float()), "my": b.get_half(), "mr": b.get_half(),
 		"cn": Vector3(b.get_half(), 0.0, b.get_half()), "ca": Vector3(b.get_float(), b.get_float(), b.get_float()),
 		"cl": b.get_u8(),

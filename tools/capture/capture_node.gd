@@ -2,12 +2,14 @@ extends Node
 
 var shot: String
 var out: String
+var args_extra := ""
 
 
 func _ready() -> void:
 	var a := OS.get_cmdline_user_args()
 	shot = a[0]
 	out = a[1]
+	args_extra = a[2] if a.size() > 2 else ""
 	await _run()
 	get_tree().quit()
 
@@ -29,8 +31,87 @@ func _scene(path: String) -> Node:
 	return get_tree().current_scene
 
 
+## An empty lit floor with a camera, for close looks at characters.
+func _plain_stage(cam_at: Vector3, look: Vector3) -> Node3D:
+	var root := Node3D.new()
+	get_tree().root.add_child(root)
+	ProtoWorld.ground(root, 60.0)
+	var sun := DirectionalLight3D.new()
+	sun.rotation_degrees = Vector3(-50, 30, 0)
+	root.add_child(sun)
+	var env := WorldEnvironment.new()
+	env.environment = Environment.new()
+	env.environment.background_mode = Environment.BG_COLOR
+	env.environment.background_color = Color(0.55, 0.6, 0.68)
+	env.environment.ambient_light_color = Color(0.6, 0.6, 0.65)
+	env.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	root.add_child(env)
+	var cam := Camera3D.new()
+	root.add_child(cam)
+	cam.look_at_from_position(cam_at, look)
+	cam.current = true
+	return root
+
+
 func _run() -> void:
 	match shot:
+		"drag":
+			# v0.2.11: dragging a downed teammate by the collar.
+			var root := _plain_stage(Vector3(4.5, 2.2, 4.5), Vector3(2.5, 0.4, 0))
+			var a := Officer.new()
+			root.add_child(a)
+			a.global_position = Vector3(0, 0.05, 0)
+			var b := Officer.new()
+			root.add_child(b)
+			b.global_position = Vector3(0.8, 0.05, 0)
+			b.holstered = true
+			for i in 5:
+				a.sim_step({"move": Vector2.ZERO, "buttons": 0, "aim_yaw": 0.0}, 1.0 / 60.0)
+				await get_tree().physics_frame
+			a.take_damage(150.0, Vector3.BACK)
+			for i in 200:
+				a.sim_step({"move": Vector2.ZERO, "buttons": 0, "aim_yaw": 0.0}, 1.0 / 60.0)
+				var drag := i > 60
+				b.sim_step({"move": Vector2(1, 0) if drag else Vector2.ZERO, "buttons": PlayerInput.DRAG if drag else 0, "aim_yaw": 0.0}, 1.0 / 60.0)
+				await get_tree().physics_frame
+			print("drag: a ", a.global_position, " ", Officer.S.keys()[a.state], " b ", b.global_position, " ", Officer.S.keys()[b.state], " yaw ", rad_to_deg(b.rotation.y), " chest ", a.rig.bone_body("chest_2").global_position)
+			await _save()
+		"fallen":
+			# v0.2.11: how bodies lie after going down (beenster: "collapse
+			# in a heap"). Three suspects shot from different sides and one
+			# shot while running, seen from the side.
+			var root := Node3D.new()
+			get_tree().root.add_child(root)
+			ProtoWorld.ground(root, 60.0)
+			var sun := DirectionalLight3D.new()
+			sun.rotation_degrees = Vector3(-50, 30, 0)
+			root.add_child(sun)
+			var env := WorldEnvironment.new()
+			env.environment = Environment.new()
+			env.environment.background_mode = Environment.BG_COLOR
+			env.environment.background_color = Color(0.55, 0.6, 0.68)
+			env.environment.ambient_light_color = Color(0.6, 0.6, 0.65)
+			env.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+			root.add_child(env)
+			var cam := Camera3D.new()
+			root.add_child(cam)
+			cam.look_at_from_position(Vector3(0, 3.5, 7.5), Vector3(0, 0.2, 0.5))
+			cam.current = true
+			var pushes := [Vector3(0, 0, -1), Vector3(1, 0, 0), Vector3(0, 0, 1), Vector3.ZERO]
+			var sps := []
+			for k in 4:
+				var sp := Suspect.new()
+				root.add_child(sp)
+				sp.global_position = Vector3(-4.5 + k * 3.0, 0.05, 0)
+				sps.append(sp)
+			await _frames(20)
+			for k in 4:
+				if k == 3:
+					sps[k].velocity = Vector3(0, 0, 6)
+				sps[k].hp = 1.0   # a pistol round finishes them
+				sps[k].take_damage(35.0, pushes[k])
+			await _frames(int(args_extra) if args_extra != "" else 200)
+			await _save()
 		"look_day", "look_night", "look_inside", "look_rotated":
 			var s := await _scene("res://prototypes/p05_look/look.tscn")
 			await _frames(5)
@@ -130,6 +211,36 @@ func _run() -> void:
 			await _frames(60)
 			await _save()
 			IsoCamera.third_person = false
+		"tp_far", "tp_far_gore":
+			# Third person down the street: buildings in the middle distance
+			# and another officer some way off (the v0.2.10-tp1 "black" bug).
+			Block.next_seed = 4242
+			var s := await _scene("res://prototypes/p08_block/block.tscn")
+			await _frames(10)
+			s.find_children("*", "NetOverlay", false, false)[0].queue_free()
+			(s.dispatch as Dispatcher).enabled = false
+			var o: Officer = s.sync.my_pawn()
+			o.global_position = Vector3(-2, 0.2, -3)
+			var mate := Officer.new()
+			mate.peer_id = 99
+			s.add_child(mate)
+			mate.global_position = Vector3(12, 0.2, 8)
+			s.cam._yaw = 220.0
+			s.cam._yaw_target = 220.0
+			s.cam.tp_pitch = -6.0
+			if shot == "tp_far_gore":
+				var sp := Suspect.new()
+				s.add_child(sp)
+				sp.global_position = Vector3(1.5, 0.2, 3.0)
+				await _frames(20)
+				var wall_side := Vector3(1.5, 1.3, 3.0)
+				for k in 3:
+					Gore.hit(s, wall_side + Vector3(-3, 0.1 * k, -4), wall_side + Vector3(0, 0.1 * k, 0))
+				Gore.hit(s, Vector3(1.5, 1.7, -2), Vector3(1.5, 1.68, 2.9))
+				sp.take_damage(500.0, Vector3(0.3, 0, 1).normalized())
+				await _frames(200)
+			await _frames(60)
+			await _save()
 		"block_overview", "block_street", "block_inside":
 			var s := await _scene("res://prototypes/p08_block/block.tscn")
 			s.find_children("*", "NetOverlay", false, false)[0].queue_free()

@@ -22,7 +22,7 @@ static func bullet_ray(space: PhysicsDirectSpaceState3D, origin: Vector3, dir: V
 		exclude.append(shooter.car.get_rid())   # shooting out of your own car
 	var ff := friendly_fire()
 	for i in 4:
-		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(origin, origin + dir * length, 1 | 2 | 16, exclude))
+		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(origin, origin + dir * length, 1 | 2 | 16 | Gore.RAGDOLL_LAYER, exclude))
 		if hit and hit.collider is Officer and not ff:
 			exclude.append((hit.collider as Officer).get_rid())
 			continue

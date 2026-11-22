@@ -126,6 +126,7 @@ func _init() -> void:
 
 func _ready() -> void:
 	_rng.seed = hash(net_id * 7919 + look)
+	add_to_group(RoofFader.CUTAWAY_GROUP)
 	collision_layer = 2
 	collision_mask = 1 | 4 | 16
 	var cs := CollisionShape3D.new()
@@ -175,7 +176,7 @@ func set_state(s: S) -> void:
 		collision_layer = 0
 		collision_mask = 1
 		if rig:
-			rig.set_downed(true, velocity)
+			rig.set_downed(true, velocity * 0.6, velocity)
 	if s in [S.IN_CAR, S.DRIVE, S.BOOKED]:
 		collision_layer = 0
 		collision_mask = 0
@@ -215,7 +216,8 @@ func take_damage(amount: float, dir := Vector3.ZERO, _where := "") -> void:
 	if rig and dir != Vector3.ZERO:
 		rig.hit_reaction(dir, 5.0)
 	if hp <= 0.0:
-		velocity = dir * 3.0
+		# Blasts throw them; a runner carries on the way they were going.
+		velocity = Vector3(velocity.x, 0.0, velocity.z) + dir * clampf(1.0 + amount * 0.05, 2.0, 22.0) * (1.0 if dir != Vector3.ZERO else 0.0)
 		set_state(S.DOWN)
 		return
 	pressure += (0.4 if fighter else 1.0) if hp > MAX_HP * 0.5 else (1.0 if fighter else 2.0)

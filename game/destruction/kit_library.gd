@@ -15,10 +15,42 @@ const KIT_PATH := "res://assets/models/kit/kit_fractured.glb"
 static var _pieces := {}
 
 
+## Phase 1.7: how finely things break (Settings > Graphics > Debris detail):
+## 0 the kit's own chunks, 1 big ones cut once, 2 most cut up to twice, 3 up
+## to three times. The host picks it for everyone, since chunk numbers must
+## match on every machine.
+static var detail := 2
+const DETAIL_CUTS := [0, 1, 2, 3]
+const DETAIL_MIN_VOLUME := [0.0, 0.04, 0.012, 0.004]
+static var _split := {}   # "kind|detail" -> chunks
+
+
+## The piece: mesh, aabb, surfaces, "solid" (the kit's own chunks, for the
+## intact piece's collision) and "chunks" (what it breaks into at the
+## current detail).
 static func get_piece(kind: String) -> Dictionary:
 	if _pieces.is_empty():
 		_load()
-	return _pieces[kind]
+	var p: Dictionary = _pieces[kind]
+	var key := "%s|%d" % [kind, detail]
+	if not _split.has(key):
+		var out := []
+		var d := clampi(detail, 0, 3)
+		# A chunk's index is part of its net id, below RELEASED_BIT (63): if a
+		# piece would break into more, cut it less.
+		for cuts in range(DETAIL_CUTS[d], -1, -1):
+			out = []
+			for i in (p.solid as Array).size():
+				var ch: Dictionary = p.solid[i]
+				if cuts == 0 or kind.begins_with("glass") or ch.volume < DETAIL_MIN_VOLUME[d] * 2.0:
+					out.append(ch)
+				else:
+					out.append_array(ChunkSplit.split(ch, cuts, hash(key) + i * 7919, DETAIL_MIN_VOLUME[d]))
+			if out.size() <= 63:
+				break
+		_split[key] = out
+	p.chunks = _split[key]
+	return p
 
 
 static func kinds() -> Array:
@@ -35,7 +67,7 @@ static func _load() -> void:
 		if not String(mi.name).contains("__"):
 			origins[String(mi.name)] = mi.global_transform.origin if mi.is_inside_tree() else mi.transform.origin
 			var cel_mesh := _celify(mi.mesh)
-			_pieces[String(mi.name)] = {"mesh": cel_mesh, "chunks": [], "aabb": cel_mesh.get_aabb(), "surfaces": surface_names(mi.mesh)}
+			_pieces[String(mi.name)] = {"mesh": cel_mesh, "chunks": [], "solid": [], "aabb": cel_mesh.get_aabb(), "surfaces": surface_names(mi.mesh)}
 	for mi: MeshInstance3D in nodes:
 		var n := String(mi.name)
 		if not n.contains("__"):
@@ -44,7 +76,7 @@ static func _load() -> void:
 		var m := _celify(mi.mesh)
 		var shape: ConvexPolygonShape3D = m.create_convex_shape(true, false)
 		var a := m.get_aabb()
-		_pieces[base].chunks.append({
+		_pieces[base].solid.append({
 			"mesh": m,
 			"offset": mi.transform.origin - origins[base],
 			"shape": shape,
@@ -101,7 +133,7 @@ static func _hull_volume(m: Mesh) -> float:
 	for i in m.get_surface_count():
 		var arr := m.surface_get_arrays(i)
 		var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
-		var idx: PackedInt32Array = arr[Mesh.ARRAY_INDEX]
+		var idx: PackedInt32Array = arr[Mesh.ARRAY_INDEX] if arr[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
 		if idx.is_empty():
 			for k in range(0, verts.size(), 3):
 				v += verts[k].dot(verts[k + 1].cross(verts[k + 2]))

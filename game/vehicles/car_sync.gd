@@ -179,6 +179,11 @@ func _physics_process(delta: float) -> void:
 					"lights": cars[i].get("lights") == true, "siren": int(cars[i].get("siren")) if cars[i].get("siren") != null else 0}
 	if Net.is_host():
 		for i in _inputs:
+			# Our own car took the live keys above. (Its parked input, the
+			# handbrake on, used to be applied over them every frame: the
+			# host's car would not move, v0.2.10.)
+			if i == mine:
+				continue
 			if i < cars.size() and simulates_locally(i):
 				_apply_input(cars[i], _inputs[i])
 		if _tick % 3 == 0 and Net.is_online():
@@ -531,3 +536,68 @@ func _apply_fire(idx: int, st: int) -> void:
 			sm.color_ramp = g2
 	if st == Fire.WRECKED:
 		car.wreck()
+
+
+# --- Catch-up and saving (Phase 1.7) -------------------------------------------
+
+## Every car as it is now: where it is, how hurt, burning or wrecked, every
+## dent and every broken window. For a friend joining late, and the save.
+func write_state(b: StreamPeerBuffer) -> void:
+	b.put_u8(cars.size())
+	for i in cars.size():
+		var car: Car = cars[i]
+		DestructionWorld._put_xform(b, car.global_transform)
+		b.put_float(car_hp.get(i, CAR_HP))
+		b.put_u8(fire_state.get(i, Fire.OK))
+		b.put_u16(car.dent_log.size())
+		for d in car.dent_log:
+			DestructionWorld._put_v3(b, d[0])
+			DestructionWorld._put_v3(b, d[1])
+			b.put_float(d[2])
+		var broken: Array = []
+		if car is PoliceCar:
+			var names: Array = (car as PoliceCar).glass.keys()
+			for k in names.size():
+				if (car as PoliceCar).glass[names[k]].broken:
+					broken.append(k)
+		b.put_u8(broken.size())
+		for k in broken:
+			b.put_u8(k)
+
+
+## from_save: the host loading a saved block (cars that were on fire are
+## burnt-out wrecks by now). Otherwise a client catching up.
+func read_state(b: StreamPeerBuffer, from_save := false) -> void:
+	var n := b.get_u8()
+	for i in n:
+		var xf := DestructionWorld._get_xform(b)
+		var hp := b.get_float()
+		var st := b.get_u8()
+		var dents: Array = []
+		for k in b.get_u16():
+			dents.append([DestructionWorld._get_v3(b), DestructionWorld._get_v3(b), b.get_float()])
+		var glass: Array = []
+		for k in b.get_u8():
+			glass.append(b.get_u8())
+		if i >= cars.size():
+			continue
+		var car: Car = cars[i]
+		if from_save:
+			car.global_transform = xf
+			car.linear_velocity = Vector3.ZERO
+			car.angular_velocity = Vector3.ZERO
+			car_hp[i] = hp
+			if st >= Fire.BURNING:
+				st = Fire.WRECKED
+		if car.dent_log.is_empty():
+			for d in dents:
+				car.apply_dent(d[0], d[1], d[2])
+		if car is PoliceCar:
+			var pc := car as PoliceCar
+			var names: Array = pc.glass.keys()
+			for k in glass:
+				if k < names.size() and not pc.glass[names[k]].broken:
+					pc.glass[names[k]].broken = true
+					(pc.glass[names[k]].node as Node3D).visible = false
+		if st > fire_state.get(i, Fire.OK):
+			_apply_fire(i, st)

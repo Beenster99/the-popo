@@ -531,17 +531,18 @@ func _on_piece_broken(id: int) -> void:
 	var parent := world.get_parent()
 	if kind.begins_with("glass"):
 		var big := kind in ["glass_shopfront", "glass_shopdoor"]
-		Sfx.play(parent, "glass_big" if big else "glass_break", at, 3.0 if big else 0.0, 70.0, 0.06)
+		Sfx.play(parent, "glass_big" if big else "glass_break", at, 6.0 if big else 3.0, 80.0, 0.06)
 		later(randf_range(0.35, 0.6), "glass_settle", at - Vector3(0, 0.8, 0), -6.0, 30.0, 0.1)
 	elif kind in ["door_closed", "garage_door"] or kind.begins_with("int_wall_door"):
-		Sfx.play(parent, "break_wood", at, 2.0, 50.0, 0.08)
+		Sfx.play(parent, "break_wood", at, 5.0, 70.0, 0.08)
 	elif kind in ["lamp_post", "bollard"]:
-		Sfx.play(parent, "break_metal", at, 0.0, 60.0, 0.08)
+		Sfx.play(parent, "break_metal", at, 4.0, 80.0, 0.08)
 	elif kind in ["pavement", "road", "road_line", "road_crossing"]:
-		Sfx.play(parent, "break_concrete", at, -2.0, 60.0, 0.08)
+		Sfx.play(parent, "break_concrete", at, 3.0, 80.0, 0.08)
 	else:
 		var size := (p.aabb as AABB).size.length()
-		Sfx.play(parent, "break_concrete", at, clampf(-4.0 + size, -4.0, 4.0), 80.0, 0.08)
+		Sfx.play(parent, "break_concrete", at, clampf(1.0 + size, 1.0, 8.0), 110.0, 0.08)
+		Sfx.play(parent, "gun_thump", at, clampf(-6.0 + size, -6.0, 3.0), 60.0, 0.2)
 		later(0.3, "rubble", at, clampf(-8.0 + size, -8.0, 2.0), 70.0, 0.1)
 
 

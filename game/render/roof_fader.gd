@@ -109,6 +109,42 @@ func _process(delta: float) -> void:
 		var body := mi.get_parent()
 		if body is CollisionObject3D:
 			body.set_meta("see_through", target < GHOST)
+	_cut_movers(home, floor_y, cutaway)
+
+
+## Phase 1.7: loose things (furniture, suspects, dropped guns) on the floors
+## above go with those floors, instead of floating over the room.
+const CUTAWAY_GROUP := "cutaway"
+var _cut := {}   # Node3D -> true while hidden
+
+func _cut_movers(home: Dictionary, floor_y: float, cutaway: bool) -> void:
+	for n in _cut.keys():
+		if not is_instance_valid(n):
+			_cut.erase(n)
+	if not is_inside_tree():
+		return
+	for n in get_tree().get_nodes_in_group(CUTAWAY_GROUP):
+		var node := n as Node3D
+		if node == null:
+			continue
+		var hide := false
+		if cutaway and not home.is_empty():
+			var q := node.global_position
+			hide = q.y > floor_y + 1.9 and (home.bounds as AABB).grow(0.2).has_point(q + Vector3(0, 0.2, 0))
+		if hide == _cut.has(node):
+			continue
+		if hide:
+			_cut[node] = true
+		else:
+			_cut.erase(node)
+		for gi in node.find_children("*", "GeometryInstance3D", true, false):
+			(gi as GeometryInstance3D).set_instance_shader_parameter("fade", 0.0 if hide else 1.0)
+		if node is CollisionObject3D:
+			node.set_meta("see_through", hide)
+
+
+func cut_count() -> int:
+	return _cut.size()
 
 
 ## A wall, door, window or pillar standing on the officer's floor.

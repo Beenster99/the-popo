@@ -1,16 +1,13 @@
 class_name DispatchHud
 extends CanvasLayer
-## Phase 1.4 HUD: the crime level meter (top centre), the open calls (top
-## left), radio chatter (under the meter for a few seconds), and arrows at
+## Phase 1.4 HUD (no crime meter since v0.2.11): the open calls (top
+## left), radio chatter (top centre for a few seconds), and arrows at
 ## the screen edge pointing to each call and, while anyone has a prisoner,
 ## to the custody bay.
 
 var dispatcher: Dispatcher
 var pawn_getter: Callable   # () -> Officer, or null
 
-var _meter: ProgressBar
-var _meter_fill: StyleBoxFlat
-var _meter_label: Label
 var _calls: Label
 var _radio: Label
 var _radio_t := 0.0
@@ -27,23 +24,6 @@ func _ready() -> void:
 	top.alignment = BoxContainer.ALIGNMENT_BEGIN
 	top.add_theme_constant_override("separation", 4)
 	add_child(top)
-	_meter_label = _label(15, Color(0.95, 0.85, 0.25))
-	_meter_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	top.add_child(_meter_label)
-	_meter = ProgressBar.new()
-	_meter.custom_minimum_size = Vector2(320, 14)
-	_meter.max_value = 100.0
-	_meter.show_percentage = false
-	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(0.05, 0.06, 0.09, 0.75)
-	bg.set_corner_radius_all(4)
-	bg.border_color = Color(0, 0, 0, 0.8)
-	bg.set_border_width_all(1)
-	_meter.add_theme_stylebox_override("background", bg)
-	_meter_fill = StyleBoxFlat.new()
-	_meter_fill.set_corner_radius_all(4)
-	_meter.add_theme_stylebox_override("fill", _meter_fill)
-	top.add_child(_meter)
 	_radio = _label(17, Color(0.75, 0.95, 1.0))
 	_radio.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_radio.custom_minimum_size.x = 900
@@ -81,13 +61,6 @@ func _on_radio(text: String) -> void:
 func _process(delta: float) -> void:
 	if dispatcher == null:
 		return
-	var c := dispatcher.crime
-	_meter.value = c
-	var col := Color("3fbf5f").lerp(Color("e8c22a"), clampf(c / 50.0, 0.0, 1.0))
-	if c > 50.0:
-		col = Color("e8c22a").lerp(Color("e0402e"), clampf((c - 50.0) / 50.0, 0.0, 1.0))
-	_meter_fill.bg_color = col
-	_meter_label.text = "CRIME LEVEL  %d" % int(round(c))
 	_radio_t -= delta
 	_radio.visible = _radio_t > 0.0
 	var o: Node3D = pawn_getter.call() if pawn_getter.is_valid() else null

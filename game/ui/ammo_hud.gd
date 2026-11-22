@@ -123,6 +123,7 @@ func _prompt(o: Officer) -> String:
 	var use := Controls.describe(Controls.pc_event("interact"))
 	if o.in_car():
 		var parts: PackedStringArray = ["%s get out" % use, "%s change seat" % Controls.describe(Controls.pc_event("stance"))]
+		parts.insert(0, "DRIVING   WASD drive   Space handbrake" if o.seat == 0 else "PASSENGER (%s to move to the wheel)" % Controls.describe(Controls.pc_event("stance")))
 		if o.seat == 0:
 			parts.append("%s lights / siren" % Controls.describe(Controls.pc_event("torch")))
 			parts.append("%s horn" % Controls.describe(Controls.pc_event("horn")))

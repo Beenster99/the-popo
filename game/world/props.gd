@@ -14,8 +14,6 @@ extends Node
 
 const MSG_SNAP := 90     # host -> all: where the moving props are
 const MSG_BREAK := 91    # host -> all: a prop broke (id, where, which way)
-const MSG_ASK := 93      # client -> host: what has broken already? (joining late)
-const MSG_GONE := 94     # host -> client: the props already broken
 const SNAP_EVERY := 0.05
 const SLEEP_REFRESH := 1.5     # s: every prop is resent at least this often
 const MAX_PER_SNAP := 80
@@ -83,45 +81,50 @@ func _ready() -> void:
 	current = self
 	Net.register(MSG_SNAP, _on_snap)
 	Net.register(MSG_BREAK, _on_break)
-	Net.register(MSG_ASK, _on_ask)
-	Net.register(MSG_GONE, _on_gone)
 
 
 func _exit_tree() -> void:
 	if current == self:
 		current = null
-	for m in [MSG_SNAP, MSG_BREAK, MSG_ASK, MSG_GONE]:
+	for m in [MSG_SNAP, MSG_BREAK]:
 		Net.unregister(m)
 
 
-func _on_ask(from: int, _data: PackedByteArray) -> void:
-	if not Net.is_host():
-		return
-	var b := StreamPeerBuffer.new()
+## The props as they are now (Phase 1.7): what has broken, and where every
+## standing one is. Sent to a friend who joins late, and what the host saves.
+func write_state(b: StreamPeerBuffer) -> void:
+	b.put_u16(props.size())
 	for p in props.values():
-		if p.broken:
-			b.put_u16(p.id)
-	Net.send(from, MSG_GONE, b.data_array)
+		b.put_u16(p.id)
+		b.put_u8(1 if p.broken else 0)
+		if not p.broken:
+			DestructionWorld._put_xform(b, (p.body as RigidBody3D).global_transform)
 
 
-func _on_gone(_from: int, data: PackedByteArray) -> void:
-	if Net.is_host():
-		return
-	var b := StreamPeerBuffer.new()
-	b.data_array = data
-	while b.get_position() + 2 <= data.size():
-		var p: Dictionary = props.get(b.get_u16(), {})
-		if not p.is_empty() and not p.broken:
+## Puts the props where a written state says, quietly: the breaking happened
+## a while ago, so no sound and no splinters.
+func read_state(b: StreamPeerBuffer) -> void:
+	for i in b.get_u16():
+		var id := b.get_u16()
+		var gone := b.get_u8() == 1
+		var xf := Transform3D() if gone else DestructionWorld._get_xform(b)
+		var p: Dictionary = props.get(id, {})
+		if p.is_empty() or p.broken:
+			continue
+		var rb: RigidBody3D = p.body
+		if gone:
 			p.broken = true
-			(p.body as Node).queue_free()
+			_targets.erase(id)
+			rb.queue_free()
+		else:
+			rb.global_transform = xf
+			_targets.erase(id)
 
 
 # --- placing -------------------------------------------------------------------------
 
 ## Furnishes a generated block from its seed (the same on every machine).
 func furnish(gen: BlockGenerator) -> void:
-	if not Net.is_host() and Net.is_online():
-		Net.send(1, MSG_ASK, PackedByteArray())
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(gen.seed_value * 31 + 5)
 	var M := BlockGenerator.M
@@ -233,6 +236,7 @@ func add_prop(kind: String, xf: Transform3D) -> int:
 	rb.set_meta("prop_id", id)
 	rb.set_meta("surface", d.surface)
 	rb.add_to_group("props")
+	rb.add_to_group(RoofFader.CUTAWAY_GROUP)   # goes with the floor it's on
 	rb.add_to_group("destruction_body")    # blasts push them
 	if d.get("throw", false):
 		rb.add_to_group("throwable")
@@ -391,10 +395,12 @@ func _apply_break(id: int, at: Vector3, dir: Vector3) -> void:
 		"glass":
 			Sfx.glass_break(parent, at)
 		"wood":
-			Sfx.play(parent, "break_wood", at, 0.0 if d.mass < 15.0 else 3.0, 50.0, 0.08)
+			Sfx.play(parent, "break_wood", at, 3.0 if d.mass < 15.0 else 6.0, 70.0, 0.08)
+			if d.mass >= 15.0:
+				Sfx.play(parent, "gun_thump", at, -4.0, 40.0, 0.15)
 		_:
 			if not d.get("explosive", false):
-				Sfx.play(parent, "break_metal", at, -2.0, 50.0, 0.08)
+				Sfx.play(parent, "break_metal", at, 3.0, 70.0, 0.08)
 	if d.get("puffs", false):
 		Sfx.play(parent, "gas_hiss", at, 2.0, 40.0, 0.06)
 		Feel.cloud(parent, at, FireSystem.PUFF_RADIUS)

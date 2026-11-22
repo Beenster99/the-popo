@@ -1,6 +1,6 @@
 extends SceneTree
 ## Headless test runner. Usage:
-##   godot --headless --path . -s res://tests/runner.gd [-- filter]
+##   godot --headless --path . -s res://tests/runner.gd [-- filter]   (a|b runs either)
 ## Runs every test_* method in res://tests/unit/test_*.gd. A test method may be
 ## a coroutine (await frames). Exits with code 1 if any test fails.
 
@@ -44,7 +44,7 @@ func _run() -> void:
 			var mname: String = m.name
 			if not mname.begins_with("test_"):
 				continue
-			if filter != "" and not (f + ":" + mname).contains(filter):
+			if filter != "" and not Array(filter.split("|")).any(func(x): return (f + ":" + mname).contains(x)):
 				continue
 			_current = f + ":" + mname
 			var inst: Object = script.new()
