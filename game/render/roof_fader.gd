@@ -37,9 +37,12 @@ func _process(delta: float) -> void:
 	var p := watch.global_position
 	for b in buildings:
 		var inside: bool = (b.bounds as AABB).grow(-0.1).has_point(p + Vector3(0, 0.5, 0))
-		for mi: MeshInstance3D in b.meshes:
-			if not is_instance_valid(mi):
+		for m in b.meshes:
+			# Pieces that broke or fell are gone; skip them (no typed loop
+			# variable, which would choke on a freed mesh).
+			if not is_instance_valid(m):
 				continue
+			var mi := m as MeshInstance3D
 			# Hide everything that starts above the officer's head.
 			var target := 0.0 if inside and float(mi.get_meta("bottom_y")) > p.y + 2.0 else 1.0
 			var cur: float = _state.get(mi, 1.0)

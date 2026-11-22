@@ -5,6 +5,10 @@ extends RefCounted
 ##   mesh          intact mesh
 ##   chunks        [{mesh, offset: Vector3, shape: ConvexPolygonShape3D, volume}]
 ##   aabb          local bounds of the intact piece
+##   surfaces      the glTF material name of each surface (kit_wall, kit_glass...)
+##
+## Glass is drawn see-through, and the ground pieces (road, pavement, paint)
+## without outlines so the street does not show a tile grid.
 
 const KIT_PATH := "res://assets/models/kit/kit_fractured.glb"
 
@@ -31,7 +35,7 @@ static func _load() -> void:
 		if not String(mi.name).contains("__"):
 			origins[String(mi.name)] = mi.global_transform.origin if mi.is_inside_tree() else mi.transform.origin
 			var cel_mesh := _celify(mi.mesh)
-			_pieces[String(mi.name)] = {"mesh": cel_mesh, "chunks": [], "aabb": cel_mesh.get_aabb()}
+			_pieces[String(mi.name)] = {"mesh": cel_mesh, "chunks": [], "aabb": cel_mesh.get_aabb(), "surfaces": surface_names(mi.mesh)}
 	for mi: MeshInstance3D in nodes:
 		var n := String(mi.name)
 		if not n.contains("__"):
@@ -46,6 +50,7 @@ static func _load() -> void:
 			"shape": shape,
 			"volume": _hull_volume(m),
 			"radius": a.size.length() * 0.5,
+			"surfaces": surface_names(mi.mesh),
 		})
 	root.free()
 
@@ -57,8 +62,38 @@ static func _celify(src: Mesh) -> ArrayMesh:
 		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, src.surface_get_arrays(i))
 		var mat := src.surface_get_material(i)
 		var col := (mat as BaseMaterial3D).albedo_color if mat is BaseMaterial3D else Color(0.7, 0.7, 0.7)
-		out.surface_set_material(i, Cel.material(col, true, 0.02))
+		var mname := mat.resource_name if mat else ""
+		out.surface_set_material(i, material_for(mname, col))
 	return out
+
+
+## The cel material for a kit surface, by its glTF material name.
+static func material_for(mname: String, col: Color) -> Material:
+	if mname.begins_with("kit_glass"):
+		return Cel.material(col, false, 0.02, null, 0.4)
+	if mname.begins_with("kit_road") or mname.begins_with("kit_pave") or mname.begins_with("kit_paint"):
+		return Cel.material(col, false, 0.025, null, 1.0, true)
+	if mname.begins_with("kit_roof"):
+		return Cel.material(col, true, 0.02, null, 1.0, true)
+	return Cel.material(col, true, 0.02)
+
+
+static func surface_names(m: Mesh) -> PackedStringArray:
+	var out := PackedStringArray()
+	for i in m.get_surface_count():
+		var mat := m.surface_get_material(i)
+		out.append(mat.resource_name if mat else "")
+	return out
+
+
+## Recolours the outer surface of exterior walls (kit_wall) on one mesh
+## instance, so buildings can differ while sharing one kit.
+static func tint(mi: MeshInstance3D, surfaces: PackedStringArray, color: Color) -> void:
+	if color.a <= 0.0:
+		return
+	for i in surfaces.size():
+		if surfaces[i] == "kit_wall":
+			mi.set_surface_override_material(i, Cel.material(color, true, 0.02))
 
 
 static func _hull_volume(m: Mesh) -> float:

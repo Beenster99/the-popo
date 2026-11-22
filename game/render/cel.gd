@@ -9,13 +9,20 @@ const OUTLINE := preload("res://game/render/outline.gdshader")
 static var _cache := {}
 
 
-static func material(color: Color, outline := true, thickness := 0.025, tex: Texture2D = null) -> ShaderMaterial:
-	var key := "%s|%s|%s|%s" % [color.to_html(), outline, thickness, tex.resource_path if tex else ""]
+## flat: no specular pop or rim, for big ground surfaces (roads, pavements)
+## where the pop would show as a bright patch.
+static func material(color: Color, outline := true, thickness := 0.025, tex: Texture2D = null, opacity := 1.0, flat := false) -> ShaderMaterial:
+	var key := "%s|%s|%s|%s|%s|%s" % [color.to_html(), outline, thickness, tex.resource_path if tex else "", opacity, flat]
 	if _cache.has(key):
 		return _cache[key]
 	var m := ShaderMaterial.new()
 	m.shader = CEL
 	m.set_shader_parameter("albedo", color)
+	if opacity < 1.0:
+		m.set_shader_parameter("opacity", opacity)
+	if flat:
+		m.set_shader_parameter("specular_size", 0.0)
+		m.set_shader_parameter("rim_amount", 0.0)
 	if tex:
 		m.set_shader_parameter("albedo_tex", tex)
 	if outline:

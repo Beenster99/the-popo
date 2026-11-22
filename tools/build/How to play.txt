@@ -35,6 +35,8 @@ Left mouse fire (at the reticle), middle mouse ping a spot for everyone,
 V punch, B kick, F use, Q/E rotate camera, mouse wheel zoom,
 F3 network overlay.
 Car: WASD drive, Space handbrake, H horn, T switches who simulates the car.
+City block (1.1): 1 pistol, 2 demolition charge, G (host) builds a new
+block for everyone. Two buildings have open doors, rooms and stairs.
 Look scene: N day / night. Sound scene: 5, 6, 7 fire the test guns, F4 auto-fire.
 
 GAME CONTROLLER (Xbox names, PlayStation in brackets)

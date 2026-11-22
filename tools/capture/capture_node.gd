@@ -115,6 +115,24 @@ func _run() -> void:
 			await RenderingServer.frame_post_draw
 			get_viewport().get_texture().get_image().save_png("%s-vault.png" % base)
 			print("saved vault")
+		"block_overview", "block_street", "block_inside":
+			var s := await _scene("res://prototypes/p08_block/block.tscn")
+			s.find_children("*", "NetOverlay", false, false)[0].queue_free()
+			await _frames(20)
+			var o: Officer = s.sync.my_pawn()
+			match shot:
+				"block_overview":
+					s.cam.target = null
+					s.cam.zoom = 48.0
+					s.cam.global_position = Vector3(24, 0, 24)
+				"block_street":
+					s.cam.zoom = 22.0
+				"block_inside":
+					var b: Dictionary = s.gen.buildings.filter(func(x): return x.enterable and x.storeys >= 2)[0]
+					o.global_position = b.origin + b.u * ((b.w - 0.5) * 4.0) + b.v * ((b.d - 1.5) * 4.0) + Vector3(0, 0.05, 0)
+					s.cam.zoom = 12.0
+			await _frames(90)
+			await _save()
 		_:
 			var s := await _scene(shot)
 			await _frames(90)
