@@ -66,3 +66,46 @@ func test_officer_walks_upstairs() -> void:
 	t.check(o.global_position.y > floor_y - 0.1, "reached the upper floor")
 	o.free()
 	w.free()
+
+
+## Inside a building the floor is cut away to the camera: near walls, floors
+## above and anything in the way fade out; far walls and interior walls stay.
+func test_inside_view_shows_the_whole_floor() -> void:
+	var w := DestructionWorld.new()
+	add_child(w)
+	var fader := RoofFader.new()
+	add_child(fader)
+	var g := CityBlock.build(w, 4242, fader)
+	var cam := Camera3D.new()
+	add_child(cam)
+	var b: Dictionary = g.buildings.filter(func(x): return x.enterable)[0]
+	var bb: AABB = b.bounds
+	var spot := Node3D.new()
+	add_child(spot)
+	spot.global_position = Vector3(bb.get_center().x, bb.position.y + 0.2, bb.get_center().z)
+	cam.global_position = spot.global_position + Vector3(10, 12, 10)
+	cam.look_at(spot.global_position)
+	cam.current = true
+	fader.watch = spot
+	for i in 40:
+		await get_tree().process_frame
+	# Every visible piece that stands taller than 1 m above this floor must
+	# not hide any of it, apart from interior walls, stairs and columns.
+	var view := -cam.global_basis.z
+	var foot := Rect2(bb.position.x, bb.position.z, bb.size.x, bb.size.z).grow(-0.6)
+	var blocking := 0
+	var hidden := 0
+	for m in fader._all:
+		if not is_instance_valid(m):
+			continue
+		var mi := m as MeshInstance3D
+		if not mi.visible:
+			hidden += 1
+			continue
+		var kind: String = mi.get_meta("kind")
+		if kind.begins_with("int_") or kind == "stairs" or kind.begins_with("column") or kind.begins_with("slab"):
+			continue
+		if fader._in_the_way(mi, spot.global_position.y, foot, view, false):
+			blocking += 1
+	t.check(hidden > 10, "pieces cut away: %d" % hidden)
+	t.check(blocking == 0, "nothing left hiding the floor (%d pieces in the way)" % blocking)

@@ -70,6 +70,9 @@ func _ready() -> void:
 	var reticle := Reticle.new()
 	reticle.pawn_getter = func(): return sync.my_pawn()
 	add_child(reticle)
+	var hud := AmmoHud.new()
+	hud.pawn_getter = func(): return sync.my_pawn()
+	add_child(hud)
 	var overlay := NetOverlay.new()
 	overlay.extra_lines = func():
 		var o: Officer = sync.my_pawn()

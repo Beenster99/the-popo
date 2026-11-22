@@ -10,8 +10,8 @@ extends Node3D
 const MODEL := preload("res://assets/models/characters/officer.glb")
 const UPPER_BONES := ["spine", "chest_2", "neck_2", "head_2", "upper_arm.L", "forearm.L", "hand.L", "upper_arm.R", "forearm.R", "hand.R"]
 const LOWER_STATES := ["idle", "walk", "run", "crouch_idle", "crouch_walk", "prone_idle", "crawl", "cover_idle",
-	"peek", "slide", "roll", "mantle", "climb", "jump", "fall", "kick"]
-const UPPER_STATES := ["none", "aim_hold", "ready_hold", "punch"]
+	"peek", "slide", "roll", "mantle", "climb", "jump", "fall", "kick", "cover_low_idle"]
+const UPPER_STATES := ["none", "aim_hold", "ready_hold", "punch", "reload", "holster", "draw"]
 var RUN_CLIP_SPEED := 3.3    # m/s of the run cycle (2.27 for the mocap run)
 const WALK_CLIP_SPEED := 1.4
 const CROUCH_CLIP_SPEED := 1.0
@@ -25,6 +25,7 @@ var procedural: OfficerProcedural
 var physics: PhysicalBoneSimulator3D
 var _lower := ""
 var _upper := ""
+var _spare_mag: Node3D
 var _hit_t := 0.0
 var downed := false
 
@@ -39,7 +40,7 @@ func _ready() -> void:
 	var lib := OfficerClips.library(anim_player, skeleton)
 	anim_player.remove_animation_library("")
 	anim_player.add_animation_library("", lib)
-	for n in ["idle", "walk", "run", "crouch_idle", "crouch_walk", "prone_idle", "crawl", "cover_idle", "fall", "aim_hold", "ready_hold", "peek"]:
+	for n in ["idle", "walk", "run", "crouch_idle", "crouch_walk", "prone_idle", "crawl", "cover_idle", "cover_low_idle", "fall", "aim_hold", "ready_hold", "peek"]:
 		if lib.has_animation(n):
 			lib.get_animation(n).loop_mode = Animation.LOOP_LINEAR
 	if "run" in OfficerClips.mocap_clips:
@@ -77,7 +78,7 @@ func _build_tree() -> void:
 	upper.input_count = UPPER_STATES.size()
 	for i in UPPER_STATES.size():
 		upper.set_input_name(i, UPPER_STATES[i])
-		upper.set_input_reset(i, UPPER_STATES[i] == "punch")
+		upper.set_input_reset(i, UPPER_STATES[i] in ["punch", "reload", "holster", "draw"])
 		var an := AnimationNodeAnimation.new()
 		an.animation = "aim_hold" if UPPER_STATES[i] == "none" else UPPER_STATES[i]
 		bt.add_node("u_" + UPPER_STATES[i], an)
@@ -176,7 +177,9 @@ func update_from(o: Officer, delta: float) -> void:
 	procedural.feet_enabled = o.state in [Officer.S.MOVE, Officer.S.CROUCH, Officer.S.COVER]
 	procedural.hand_lock = o.is_aiming() and not o.is_reloading()
 	procedural.recoil = o.recoil
-	procedural.reload_k = 1.0 - o.reload_t / Officer.RELOAD_TIME if o.is_reloading() else 0.0
+	# The reload is a hand-keyed clip now; the old procedural hand is off.
+	procedural.reload_k = 0.0
+	_update_spare_mag(o)
 	procedural.ground_y = o.global_position.y
 	# Climbing: hands on the real ledge until the body is up over it.
 	if o.state == Officer.S.CLIMB:
@@ -214,7 +217,7 @@ func _lower_state(o: Officer) -> String:
 			if o.is_aiming():
 				return "walk" if hs > 0.2 else "idle"
 			if o._cover_low:
-				return "crouch_walk" if hs > 0.2 else "crouch_idle"
+				return "crouch_walk" if hs > 0.2 else "cover_low_idle"
 			return "crouch_walk" if hs > 0.2 else "cover_idle"
 	if o.is_reviving():
 		return "crouch_idle"
@@ -226,19 +229,33 @@ func _lower_state(o: Officer) -> String:
 func _upper_state(o: Officer) -> String:
 	if o.state in [Officer.S.ROLL, Officer.S.SLIDE, Officer.S.VAULT, Officer.S.CLIMB, Officer.S.PRONE, Officer.S.KICK, Officer.S.DOWNED] or o.is_reviving():
 		return "none"
-	if o.state == Officer.S.COVER and not o.is_aiming() and o.blind_t <= 0.0:
-		return "none"
 	if o.punch_t > 0.0:
 		return "punch"
+	if o.holster_t > 0.0 and not o.is_aiming():
+		return "draw" if o.drawing else "holster"
+	if o.is_reloading() and not o.holstered:
+		return "reload"
+	if o.state == Officer.S.COVER and not o.is_aiming() and o.blind_t <= 0.0:
+		return "none"
 	if o.is_aiming() or o.blind_t > 0.0:
 		return "aim_hold"
 	if o.holstered:
 		return "none"
-	# Gun drawn but not aimed: low ready (and while reloading); sprinting
-	# carries it down at the side.
-	if o.is_reloading() or (o.buttons & PlayerInput.SPRINT) == 0:
+	# Gun drawn but not aimed: low ready; sprinting carries it down at the side.
+	if (o.buttons & PlayerInput.SPRINT) == 0:
 		return "ready_hold"
 	return "none"
+
+
+## The fresh magazine shows in the left hand from the belt pouch until it is
+## seated in the grip (the middle of the reload clip).
+func _update_spare_mag(o: Officer) -> void:
+	if _spare_mag == null:
+		_spare_mag = model.find_child("spare_mag", true, false) as Node3D
+		if _spare_mag == null:
+			return
+	var k := 1.0 - o.reload_t / Officer.RELOAD_TIME if o.is_reloading() else 0.0
+	_spare_mag.visible = k > 0.33 and k < 0.59
 
 
 ## Partial ragdoll: the upper body takes the hit, then animation wins back.

@@ -228,7 +228,12 @@ func test_cover_hides_and_peeks_on_aim() -> void:
 	await _run(p, _cmd(Vector2.ZERO, PlayerInput.COVER), 1)
 	await _run(p, _cmd(), 3)
 	t.check(p.state == Officer.S.COVER and p._cover_low, "low cover")
-	t.check(p.rig._lower_state(p) == "crouch_idle", "crouched behind low cover")
+	t.check(p.rig._lower_state(p) == "cover_low_idle", "ducked behind low cover")
+	await _run(p, _cmd(), 30)
+	var psk := p.rig.skeleton
+	var head_y := (psk.global_transform * psk.get_bone_global_pose(psk.find_bone("head_2")).origin).y
+	print("    head bone at %.2f behind a 1.0 m wall" % head_y)
+	t.check(head_y < 0.82, "head well below a 1 m wall top: %.2f" % head_y)
 	await _run(p, aim, 3)
 	t.check(p.rig._lower_state(p) == "idle" and p.rig._upper_state(p) == "aim_hold", "stands and aims over it")
 
@@ -266,13 +271,17 @@ func test_magazine_reload_holster_and_blind_fire() -> void:
 	t.check(o.is_reloading(), "R reloads a part-used magazine")
 	await _run(o, _cmd(), 120)
 	await _run(o, _cmd(Vector2.ZERO, PlayerInput.HOLSTER), 1)
-	await _run(o, _cmd(), 2)
-	t.check(o.holstered, "holstered")
+	await _run(o, _cmd(), 6)
+	t.check(not o.holstered and o.holster_t > 0.0 and o.gun_in_hand(), "holstering takes a moment, gun still in hand")
+	await _run(o, _cmd(), 40)
+	t.check(o.holstered and not o.gun_in_hand(), "holstered")
 	shots.clear()
 	await _run(o, {"move": Vector2.ZERO, "buttons": PlayerInput.FIRE, "aim_yaw": 0.0}, 30)
 	t.check(shots.is_empty(), "a holstered gun does not fire")
 	await _run(o, aim, 3)
-	t.check(not o.holstered, "aiming draws the gun")
+	t.check(not o.holstered and not o.is_aiming(), "aiming starts the draw")
+	await _run(o, aim, 40)
+	t.check(o.is_aiming() and o.gun_in_hand(), "drawn and aiming")
 	# Blind fire from behind a wall.
 	ProtoWorld.block(self, Vector3(4, 1.0, 0.3), o.global_position + Vector3(0, 0.5, 0.8), Color.GRAY)
 	await _run(o, _cmd(Vector2.ZERO, PlayerInput.RELOAD), 1)
@@ -325,6 +334,33 @@ func test_vault_over_a_car() -> void:
 	t.check(o.state == Officer.S.VAULT, "vaults the car (state %s, at %s)" % [Officer.S.keys()[o.state], o.global_position])
 
 
+## Cover snaps to a wall beside or behind the officer, not only ahead; the
+## officer stands with his back to it; moving away leaves cover; and cover
+## that is taken away (broken, knocked over) leaves cover too.
+func test_cover_snaps_back_to_wall_and_move_away_leaves() -> void:
+	var o := _officer(Vector3(20, 0, 0))
+	# A wall 1 m to the officer's left side (+X), while he faces +Z.
+	var wall := ProtoWorld.block(self, Vector3(0.3, 2.2, 3.0), Vector3(21.15, 1.1, 0), Color.GRAY)
+	await _run(o, _cmd(), 5)
+	await _run(o, _cmd(Vector2.ZERO, PlayerInput.COVER), 1)
+	await _run(o, _cmd(), 10)
+	t.check(o.state == Officer.S.COVER, "snapped to the wall at the side (state %s)" % Officer.S.keys()[o.state])
+	t.check(absf(o.global_position.x - (21.0 - Officer.COVER_GAP)) < 0.08, "pressed up to it: x=%.2f" % o.global_position.x)
+	var facing := Vector3(sin(o.rotation.y), 0, cos(o.rotation.y))
+	t.check(facing.dot(Vector3.LEFT) > 0.9, "back to the wall, facing away: %s" % facing)
+	await _run(o, _cmd(Vector2(0, 1)), 20)
+	t.check(o.state == Officer.S.COVER, "sliding along the wall keeps cover")
+	await _run(o, _cmd(Vector2(-1, 0)), 10)
+	t.check(o.state != Officer.S.COVER, "moving away leaves cover")
+	await _run(o, _cmd(), 20)
+	await _run(o, _cmd(Vector2.ZERO, PlayerInput.COVER), 1)
+	await _run(o, _cmd(), 5)
+	t.check(o.state == Officer.S.COVER, "back in cover")
+	wall.queue_free()
+	await _run(o, _cmd(), 15)
+	t.check(o.state != Officer.S.COVER, "cover gone, out of cover")
+
+
 ## Cover snaps to a car, and cover pressed with a direction runs to the next
 ## cover that way; at the end of a wall it swings round the corner.
 func test_cover_on_cars_cover_to_cover_and_corners() -> void:
@@ -342,8 +378,9 @@ func test_cover_on_cars_cover_to_cover_and_corners() -> void:
 	await _run(o, _cmd(Vector2(-1, 0), PlayerInput.COVER), 1)
 	t.check(o._dash, "running to the next cover")
 	await _run(o, _cmd(Vector2(-1, 0)), 150)
-	t.check(o.state == Officer.S.COVER and absf(o.global_position.x + 5.4) < 0.15, "in cover at the wall: x=%.2f state %s" % [o.global_position.x, Officer.S.keys()[o.state]])
-	t.check(o._cover_n.dot(Vector3.RIGHT) > 0.9, "facing the wall")
+	t.check(o.state == Officer.S.COVER and absf(o.global_position.x - (-5.85 + Officer.COVER_GAP)) < 0.15, "in cover at the wall: x=%.2f state %s" % [o.global_position.x, Officer.S.keys()[o.state]])
+	t.check(o._cover_n.dot(Vector3.RIGHT) > 0.9, "cover facing the wall")
+	t.check(absf(angle_difference(o.rotation.y, atan2(o._cover_n.x, o._cover_n.z))) < 0.2, "back to the wall")
 	# Slide to the wall's end (toward +Z) and swing round it.
 	await _run(o, _cmd(Vector2(0, 1)), 90)
 	var z_end := o.global_position.z
@@ -417,3 +454,43 @@ func test_training_yard_loads() -> void:
 	await get_tree().physics_frame
 	t.check(s.world.pieces.size() >= 25, "yard pieces: %d" % s.world.pieces.size())
 	s.queue_free()
+
+
+## Prone: the whole body lies on the ground, legs included.
+func test_prone_legs_on_the_ground() -> void:
+	var o := _officer()
+	await _run(o, _cmd(), 10)
+	await _run(o, _cmd(Vector2.ZERO, PlayerInput.PRONE), 1)
+	await _run(o, _cmd(), 90)
+	var sk: Skeleton3D = o.rig.skeleton
+	var h := {}
+	for b in ["hips", "chest_2", "thigh.L", "shin.L", "foot.L", "shin.R", "foot.R"]:
+		h[b] = (sk.global_transform * sk.get_bone_global_pose(sk.find_bone(b)).origin).y - o.global_position.y
+	print("    prone heights: %s" % h)
+	t.check(h["shin.L"] < 0.22 and h["shin.R"] < 0.22, "knees on the ground (%.2f, %.2f)" % [h["shin.L"], h["shin.R"]])
+	t.check(h["foot.L"] < 0.14 and h["foot.R"] < 0.14, "feet on the ground (%.2f, %.2f)" % [h["foot.L"], h["foot.R"]])
+	# Aiming prone keeps the body down too.
+	var aim := {"move": Vector2.ZERO, "buttons": PlayerInput.AIM, "aim_yaw": 0.0, "aim_point": o.global_position + Vector3(0, 0.3, 8)}
+	await _run(o, aim, 60)
+	var hh := (sk.global_transform * sk.get_bone_global_pose(sk.find_bone("hips")).origin).y - o.global_position.y
+	var hf := (sk.global_transform * sk.get_bone_global_pose(sk.find_bone("foot.L")).origin).y - o.global_position.y
+	print("    aiming prone: hips %.2f foot %.2f, body at %.2f, state %s" % [hh, hf, o.global_position.y, Officer.S.keys()[o.state]])
+	t.check(hh < 0.2 and hf < 0.14, "aiming prone stays on the ground (hips %.2f, feet %.2f)" % [hh, hf])
+
+
+## Reloading takes rounds from the belt; with none left you cannot reload.
+func test_reload_uses_spare_rounds() -> void:
+	var o := _officer()
+	await _run(o, _cmd(), 5)
+	o.ammo = 5
+	o.reserve = 7
+	await _run(o, _cmd(Vector2.ZERO, PlayerInput.RELOAD), 1)
+	await _run(o, _cmd(), int(Officer.RELOAD_TIME * 60) + 5)
+	t.check(o.ammo == 12 and o.reserve == 0, "partial reload from the belt: %d / %d" % [o.ammo, o.reserve])
+	await _run(o, _cmd(Vector2.ZERO, PlayerInput.RELOAD), 1)
+	t.check(not o.is_reloading(), "no spare rounds: no reload")
+	t.check(o.refill_ammo() and o.reserve == Officer.RESERVE_MAX, "ammo box fills the belt")
+	var b := StreamPeerBuffer.new()
+	o.encode_state(b)
+	b.seek(0)
+	t.check(o.decode_state(b).rs == Officer.RESERVE_MAX, "spare rounds are synced")

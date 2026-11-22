@@ -524,6 +524,10 @@ def build_body(rig):
         a = P('ankle.' + s)
         add(rbox('boot.' + s, a + Vector((0, -0.045, -0.045)), (0.11, 0.27, 0.11), 'boots', bevel=0.035, subsurf=1, outline=0.01), 'foot.' + s)
         add(rbox('bootcuff.' + s, a + Vector((0, 0.0, 0.04)), (0.11, 0.12, 0.08), 'boots', bevel=0.025, outline=0.008), 'shin.' + s)
+    # A fresh magazine in the left fist, shown only mid-reload (the game
+    # switches it on and off).
+    wl = P('wrist.L')
+    add(rbox('spare_mag', wl + Vector((0, -0.035, -0.10)), (0.024, 0.034, 0.10), 'gun', bevel=0.005, outline=0.005), 'hand.L')
     # pistol in right hand: barrel along hand bone axis (down in rest pose)
     w = P('wrist.R')
     g = []

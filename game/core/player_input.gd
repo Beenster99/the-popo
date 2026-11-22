@@ -35,6 +35,8 @@ static var aim_point := Vector3.ZERO
 static var aim_normal := Vector3.UP
 static var aim_on_surface := false
 static var using_pad := false
+## A menu is open over the game (pause menu, settings): the player stands still.
+static var blocked := false
 const CHEST := 1.3
 const PAD_AIM_RANGE := 10.0
 
@@ -48,6 +50,10 @@ const _MAP := {
 ## cam: the IsoCamera (movement is relative to the view).
 ## from: the pawn, for the aim direction toward the mouse.
 static func sample(cam: IsoCamera, from: Node3D) -> Dictionary:
+	if blocked:
+		var tb := TORCH if torch_on else 0
+		var yaw := from.rotation.y if from else 0.0
+		return {"move": Vector2.ZERO, "buttons": tb, "aim_yaw": yaw, "aim_point": Vector3.ZERO}
 	var raw := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var world := cam.view_relative(raw) if cam else Vector3(raw.x, 0, raw.y)
 	var buttons := 0
@@ -72,7 +78,7 @@ static func sample(cam: IsoCamera, from: Node3D) -> Dictionary:
 		var exclude: Array[RID] = []
 		if from is CollisionObject3D:
 			exclude.append((from as CollisionObject3D).get_rid())
-		var stick := Input.get_vector("aim_left", "aim_right", "aim_up", "aim_down", 0.25)
+		var stick := Input.get_vector("aim_left", "aim_right", "aim_up", "aim_down", float(Settings.values.get("pad_deadzone", 0.25)))
 		if stick.length() > 0.0:
 			using_pad = true
 		elif Input.get_last_mouse_velocity().length() > 50.0:

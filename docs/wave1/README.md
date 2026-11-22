@@ -70,3 +70,40 @@ city block. It is built phase by phase; each phase ends with a build.
 - Kicked-in doors come off their frame and fall in.
 
 ![Officer v0.2.2](img/officer_v0_2_2.png)
+
+### v0.2.3: menus, settings, cover and animation fixes (beenster's playtest)
+
+- Opening menu (`game/ui/main_menu.tscn`, now the main scene): Single
+  Player (pick a scene), Online (the host / join lobby), Settings, Quit.
+  Esc in a game opens a pause menu (Resume, Settings, Leave to main menu);
+  alone it pauses the game, online the game carries on and your officer
+  stands still.
+- Settings (`game/core/settings.gd`, autoload `Settings`): one SCHEMA list
+  drives the screen, saved in `user://settings.cfg`, applied live.
+  Graphics: window mode, size, screen, V-Sync, frame cap, renderer and
+  driver (restart, through `user://override.cfg`), presets Low to Max,
+  render scale, FSR 1/2, MSAA, FXAA/SMAA, TAA, debanding, anisotropy,
+  mipmap bias, LOD, occlusion culling, sun and lamp shadows (size,
+  distance, splits, softness, filter, 16-bit), SSAO, SSIL, SSR, SDFGI,
+  VoxelGI, glow, volumetric fog, haze, subsurface scattering, specular AA,
+  tone mapping, exposure, brightness, contrast, saturation. Sound: bus
+  volumes, output device, mute in background. Gameplay: friendly fire
+  (host's setting), camera speeds and zoom, cutaway on/off, HUD parts,
+  stick dead zone, key changes. Debug: FPS and performance readout,
+  network overlay, render debug views, collision shapes, fake lag, jitter
+  and loss, game speed.
+- Ammo panel bottom right: weapon, rounds in the gun, spare rounds
+  (60 to start, 90 max; the yard's ammo box refills them).
+- Inside a building, everything that would hide any part of the floor you
+  stand on fades out, at any camera angle (`game/render/roof_fader.gd`).
+- Hand-keyed reload (drop the mag, fresh one from the belt pouch, seat,
+  rack), holster and draw clips.
+- Cover: snaps to the nearest wall, car or ledge within 1.6 m any way
+  round; the officer stands (or crouches, head well below a 1 m wall)
+  with his back to it; moving away leaves cover; cover that is shot or
+  blown away drops you out of it.
+- Prone legs lie on the ground.
+
+![Menu](img/menu_v0_2_3.png)
+![Settings](img/settings_v0_2_3.png)
+![Low cover and reload](img/cover_v0_2_3.png)
