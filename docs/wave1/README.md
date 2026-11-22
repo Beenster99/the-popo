@@ -271,6 +271,14 @@ and a knocked chair in the same place to the centimetre.
 ![A shelf on fire](img/mayhem_fire.png)
 ![A car after it went up](img/mayhem_car.png)
 
+### v0.2.9: respawn (beenster)
+
+- Downed officers can respawn: after 3 s, R puts you back where you came
+  into the game with full health, no wounds, a full pouch, full magazine
+  and belt, and the service pistol holstered (a picked-up gun is lost).
+  Teammate revive (hold F) and getting up by yourself after 30 s still
+  work. The HUD shows the choices and the countdowns while you are down.
+
 ## Phase 1.6: sound that hits hard (v0.2.7, pulled forward)
 
 beenster heard nothing in v0.2.5: the officers' own gunshots and bullet
