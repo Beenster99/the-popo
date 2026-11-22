@@ -257,7 +257,7 @@ def main(folder):
         by_file[rel] = [rel, f"Sonniss GDC bundle / {pack} / {name} ({MIRROR})", LICENCE, note]
         print(f"{stem:22s} {len(seg) / RATE:4.2f}s  {target:6.1f} dB  <- {name}")
     with open(MANIFEST, "w", newline="") as f:
-        w = csv.writer(f)
+        w = csv.writer(f, lineterminator="\n")
         w.writerow(head)
         order = [r[0] for r in body] + [k for k in by_file if k not in {r[0] for r in body}]
         for k in order:

@@ -31,8 +31,51 @@ func _scene(path: String) -> Node:
 	return get_tree().current_scene
 
 
+## An empty lit floor with a camera, for close looks at characters.
+func _plain_stage(cam_at: Vector3, look: Vector3) -> Node3D:
+	var root := Node3D.new()
+	get_tree().root.add_child(root)
+	ProtoWorld.ground(root, 60.0)
+	var sun := DirectionalLight3D.new()
+	sun.rotation_degrees = Vector3(-50, 30, 0)
+	root.add_child(sun)
+	var env := WorldEnvironment.new()
+	env.environment = Environment.new()
+	env.environment.background_mode = Environment.BG_COLOR
+	env.environment.background_color = Color(0.55, 0.6, 0.68)
+	env.environment.ambient_light_color = Color(0.6, 0.6, 0.65)
+	env.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	root.add_child(env)
+	var cam := Camera3D.new()
+	root.add_child(cam)
+	cam.look_at_from_position(cam_at, look)
+	cam.current = true
+	return root
+
+
 func _run() -> void:
 	match shot:
+		"drag":
+			# v0.2.11: dragging a downed teammate by the collar.
+			var root := _plain_stage(Vector3(4.5, 2.2, 4.5), Vector3(2.5, 0.4, 0))
+			var a := Officer.new()
+			root.add_child(a)
+			a.global_position = Vector3(0, 0.05, 0)
+			var b := Officer.new()
+			root.add_child(b)
+			b.global_position = Vector3(0.8, 0.05, 0)
+			b.holstered = true
+			for i in 5:
+				a.sim_step({"move": Vector2.ZERO, "buttons": 0, "aim_yaw": 0.0}, 1.0 / 60.0)
+				await get_tree().physics_frame
+			a.take_damage(150.0, Vector3.BACK)
+			for i in 200:
+				a.sim_step({"move": Vector2.ZERO, "buttons": 0, "aim_yaw": 0.0}, 1.0 / 60.0)
+				var drag := i > 60
+				b.sim_step({"move": Vector2(1, 0) if drag else Vector2.ZERO, "buttons": PlayerInput.DRAG if drag else 0, "aim_yaw": 0.0}, 1.0 / 60.0)
+				await get_tree().physics_frame
+			print("drag: a ", a.global_position, " ", Officer.S.keys()[a.state], " b ", b.global_position, " ", Officer.S.keys()[b.state], " yaw ", rad_to_deg(b.rotation.y), " chest ", a.rig.bone_body("chest_2").global_position)
+			await _save()
 		"fallen":
 			# v0.2.11: how bodies lie after going down (beenster: "collapse
 			# in a heap"). Three suspects shot from different sides and one

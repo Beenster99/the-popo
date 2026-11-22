@@ -23,6 +23,7 @@ const KEYS := {
 	"punch": [KEY_V],
 	"kick": [KEY_B],
 	"interact": [KEY_F],
+	"drag": [KEY_G],              # hold: drag a downed teammate
 	"horn": [KEY_H],
 	"weapon_1": [KEY_1],
 	"weapon_2": [KEY_2],
@@ -47,6 +48,7 @@ const PAD_BUTTONS := {
 	"stance": [JOY_BUTTON_B],               # B (Circle): tap crouch, hold prone, hold running roll
 	"reload": [JOY_BUTTON_X],               # X (Square)
 	"holster": [JOY_BUTTON_Y],              # Y (Triangle)
+	"drag": [JOY_BUTTON_Y],                 # held next to a downed teammate
 	"horn": [JOY_BUTTON_Y],
 	"torch": [JOY_BUTTON_DPAD_DOWN],
 	"cover": [JOY_BUTTON_LEFT_SHOULDER],    # LB (L1)
@@ -81,7 +83,7 @@ const REBINDABLE := [
 	["stance", "Tap crouch / stand, hold prone, hold while running roll"],
 	["crouch", "Crouch"], ["prone", "Lie prone"], ["dive", "Roll (slide when sprinting)"],
 	["cover", "Take cover (with a direction: run to the next cover)"], ["reload", "Reload"],
-	["holster", "Holster / draw"], ["torch", "Torch on / off"], ["punch", "Punch"], ["kick", "Kick"], ["interact", "Use / revive (hold)"],
+	["holster", "Holster / draw"], ["torch", "Torch on / off"], ["punch", "Punch"], ["kick", "Kick"], ["interact", "Use / revive (hold)"], ["drag", "Drag a downed teammate (hold)"],
 	["aim", "Aim / peek from cover"], ["fire", "Fire"], ["ping", "Ping a spot for everyone"], ["horn", "Car horn"], ["handbrake", "Handbrake"],
 	["cam_rotate_left", "Rotate camera left"], ["cam_rotate_right", "Rotate camera right"],
 ]

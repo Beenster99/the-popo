@@ -30,6 +30,9 @@ var reload_k := 0.0
 var ledge_weight := 0.0
 var ledge_point := Vector3.ZERO
 var ledge_right := Vector3.RIGHT
+## Dragging a teammate: the left hand in their collar (world point).
+var collar_weight := 0.0
+var collar_point := Vector3.ZERO
 
 var _legs := [["thigh.L", "shin.L", "foot.L"], ["thigh.R", "shin.R", "foot.R"]]
 var _idx := {}
@@ -62,6 +65,7 @@ func _process_modification() -> void:
 	_hand_lock(sk)
 	_reload_hand(sk)
 	_ledge_hands(sk)
+	_collar_hand(sk)
 
 
 func _rotate_global(sk: Skeleton3D, bone: int, q: Quaternion) -> void:
@@ -200,6 +204,15 @@ func _ledge_hands(sk: Skeleton3D) -> void:
 		var cur := sk.get_bone_global_pose(hand).origin
 		var grip: Vector3 = inv * (ledge_point + ledge_right * (0.22 * side[1]) + Vector3(0, 0.04, 0))
 		_two_bone(sk, _idx["upper_arm." + side[0]], _idx["forearm." + side[0]], hand, cur.lerp(grip, ledge_weight))
+
+
+func _collar_hand(sk: Skeleton3D) -> void:
+	if collar_weight <= 0.001:
+		return
+	var hand: int = _idx["hand.L"]
+	var cur := sk.get_bone_global_pose(hand).origin
+	var grip: Vector3 = sk.global_transform.affine_inverse() * collar_point
+	_two_bone(sk, _idx["upper_arm.L"], _idx["forearm.L"], hand, cur.lerp(grip, collar_weight))
 
 
 ## Analytic two-bone IK in skeleton space. Keeps the joint bending the way

@@ -32,6 +32,9 @@ var _hit_t := 0.0
 ## Seconds since the body went down: the joints start stiff (a person
 ## topples rather than folds) and go slack over LIMP_TIME.
 var _limp_t := 99.0
+## Downed and dragged by the collar: the point the chest is pulled to.
+var drag_point := Vector3.INF
+var _smear_at := Vector3.INF
 const LIMP_TIME := 1.2
 var downed := false
 var _aim_smooth := Vector3.INF
@@ -108,6 +111,50 @@ func _build_tree() -> void:
 	# roll, mantle, climb and slide is taken out of the pose here.
 	tree.root_motion_track = NodePath("%s:root" % skel_path)
 	tree.active = true
+
+
+# Every physics tick, so the pull holds even when frames are slow.
+func _physics_process(_delta: float) -> void:
+	if not downed:
+		return
+	var o := _owner_officer()
+	var d: Officer = o._dragger() if o else null
+	# Being dragged: the collar is in the dragger's hand, just behind them.
+	drag_point = Vector3.INF if d == null else d.global_position + (o.global_position - d.global_position).normalized() * 0.35 + Vector3(0, 0.6, 0)
+	_drag_pull()
+	# A smear of blood along the ground behind a dragged body.
+	var hips := bone_body("hips")
+	if d and hips and Gore.level() > 0:
+		if _smear_at == Vector3.INF or hips.global_position.distance_to(_smear_at) > 0.35:
+			_smear_at = hips.global_position
+			Gore.splat(o.get_parent(), Vector3(_smear_at.x, o.global_position.y + 0.01, _smear_at.z), Vector3.UP, 0.35 + 0.1 * Gore.level(), true)
+	elif d == null:
+		_smear_at = Vector3.INF
+
+
+func _owner_officer() -> Officer:
+	var n := get_parent()
+	while n and not n is Officer:
+		n = n.get_parent()
+	return n as Officer
+
+
+func _drag_pull() -> void:
+	if not downed or drag_point == Vector3.INF:
+		return
+	var chest := bone_body("chest_2")
+	var neck := bone_body("neck_2")
+	if chest == null:
+		return
+	# A body that has come to rest is asleep: wake it all, or it won't move.
+	for c in physics.get_children():
+		if c is PhysicalBone3D:
+			PhysicsServer3D.body_set_state((c as PhysicalBone3D).get_rid(), PhysicsServer3D.BODY_STATE_SLEEPING, false)
+	var grip: Vector3 = neck.global_position if neck else chest.global_position
+	var want := ((drag_point - grip) * 8.0).limit_length(5.0)
+	chest.linear_velocity = chest.linear_velocity.lerp(want, 0.5)
+	if neck:
+		neck.linear_velocity = neck.linear_velocity.lerp(want, 0.5)
 
 
 func _go_limp(delta: float) -> void:
@@ -194,6 +241,7 @@ func _set_ragdoll_layer(on: bool) -> void:
 ## Called every frame with the officer's current state.
 func update_from(o: Officer, delta: float) -> void:
 	if downed:
+		_go_limp(delta)
 		return
 	var lower := _lower_state(o)
 	var upper := _upper_state(o)
@@ -268,6 +316,12 @@ func update_from(o: Officer, delta: float) -> void:
 		procedural.ledge_weight = 1.0 - smoothstep(0.7, 0.95, k)
 	else:
 		procedural.ledge_weight = 0.0
+	# Dragging: the left hand reaches back into the teammate's collar.
+	var dragged := o.drag_target()
+	var neck: PhysicalBone3D = dragged.rig.bone_body("neck_2") if dragged and dragged.rig else null
+	procedural.collar_weight = move_toward(procedural.collar_weight, 1.0 if neck else 0.0, delta * 5.0)
+	if neck:
+		procedural.collar_point = neck.global_position
 	_go_limp(delta)
 	if _hit_t > 0.0:
 		_hit_t -= delta
@@ -279,6 +333,8 @@ func update_from(o: Officer, delta: float) -> void:
 
 func _lower_state(o: Officer) -> String:
 	var hs := Vector2(o.velocity.x, o.velocity.z).length()
+	if o.state in [Officer.S.MOVE, Officer.S.CROUCH] and o.drag_target():
+		return "crouch_walk" if hs > 0.3 else "crouch_idle"   # bent over, backing off
 	match o.state:
 		Officer.S.ROLL: return "roll"
 		Officer.S.SLIDE: return "slide"
