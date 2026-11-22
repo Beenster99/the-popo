@@ -378,6 +378,14 @@ func _spawn_released(p: Dictionary) -> void:
 	for other in pieces.values():
 		if other.state == "intact" and other.below.has(p.id) and is_instance_valid(other.node):
 			rb.add_collision_exception_with(other.node)
+	# The pieces it was touching when it let go (the next slab along, the
+	# wall it hung off). Scraping past them as it tips is not an impact.
+	var torn_from: Array = []
+	var near: AABB = p.aabb.grow(0.1)
+	for other in pieces.values():
+		if other.id != p.id and other.state == "intact" and near.intersects(other.aabb):
+			torn_from.append(other.id)
+	rb.set_meta("torn_from", torn_from)
 	if Net.is_host():
 		rb.contact_monitor = true
 		rb.max_contacts_reported = 6
@@ -399,12 +407,20 @@ func _on_released_hit(other: Node, rb: RigidBody3D, piece_id: int) -> void:
 		return
 	var speed := rb.linear_velocity.length() + rb.angular_velocity.length() * 0.5
 	if other.has_meta("piece_id"):
+		var torn_from: Array = rb.get_meta("torn_from", [])
+		if speed < TEAR_SCRAPE_SPEED and torn_from.has(other.get_meta("piece_id")):
+			return
 		damage_piece(other.get_meta("piece_id"), rb.mass * speed * 0.02, rb.global_position, 1.0)
 
 
 ## Host: a falling piece shatters when it is stopped hard (a big change of
 ## velocity in one physics step), wherever it lands.
 const SHATTER_DELTA_V := 2.2
+## Physics steps after release before a hard stop can shatter the piece.
+const SHATTER_GRACE_STEPS := 6
+## Below this speed a falling piece scraping the pieces it tore away from
+## does them no damage.
+const TEAR_SCRAPE_SPEED := 4.0
 
 func _check_released_impacts(_delta: float) -> void:
 	for p in pieces.values():
@@ -416,6 +432,12 @@ func _check_released_impacts(_delta: float) -> void:
 		var v := rb.linear_velocity
 		var prev: Vector3 = rb.get_meta("prev_v", v)
 		rb.set_meta("prev_v", v)
+		# Just after letting go it is still pressed against the pieces it tore
+		# from, and the solver pushing them apart is not a landing.
+		var age: int = rb.get_meta("age", 0) + 1
+		rb.set_meta("age", age)
+		if age <= SHATTER_GRACE_STEPS:
+			continue
 		if (v - prev).length() > SHATTER_DELTA_V and rb.get_contact_count() > 0:
 			p.state = "shattering"
 			_host_break(p.id, BREAK_BODY_SHATTER, rb.global_position - prev.normalized() * 0.5, 1.0)

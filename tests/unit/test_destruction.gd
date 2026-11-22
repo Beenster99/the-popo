@@ -61,3 +61,26 @@ func test_explosion_breaks_nearby_pieces() -> void:
 	t.check(w.pieces[1].state == "gone", "near wall gone")
 	t.check(w.pieces[3].state == "intact", "far wall intact")
 	t.check(w.bodies.size() > 3, "big chunks registered: %d" % w.bodies.size())
+
+
+func test_falling_slab_scraping_its_neighbour_does_no_damage() -> void:
+	var w := _world()
+	BuildingLayout.shop(w, Vector3.ZERO)
+	w.finalize()
+	w.damage_piece(1, 9999.0, Vector3(-1, 1.5, 2), 3.0)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var slab: RigidBody3D = w.bodies.get(8 * 64 + DestructionWorld.RELEASED_BIT)
+	t.check(slab != null, "west slab released (state %s)" % w.pieces[8].state)
+	if slab == null:
+		return
+	# A slow scrape past the east slab as the west one tips away from it.
+	slab.linear_velocity = Vector3(0, -1.5, 0)
+	slab.angular_velocity = Vector3(0, 0, 1.0)
+	w._on_released_hit(w.pieces[9].node, slab, 8)
+	t.check(w.pieces[9].state == "intact", "east slab survived the scrape")
+	# A hard hit on something it was not attached to still does damage.
+	var hp_before: float = w.pieces[3].hp
+	slab.set_meta("torn_from", [])
+	w._on_released_hit(w.pieces[3].node, slab, 8)
+	t.check(w.pieces[3].hp < hp_before or w.pieces[3].state != "intact", "unattached piece takes damage")

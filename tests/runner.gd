@@ -57,7 +57,11 @@ func _run() -> void:
 			if errors.count > errs_before:
 				check(false, "%d engine/script error(s), last: %s" % [errors.count - errs_before, errors.last])
 			if inst is Node:
+				# Free it fully before the next test starts, so the next test's
+				# physics never meets this one's leftover bodies.
 				inst.queue_free()
+				await process_frame
+				await physics_frame
 			if failures == before:
 				passed += 1
 				print("  ok   ", _current)
