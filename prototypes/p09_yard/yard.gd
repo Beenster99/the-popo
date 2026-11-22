@@ -92,6 +92,11 @@ func _ready() -> void:
 	sync.pawn_spawned.connect(func(id, p): if id == Net.my_id(): cam.target = p)
 	world.sync = sync
 	add_child(sync)
+	# Phase 1.6: sound (footsteps, guns, brass, engines, background).
+	var sounds := GameSounds.new()
+	sounds.world = world
+	sounds.pawn_getter = func(): return sync.my_pawn()
+	add_child(sounds)
 	var reticle := Reticle.new()
 	reticle.pawn_getter = func(): return sync.my_pawn()
 	add_child(reticle)

@@ -14,7 +14,7 @@ const TESTS := [
 	["0.4 Car spike", "res://prototypes/p04_car/car.tscn"],
 	["0.5 Look spike (cel shading, camera, roofs)", "res://prototypes/p05_look/look.tscn"],
 	["0.6 Movement and animation course", "res://prototypes/p06_movement/movement.tscn"],
-	["0.7 Sound spike", "res://prototypes/p07_sound/sound.tscn"],
+	["1.6 Listening room (every gun, every material)", "res://prototypes/p07_sound/sound.tscn"],
 	["1.1 City block (generated, breakable)", "res://prototypes/p08_block/block.tscn"],
 	["1.2 Training yard (movement, cover, melee, revive)", "res://prototypes/p09_yard/yard.tscn"],
 	["1.3 Patrol (police car, seats, lights and siren, injuries)", "res://prototypes/p10_patrol/patrol.tscn"],

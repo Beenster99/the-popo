@@ -78,6 +78,12 @@ func _ready() -> void:
 	world.sync = sync
 	cars.sync = sync
 	add_child(sync)
+	# Phase 1.6: sound (footsteps, guns, brass, engines, background).
+	var sounds := GameSounds.new()
+	sounds.world = world
+	sounds.cars = cars
+	sounds.pawn_getter = func(): return sync.my_pawn()
+	add_child(sounds)
 	var reticle := Reticle.new()
 	reticle.pawn_getter = func(): return sync.my_pawn()
 	add_child(reticle)

@@ -40,7 +40,19 @@ static func resolve(world: DestructionWorld, cars: CarSync, origin: Vector3, dir
 		var surface := cars.bullet_hit(hit.collider, hit.position, dir)
 		if world:
 			world.bullet_hit(null, hit.position, hit.normal, dir)
-		Sfx.impact(shooter.get_parent(), hit.position, surface, 0.8)
+		_sound(origin, hit.position, surface, 0, shooter)
 	elif hit and world:
 		world.bullet_hit(hit.collider, hit.position, hit.normal, dir)
-	return hit.position if hit else origin + dir * 60.0
+	var end: Vector3 = hit.position if hit else origin + dir * 60.0
+	if not alt and not (hit and hit.collider is Car):
+		var what := 2 if not hit else (1 if (hit.collider is Officer or hit.collider is Suspect) else 0)
+		_sound(origin, end, Sfx.surface_of(hit.collider) if hit else "concrete", what, shooter)
+	return end
+
+
+## Everyone hears where the bullet went (Phase 1.6).
+static func _sound(a: Vector3, b: Vector3, surface: String, what: int, shooter: Officer) -> void:
+	if GameSounds.current and GameSounds.current.sync:
+		GameSounds.current.sync.bullet(a, b, surface, what, shooter.peer_id if shooter else 0)
+	elif shooter:
+		Sfx.impact(shooter.get_parent(), b, surface, 0.8)

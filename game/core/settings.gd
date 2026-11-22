@@ -116,6 +116,8 @@ const SCHEMA := [
 	["Sound", "vol_sfx", "Effects", "range", 100, [0, 100, 1, "%"]],
 	["Sound", "vol_outdoor", "Outdoor gunshots", "range", 100, [0, 100, 1, "%"]],
 	["Sound", "vol_indoor", "Indoor sounds", "range", 100, [0, 100, 1, "%"]],
+	["Sound", "vol_ambience", "Background (street, rooms)", "range", 100, [0, 100, 1, "%"]],
+	["Sound", "vol_vehicles", "Engines and tyres", "range", 100, [0, 100, 1, "%"]],
 	["Sound", "", "Output", "head"],
 	["Sound", "device", "Output device", "enum", 0, "@devices"],
 	["Sound", "mute_unfocused", "Mute when the game is in the background", "bool", false],
@@ -448,6 +450,8 @@ func _apply_audio() -> void:
 	_bus_volume(Sfx.BUS_SFX, values.vol_sfx)
 	_bus_volume(Sfx.BUS_OUTDOOR, values.vol_outdoor)
 	_bus_volume(Sfx.BUS_INDOOR, values.vol_indoor)
+	_bus_volume(Sfx.BUS_AMBIENCE, values.vol_ambience)
+	_bus_volume(Sfx.BUS_VEHICLES, values.vol_vehicles)
 	var devs := AudioServer.get_output_device_list()
 	if devs.size() > 0:
 		var want: String = devs[clampi(values.device, 0, devs.size() - 1)]

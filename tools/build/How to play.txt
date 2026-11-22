@@ -58,6 +58,15 @@ Driver: WASD drive, Space handbrake, H horn, T lights, then lights and wail,
 then yelp, then off. Passengers: hold right mouse to lean out of the window
 and shoot. Windows shatter when shot; doors, bonnet, boot, bumpers and
 mirrors come off in big crashes. Hold F at the boot for ammo and first aid.
+SOUND (1.6)
+Turn your speakers or headphones up: gunshots, bullet hits and near misses,
+footsteps, engines, the street outside and breaking glass all play now.
+Settings > Sound has sliders for each part. To hear everything on its own,
+open Settings > Debug > Open a test scene > 1.6 Listening room: 5, 6 and 7
+fire test guns in the street, the shop and behind a wall, 8 fires a shotgun
+next to you, 9 sends bullets past your head, 0 sets off a blast, F4 fires
+the test guns in turn. Shoot the shop's glass, door and walls, the car and
+the crates.
 CALLS AND ARRESTS (1.4)
 Calls come in over the radio (top of the screen) and are listed top left
 with their distance; arrows at the screen edge point the way. The CRIME
@@ -80,7 +89,7 @@ the shut doors of the others in.
 Training yard (1.2): everything above in one place; hold F at the ammo box
 for spare rounds. K (host) puts you down
 to try reviving, G (host) resets the yard.
-Look scene: N day / night. Sound scene: 5, 6, 7 fire the test guns, F4 auto-fire.
+Look scene: N day / night.
 
 GAME CONTROLLER (Xbox names, PlayStation in brackets)
 Left stick move, right stick aim, LT (L2) aim, RT (R2) fire,
