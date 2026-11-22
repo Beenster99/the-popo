@@ -33,3 +33,4 @@ sfx/glass_break_1.wav,breaking/bfh1_glass_breaking_01.ogg (https://opengameart.o
 sfx/glass_break_2.wav,breaking/bfh1_glass_breaking_03.ogg (https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx),CC0 1.0 (public domain),glass break
 sfx/glass_break_3.wav,raw/glass_breaking.wav (https://opengameart.org/content/glass-break),CC0 1.0 (public domain),glass break
 sfx/car_horn_1.wav,Made by tools/audio/make_horn.py,Project's own (no third-party audio),"two-tone car horn, loops"
+sfx/ping_1.wav,Made by tools/audio/make_ping.py,Project's own (no third-party audio),ping chime

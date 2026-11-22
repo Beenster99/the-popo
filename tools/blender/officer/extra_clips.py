@@ -82,10 +82,16 @@ def crouch_idle(rig, A):
         A.rot('chest', f, 6 + b * 1.5, 0, 0)
         A.rot('neck', f, -12, 0, 0)
         A.rot('head', f, -10, 0, 0)
-        A.pos('foot_ik.L', f, 0.16, -0.22, 0.10)
-        A.rot('foot_ik.L', f, 0, 0, 6)
-        A.pos('foot_ik.R', f, -0.15, 0.20, 0.13)
-        A.rot('foot_ik.R', f, 40, 0, -8)
+        # Feet apart and flat, left a little ahead: a balanced low crouch.
+        # (Narrow feet with the right one tucked behind on its toes read as
+        # crossed legs from the iso camera.)
+        A.pos('foot_ik.L', f, 0.20, -0.12, 0.10)
+        A.rot('foot_ik.L', f, 0, 0, 10)
+        A.pos('foot_ik.R', f, -0.20, 0.10, 0.10)
+        A.rot('foot_ik.R', f, 8, 0, -12)
+        # Knees point out over the feet, not in toward each other.
+        A.loc('knee_pole.L', f, 0.15, 0, 0)
+        A.loc('knee_pole.R', f, -0.15, 0, 0)
         K.low_ready(A, f, breathe=b)
         A.loc('hips', f, 0, 0.06, -0.42)
         A.rot('hips', f, 18, 0, 0)
@@ -115,6 +121,8 @@ def crouch_walk(rig, A):
         ph = 2 * math.pi * t / N
         A.loc('hips', t + 1, 0.025 * math.cos(ph), 0.04, -0.40 + 0.015 * math.cos(2 * ph))
         A.rot('hips', t + 1, 20, 0, -6 * math.cos(ph))
+        A.loc('knee_pole.L', t + 1, 0.12, 0, 0)
+        A.loc('knee_pole.R', t + 1, -0.12, 0, 0)
         A.rot('spine', t + 1, 10, 0, 3 * math.cos(ph))
         A.rot('chest', t + 1, 8, 0, 3 * math.cos(ph))
         A.rot('neck', t + 1, -14, 0, 0)

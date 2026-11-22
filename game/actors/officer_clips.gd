@@ -13,6 +13,10 @@ const ROOT_MOTION_CLIPS := ["roll", "mantle", "climb", "slide"]
 static var _library: AnimationLibrary
 static var _curves := {}       # clip -> {length, points: PackedVector3Array at 30 Hz (model space, metres)}
 static var mocap_clips: Array = []
+## Clips whose hips rise is taken out of the pose and given to the body
+## instead, so blending out of them never leaves the model hanging high.
+const LIFT_CLIPS := ["climb"]
+static var _lifts := {}        # clip -> {points: PackedFloat32Array at 30 Hz, done: seconds}
 
 
 ## Returns the merged library (cached). skeleton_path is the track prefix.
@@ -46,7 +50,77 @@ static func library(template: AnimationPlayer, skeleton: Skeleton3D) -> Animatio
 				_library.add_animation("hk_aim_hold", _library.get_animation("aim_hold"))
 				_library.remove_animation("aim_hold")
 			_library.add_animation("aim_hold", slice(_library.get_animation("aim"), 2.05, 3.95))
+	for n in LIFT_CLIPS:
+		if _library.has_animation(n):
+			var flat := _library.get_animation(n).duplicate(true)
+			# "Up" in the hips' parent space (the rig's bones are not Y up).
+			var hb := skeleton.find_bone("hips")
+			var par := skeleton.get_bone_parent(hb)
+			var up := Vector3.UP
+			if par >= 0:
+				up = (skeleton.get_bone_global_rest(par).basis.inverse() * Vector3.UP).normalized()
+			_lifts[n] = _strip_lift(flat, up)
+			_library.remove_animation(n)
+			_library.add_animation(n, flat)
 	return _library
+
+
+## Takes the hips' rise out of a clip (in place) and returns it as a curve.
+static func _strip_lift(a: Animation, up: Vector3) -> Dictionary:
+	var tr := -1
+	for i in a.get_track_count():
+		if a.track_get_type(i) == Animation.TYPE_POSITION_3D and String(a.track_get_path(i).get_concatenated_subnames()) == "hips":
+			tr = i
+	var pts := PackedFloat32Array()
+	if tr < 0:
+		return {"points": pts, "done": a.length}
+	var y0 := a.position_track_interpolate(tr, 0.0).dot(up)
+	var n := int(a.length * 30.0) + 1
+	var keys: Array = []
+	for k in n:
+		var tt := minf(k / 30.0, a.length)
+		var p := a.position_track_interpolate(tr, tt)
+		var h := p.dot(up) - y0
+		pts.append(maxf(0.0, h))
+		keys.append([tt, p - up * h])
+	for k in range(a.track_get_key_count(tr) - 1, -1, -1):
+		a.track_remove_key(tr, k)
+	for kv in keys:
+		a.position_track_insert_key(tr, kv[0], kv[1])
+	# The move is done once the hips have finished rising.
+	var top := pts[pts.size() - 1]
+	var done := a.length
+	for k in n:
+		if top > 0.05 and pts[k] >= top * 0.995:
+			done = minf(a.length, k / 30.0 + 0.05)
+			break
+	return {"points": pts, "done": done}
+
+
+## How far a clip has lifted the hips at time t (0 for clips without a lift).
+static func lift(clip: String, t: float) -> float:
+	if _library == null:
+		_ensure_loaded()
+	if not _lifts.has(clip) or _lifts[clip].points.is_empty():
+		return 0.0
+	var pts: PackedFloat32Array = _lifts[clip].points
+	var f := clampf(t * 30.0, 0.0, pts.size() - 1.001)
+	var i := int(f)
+	return lerpf(pts[i], pts[min(i + 1, pts.size() - 1)], f - i)
+
+
+## The full lift of a clip.
+static func lift_total(clip: String) -> float:
+	return lift(clip, 999.0)
+
+
+## How long a move lasts in play: lift clips end once the body is up.
+static func move_length(clip: String) -> float:
+	if _library == null:
+		_ensure_loaded()
+	if _lifts.has(clip):
+		return _lifts[clip].done
+	return clip_length(clip)
 
 
 ## A looping copy of part of a clip, keys shifted to start at zero.

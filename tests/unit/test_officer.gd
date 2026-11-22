@@ -129,3 +129,105 @@ func test_feet_step_round_instead_of_twisting() -> void:
 	await _run(o, cmd, 40)
 	t.check(absf(angle_difference(o.rotation.y, 2.0)) < 0.15, "ends facing the aim: %f" % o.rotation.y)
 	t.check(not o.turning, "stops turning")
+
+
+## The model must not hang in the air or drop when a climb ends.
+func test_climb_ends_without_a_drop() -> void:
+	var o := _officer()
+	ProtoWorld.block(self, Vector3(3, 2.0, 3), Vector3(0, 1.0, 2.2), Color.GRAY)
+	await _run(o, _cmd(Vector2(0, 1)), 8)
+	await _run(o, _cmd(Vector2(0, 1), PlayerInput.JUMP), 1)
+	var sk := o.rig.skeleton
+	var head := sk.find_bone("head_2")
+	var worst_above := -9.0
+	var worst_step := 0.0
+	var prev := -1.0
+	var ended := -1
+	for i in 200:
+		await _run(o, _cmd(), 1)
+		await get_tree().process_frame
+		var y := (sk.global_transform * sk.get_bone_global_pose(head)).origin.y
+		if prev >= 0.0:
+			worst_step = maxf(worst_step, absf(y - prev))
+		prev = y
+		if ended < 0 and o.state != Officer.S.CLIMB:
+			ended = i
+		if ended >= 0:
+			worst_above = maxf(worst_above, y - o.global_position.y)
+	print("    head above feet after the climb: worst %.2f m, worst frame step %.2f m" % [worst_above, worst_step])
+	t.check(worst_above < 2.0, "head never far above the officer after climbing: %.2f" % worst_above)
+	t.check(worst_step < 0.25, "no jump in head height between frames: %.2f" % worst_step)
+
+
+## The pistol itself points at the reticle (low, high and to the side), and
+## aiming works lying down too.
+func test_gun_points_at_the_reticle() -> void:
+	var o := _officer()
+	await get_tree().process_frame
+	for target in [Vector3(1.5, 0.0, 4.0), Vector3(-2.0, 2.5, 5.0), Vector3(0.0, 1.2, 8.0)]:
+		var cmd := {"move": Vector2.ZERO, "buttons": PlayerInput.AIM, "aim_yaw": atan2(target.x, target.z), "aim_point": target}
+		for i in 50:
+			o.sim_step(cmd, 1.0 / 60.0)
+			await get_tree().process_frame
+		# The rendered gun (it follows the hand after the procedural layers).
+		var sl := o.rig.model.find_child("gun_slide", true, false) as Node3D
+		var dir := -sl.global_basis.y.normalized()
+		var want: Vector3 = (target - o.muzzle_position()).normalized()
+		var err := rad_to_deg(dir.angle_to(want))
+		print("    target %s: barrel off by %.1f deg" % [target, err])
+		t.check(err < 4.0, "barrel points at %s (%.1f deg off)" % [target, err])
+	# Prone: aiming is allowed and the body turns to the aim.
+	await _run(o, _cmd(Vector2.ZERO, PlayerInput.PRONE), 1)
+	var tgt := Vector3(3.0, 0.0, 0.5)
+	var pc := {"move": Vector2.ZERO, "buttons": PlayerInput.AIM, "aim_yaw": atan2(tgt.x, tgt.z), "aim_point": tgt}
+	for i in 90:
+		o.sim_step(pc, 1.0 / 60.0)
+		await get_tree().process_frame
+	t.check(o.state == Officer.S.PRONE and o.is_aiming(), "aiming while prone")
+	t.check(absf(angle_difference(o.rotation.y, pc.aim_yaw)) < 0.15, "prone body turns to the aim")
+
+
+## Crouched (still and moving), each knee stays on its own side.
+func test_crouch_knees_do_not_cross() -> void:
+	var o := _officer()
+	await get_tree().process_frame
+	o._set_state(Officer.S.CROUCH)
+	var sk := o.rig.skeleton
+	for mv in [Vector2.ZERO, Vector2(0, 1)]:
+		for i in 40:
+			o.sim_step(_cmd(mv), 1.0 / 60.0)
+			await get_tree().process_frame
+		var kl := sk.get_bone_global_pose(sk.find_bone("shin.L")).origin.x
+		var kr := sk.get_bone_global_pose(sk.find_bone("shin.R")).origin.x
+		t.check(kl > 0.05 and kr < -0.05, "knees apart while crouched (%s): L %.2f R %.2f" % [mv, kl, kr])
+
+
+## Cover: tucks the whole body in behind the end of a wall, stays hidden
+## while moving toward the end, and leans out only while aiming.
+func test_cover_hides_and_peeks_on_aim() -> void:
+	var o := _officer(Vector3(0.1, 0, 0))
+	# A tall wall ahead (facing +Z) whose right end (-X) is 0.1 m from the officer.
+	ProtoWorld.block(self, Vector3(3, 2.2, 0.3), Vector3(1.5, 1.1, 1.0), Color.GRAY)
+	await _run(o, _cmd(), 5)
+	await _run(o, _cmd(Vector2.ZERO, PlayerInput.COVER), 1)
+	await _run(o, _cmd(), 5)
+	t.check(o.state == Officer.S.COVER, "in cover, state %s" % Officer.S.keys()[o.state])
+	t.check(o.global_position.x > 0.3, "shuffled in behind the wall's end: x=%.2f" % o.global_position.x)
+	await _run(o, _cmd(Vector2(-1, 0)), 60)
+	t.check(o.global_position.x > 0.3, "stays hidden at the end of the wall: x=%.2f" % o.global_position.x)
+	var hidden_x := o.global_position.x
+	var aim := {"move": Vector2.ZERO, "buttons": PlayerInput.AIM, "aim_yaw": 0.0, "aim_point": Vector3(-1, 1.2, 8)}
+	await _run(o, aim, 40)
+	t.check(o.global_position.x < hidden_x - 0.4, "leans out past the end while aiming: x=%.2f" % o.global_position.x)
+	await _run(o, _cmd(), 40)
+	t.check(absf(o.global_position.x - hidden_x) < 0.1, "back in cover when the aim is let go: x=%.2f" % o.global_position.x)
+	# A low wall: crouch behind it, stand to aim over.
+	var p := _officer(Vector3(10, 0, 0))
+	ProtoWorld.block(self, Vector3(3, 1.0, 0.3), Vector3(10, 0.5, 1.0), Color.GRAY)
+	await _run(p, _cmd(), 5)
+	await _run(p, _cmd(Vector2.ZERO, PlayerInput.COVER), 1)
+	await _run(p, _cmd(), 3)
+	t.check(p.state == Officer.S.COVER and p._cover_low, "low cover")
+	t.check(p.rig._lower_state(p) == "crouch_idle", "crouched behind low cover")
+	await _run(p, aim, 3)
+	t.check(p.rig._lower_state(p) == "idle" and p.rig._upper_state(p) == "aim_hold", "stands and aims over it")

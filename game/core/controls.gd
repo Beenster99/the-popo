@@ -11,9 +11,10 @@ const KEYS := {
 	"move_right": [KEY_D],
 	"sprint": [KEY_SHIFT],
 	"jump": [KEY_SPACE],          # jump, mantle, vault, climb
+	"stance": [KEY_CTRL],         # tap crouch / stand, hold prone, hold while running roll
 	"crouch": [KEY_C],
 	"prone": [KEY_Z],
-	"dive": [KEY_CTRL],           # roll when moving, slide when sprinting
+	"dive": [KEY_X],              # roll when moving, slide when sprinting
 	"cover": [KEY_R],
 	"punch": [KEY_V],
 	"kick": [KEY_B],
@@ -31,6 +32,7 @@ const KEYS := {
 const MOUSE := {
 	"fire": [MOUSE_BUTTON_LEFT],
 	"aim": [MOUSE_BUTTON_RIGHT],
+	"ping": [MOUSE_BUTTON_MIDDLE],
 	"cam_zoom_in": [MOUSE_BUTTON_WHEEL_UP],
 	"cam_zoom_out": [MOUSE_BUTTON_WHEEL_DOWN],
 }
@@ -47,6 +49,7 @@ const PAD_BUTTONS := {
 	"kick": [JOY_BUTTON_RIGHT_STICK],       # R3
 	"sprint": [JOY_BUTTON_LEFT_STICK],      # L3
 	"interact": [JOY_BUTTON_BACK],          # View (Share)
+	"ping": [JOY_BUTTON_TOUCHPAD],          # (touchpad)
 	"cam_rotate_left": [JOY_BUTTON_DPAD_LEFT],
 	"cam_rotate_right": [JOY_BUTTON_DPAD_RIGHT],
 	"cam_zoom_in": [JOY_BUTTON_DPAD_UP],
@@ -70,12 +73,16 @@ const PAD_AXES := {
 const REBINDABLE := [
 	["move_forward", "Move forward"], ["move_back", "Move back"], ["move_left", "Move left"],
 	["move_right", "Move right"], ["sprint", "Sprint"], ["jump", "Jump / vault / climb"],
+	["stance", "Tap crouch / stand, hold prone, hold while running roll"],
 	["crouch", "Crouch"], ["prone", "Lie prone"], ["dive", "Roll (slide when sprinting)"],
 	["cover", "Take cover"], ["punch", "Punch"], ["kick", "Kick"], ["interact", "Use / enter car"],
-	["aim", "Aim"], ["fire", "Fire"], ["horn", "Car horn"], ["handbrake", "Handbrake"],
+	["aim", "Aim / peek from cover"], ["fire", "Fire"], ["ping", "Ping a spot for everyone"], ["horn", "Car horn"], ["handbrake", "Handbrake"],
 	["cam_rotate_left", "Rotate camera left"], ["cam_rotate_right", "Rotate camera right"],
 ]
 const SAVE_PATH := "user://controls.cfg"
+## Bumped when the defaults change in a way that clashes with old saved
+## changes (v0.1.2 moved roll off Ctrl), so old files are ignored.
+const SAVE_VERSION := 2
 
 
 func _enter_tree() -> void:
@@ -169,6 +176,7 @@ static func reset_to_defaults() -> void:
 
 static func _save() -> void:
 	var cfg := ConfigFile.new()
+	cfg.set_value("meta", "version", SAVE_VERSION)
 	for pair in REBINDABLE:
 		var ev := pc_event(pair[0])
 		if ev is InputEventKey:
@@ -181,6 +189,8 @@ static func _save() -> void:
 static func _load_overrides() -> void:
 	var cfg := ConfigFile.new()
 	if cfg.load(SAVE_PATH) != OK or not cfg.has_section("keys"):
+		return
+	if int(cfg.get_value("meta", "version", 1)) != SAVE_VERSION:
 		return
 	for action in cfg.get_section_keys("keys"):
 		if not InputMap.has_action(action):

@@ -158,7 +158,14 @@ func update_from(o: Officer, delta: float) -> void:
 	tree.set("parameters/ts_mantle/scale", Officer.MANTLE_PLAYBACK)
 	tree.set("parameters/ts_climb/scale", Officer.CLIMB_PLAYBACK)
 	tree.set("parameters/ts_slide/scale", 1.2)
-	procedural.aim_yaw_offset = angle_difference(o.rotation.y, o.aim_yaw) if o.is_aiming() else 0.0
+	procedural.aim_yaw_offset = angle_difference(o.rotation.y, o.aim_yaw) if o.is_aiming() and o.state != Officer.S.PRONE else 0.0
+	procedural.aim_active = o.is_aiming() and o.aim_point != Vector3.ZERO
+	procedural.aim_target = o.aim_point
+	if not procedural.have_slide:
+		var sl := model.find_child("gun_slide", true, false) as Node3D
+		if sl and sl.get_parent() is BoneAttachment3D:
+			procedural.slide_rel = (sl.get_parent() as Node3D).global_transform.affine_inverse() * sl.global_transform
+			procedural.have_slide = true
 	procedural.feet_enabled = o.state in [Officer.S.MOVE, Officer.S.CROUCH, Officer.S.COVER]
 	procedural.hand_lock = o.is_aiming()
 	procedural.ground_y = o.global_position.y
@@ -181,14 +188,21 @@ func _lower_state(o: Officer) -> String:
 		Officer.S.AIR: return "jump" if o.velocity.y > 0.5 else "fall"
 		Officer.S.PRONE: return "crawl" if hs > 0.1 else "prone_idle"
 		Officer.S.CROUCH: return "crouch_walk" if hs > 0.2 else "crouch_idle"
-		Officer.S.COVER: return "peek" if o.is_aiming() else ("crouch_walk" if hs > 0.2 else "cover_idle")
+		Officer.S.COVER:
+			if o.is_aiming():
+				return "walk" if hs > 0.2 else "idle"
+			if o._cover_low:
+				return "crouch_walk" if hs > 0.2 else "crouch_idle"
+			return "crouch_walk" if hs > 0.2 else "cover_idle"
 	if hs < 0.2:
 		return "walk" if o.turning else "idle"
 	return "walk" if hs < 2.2 else "run"
 
 
 func _upper_state(o: Officer) -> String:
-	if o.state in [Officer.S.ROLL, Officer.S.SLIDE, Officer.S.VAULT, Officer.S.CLIMB, Officer.S.PRONE, Officer.S.KICK, Officer.S.COVER]:
+	if o.state in [Officer.S.ROLL, Officer.S.SLIDE, Officer.S.VAULT, Officer.S.CLIMB, Officer.S.PRONE, Officer.S.KICK]:
+		return "none"
+	if o.state == Officer.S.COVER and not o.is_aiming():
 		return "none"
 	if o.punch_t > 0.0:
 		return "punch"

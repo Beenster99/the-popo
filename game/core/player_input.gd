@@ -14,6 +14,16 @@ const AIM := 256
 const FIRE := 512
 const INTERACT := 1024
 const ALT_TOOL := 2048  # weapon slot 2 (demolition charge in the destruction spike)
+const STAND := 4096    # stand up from crouch or prone
+
+## The stance key (Ctrl): tap to crouch or stand back up, hold to lie prone,
+## hold while running to roll (slide when sprinting). It is turned into the
+## one-tick CROUCH / PRONE / DIVE / STAND presses the officer already knows.
+const STANCE_HOLD := 0.3        # s held before a hold counts as prone
+const STANCE_DIVE_HOLD := 0.12  # s held while running before rolling
+const RUNNING_SPEED := 2.5      # m/s
+static var _stance_down_at := -1.0
+static var _stance_used := false
 
 static var alt_tool := false
 ## Where the local player is aiming, for the reticle.
@@ -39,6 +49,7 @@ static func sample(cam: IsoCamera, from: Node3D) -> Dictionary:
 	for a in _MAP:
 		if Input.is_action_pressed(a):
 			buttons |= _MAP[a]
+	buttons |= stance_buttons(Input.is_action_pressed("stance"), Time.get_ticks_msec() / 1000.0, from)
 	if Input.is_action_just_pressed("weapon_1"):
 		alt_tool = false
 	elif Input.is_action_just_pressed("weapon_2"):
@@ -74,3 +85,31 @@ static func sample(cam: IsoCamera, from: Node3D) -> Dictionary:
 		var d2 := point - from.global_position
 		aim_yaw = atan2(d2.x, d2.z)
 	return {"move": Vector2(world.x, world.z), "buttons": buttons, "aim_yaw": aim_yaw, "aim_point": point}
+
+
+## Turns the stance key into officer presses. held: the key is down now;
+## now: seconds; pawn: the local officer (for its stance and speed).
+static func stance_buttons(held: bool, now: float, pawn: Node3D) -> int:
+	var st := -1
+	var speed := 0.0
+	if pawn is Officer:
+		st = (pawn as Officer).state
+		speed = Vector2(pawn.velocity.x, pawn.velocity.z).length()
+	if held and _stance_down_at < 0.0:
+		_stance_down_at = now
+		_stance_used = false
+	if held:
+		var t := now - _stance_down_at
+		if not _stance_used:
+			if speed > RUNNING_SPEED and st == Officer.S.MOVE and t >= STANCE_DIVE_HOLD:
+				_stance_used = true
+				return DIVE
+			if t >= STANCE_HOLD:
+				_stance_used = true
+				return PRONE if st != Officer.S.PRONE else 0
+		return 0
+	if _stance_down_at >= 0.0:
+		_stance_down_at = -1.0
+		if not _stance_used:
+			return STAND if st in [Officer.S.CROUCH, Officer.S.PRONE, Officer.S.COVER] else CROUCH
+	return 0
