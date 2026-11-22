@@ -1,0 +1,7 @@
+.godot/
+/build/
+*.tmp
+*.blend1
+/tools/blender/out/
+.DS_Store
+Thumbs.db
