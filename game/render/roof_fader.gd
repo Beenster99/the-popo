@@ -78,6 +78,9 @@ func _process(delta: float) -> void:
 		for m in home.meshes:
 			home_meshes[m] = true
 	var cutaway: bool = Settings.values.get("cutaway", true)
+	# Third person: roofs and ceilings stay; only what stands between the
+	# officer and the camera itself turns see-through.
+	var tp := IsoCamera.third_person and cam != null
 	var eye := -view
 	var probes := [p + Vector3(0, 0.3, 0), p + Vector3(0, 1.0, 0), p + Vector3(0, 1.75, 0)]
 	for m in _all:
@@ -89,14 +92,17 @@ func _process(delta: float) -> void:
 		var target := 1.0
 		var kind: String = mi.get_meta("kind")
 		var bottom: float = mi.get_meta("bottom_y")
-		if cutaway and not home.is_empty():
+		if tp:
+			if _between(mi, probes[2], cam.global_position):
+				target = GHOST
+		elif cutaway and not home.is_empty():
 			if home_meshes.has(mi) and bottom > floor_y + 2.0:
 				target = 0.0   # the floors and roof above
 			elif _in_the_way(mi, floor_y, foot, view, home_meshes.has(mi)):
 				# Walls standing on this floor turn see-through, so the room
 				# and its doorways still show; anything else in the way goes.
 				target = GHOST if _on_floor(kind, bottom, floor_y) else 0.0
-		if cutaway and target > GHOST and _hides(mi, p, probes, eye):
+		if not tp and cutaway and target > GHOST and _hides(mi, p, probes, eye):
 			target = GHOST if _on_floor(kind, bottom, floor_y) else 0.0
 		_fade(mi, target, delta)
 		# Hidden pieces are not aimed at (the reticle looks through them).
@@ -151,6 +157,15 @@ static func _is_wall(kind: String) -> bool:
 		if kind.begins_with(k):
 			return true
 	return false
+
+
+## Third person: does this piece cross the line from the officer's head to
+## the camera?
+func _between(mi: MeshInstance3D, head: Vector3, cam_pos: Vector3) -> bool:
+	var box: AABB = mi.get_meta("box")
+	if box.end.y < head.y - 1.2:
+		return false
+	return box.grow(0.05).intersects_segment(head, cam_pos) != null
 
 
 ## Is this piece over the officer's head, or between them and the camera?

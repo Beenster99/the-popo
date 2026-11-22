@@ -91,7 +91,7 @@ static func sample(cam: IsoCamera, from: Node3D) -> Dictionary:
 			using_pad = true
 		elif Input.get_last_mouse_velocity().length() > 50.0:
 			using_pad = false
-		if using_pad:
+		if using_pad and not IsoCamera.third_person:
 			# Right stick: aim along the stick, reticle on the first thing hit.
 			var d := cam.view_relative(stick.normalized()) if stick.length() > 0.0 else Vector3(sin(from.rotation.y), 0, cos(from.rotation.y))
 			var q := PhysicsRayQueryParameters3D.create(chest, chest + d * PAD_AIM_RANGE, 1 | 4 | 16, exclude)

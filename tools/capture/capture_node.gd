@@ -115,6 +115,21 @@ func _run() -> void:
 			await RenderingServer.frame_post_draw
 			get_viewport().get_texture().get_image().save_png("%s-vault.png" % base)
 			print("saved vault")
+		"tp_street", "tp_inside", "tp_aim":
+			# Third-person test view (Tab): street, a room, aiming down the sight line.
+			var s := await _scene("res://prototypes/p08_block/block.tscn")
+			await _frames(10)
+			s.find_children("*", "NetOverlay", false, false)[0].queue_free()
+			var o: Officer = s.sync.my_pawn()
+			IsoCamera.third_person = true
+			if shot == "tp_inside":
+				var b: Dictionary = s.gen.buildings.filter(func(x): return x.enterable and x.storeys >= 2)[0]
+				o.global_position = b.origin + b.u * ((b.w - 0.5) * 4.0) + b.v * ((b.d - 1.5) * 4.0) + Vector3(0, 0.05, 0)
+			if shot == "tp_aim":
+				s.sync.input_source = func(): return {"move": Vector2.ZERO, "buttons": PlayerInput.AIM, "aim_yaw": o.rotation.y, "aim_point": PlayerInput.sample(s.cam, o).aim_point}
+			await _frames(60)
+			await _save()
+			IsoCamera.third_person = false
 		"block_overview", "block_street", "block_inside":
 			var s := await _scene("res://prototypes/p08_block/block.tscn")
 			s.find_children("*", "NetOverlay", false, false)[0].queue_free()
