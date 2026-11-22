@@ -93,6 +93,10 @@ const TREAT_MATE := 1.5       # s for a teammate to treat you
 var injuries := 0
 var pouch := POUCH_MAX
 var treat_t := 0.0
+## Phase 1.4: holding interact next to a suspect who has given up cuffs them.
+const CUFF_TIME := 1.2
+const CUFF_RANGE := 1.6
+var cuff_t := 0.0
 var _rng_inj := RandomNumberGenerator.new()
 var state: S = S.MOVE
 var state_t := 0.0
@@ -330,10 +334,12 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 			velocity.z = f.z * BARGE_SPEED
 	if is_reviving():
 		wish = Vector3.ZERO
-	if state in [S.MOVE, S.CROUCH] and _pressed(PlayerInput.INTERACT) and not is_reviving() and _try_enter_car():
+	if state in [S.MOVE, S.CROUCH] and _pressed(PlayerInput.INTERACT) and not is_reviving() and _try_seat_prisoner():
+		pass
+	elif state in [S.MOVE, S.CROUCH] and _pressed(PlayerInput.INTERACT) and not is_reviving() and _try_enter_car():
 		return
 	_boot_and_treat(delta)
-	if treat_t > 0.0 or _boot_t > 0.0:
+	if treat_t > 0.0 or _boot_t > 0.0 or cuff_t > 0.0:
 		wish = Vector3.ZERO
 
 	# Speed for the current stance.
@@ -542,7 +548,20 @@ func _boot_and_treat(delta: float) -> void:
 	if not held:
 		_boot_t = 0.0
 		treat_t = 0.0
+		cuff_t = 0.0
 		return
+	# A suspect on their knees close by: cuffs first.
+	var cs := cuff_target()
+	if cs:
+		_boot_t = 0.0
+		treat_t = 0.0
+		cuff_t += delta
+		if cuff_t >= CUFF_TIME:
+			cuff_t = 0.0
+			if Net.is_host():
+				cs.cuff(self)
+		return
+	cuff_t = 0.0
 	var at_boot := false
 	for c in get_tree().get_nodes_in_group("police_cars"):
 		var bp: Vector3 = (c as PoliceCar).boot_point()
@@ -571,6 +590,69 @@ func _boot_and_treat(delta: float) -> void:
 		treat_t = 0.0
 		if target.treat_one() != "":
 			pouch -= 1
+
+
+## A suspect close by who has given up (or whose escort is gone): holding
+## interact cuffs them, or takes them over.
+func cuff_target() -> Suspect:
+	if not is_inside_tree():
+		return null
+	for n in get_tree().get_nodes_in_group("suspects"):
+		var s := n as Suspect
+		if s == null or s.global_position.distance_to(global_position) > CUFF_RANGE:
+			continue
+		if s.state == Suspect.S.SURRENDER:
+			return s
+		if s.state == Suspect.S.CUFFED and s.escort_peer != peer_id and not _escort_here(s):
+			return s
+	return null
+
+
+func _escort_here(s: Suspect) -> bool:
+	for n in get_tree().get_nodes_in_group("officers"):
+		var o := n as Officer
+		if o and o.peer_id == s.escort_peer and o.state not in [S.DOWNED, S.VEHICLE] \
+				and o.global_position.distance_to(s.global_position) < 12.0:
+			return true
+	return false
+
+
+## The suspect this officer is walking in, if any.
+func prisoner() -> Suspect:
+	if not is_inside_tree():
+		return null
+	for n in get_tree().get_nodes_in_group("suspects"):
+		var s := n as Suspect
+		if s and s.state == Suspect.S.CUFFED and s.escort_peer == peer_id and s.global_position.distance_to(global_position) < 5.0:
+			return s
+	return null
+
+
+## Interact at a police car door while walking a prisoner: they go in the
+## back (or the front passenger seat if the back is full).
+func _try_seat_prisoner() -> bool:
+	var pr := prisoner()
+	if pr == null:
+		return false
+	var best: PoliceCar = null
+	var best_d := ENTER_RANGE + 0.4
+	for c in get_tree().get_nodes_in_group("police_cars"):
+		var pc := c as PoliceCar
+		for i in 4:
+			var dp := pc.door_point(i)
+			var d := Vector2(dp.x - global_position.x, dp.z - global_position.z).length()
+			if d < best_d:
+				best_d = d
+				best = pc
+	if best == null:
+		return false
+	var taken := best.occupants()
+	for s in [2, 3, 1]:
+		if not taken.has(s):
+			if Net.is_host():
+				pr.put_in_car(best, s)
+			return true
+	return false
 
 
 ## Who holding interact would treat: a wounded teammate close by first.
@@ -1249,6 +1331,7 @@ func encode_state(b: StreamPeerBuffer) -> void:
 	b.put_u8(injuries | (pouch << 4))
 	b.put_half(treat_t)
 	b.put_half(_boot_t)
+	b.put_half(cuff_t)
 
 
 func decode_state(b: StreamPeerBuffer) -> Dictionary:
@@ -1262,7 +1345,7 @@ func decode_state(b: StreamPeerBuffer) -> Dictionary:
 		"cl": b.get_u8(),
 		"ammo": b.get_u8(), "rs": b.get_u8(), "rl": b.get_half(), "ht": b.get_half(), "cd": b.get_half(), "bl": b.get_half(),
 		"hp": b.get_u8(), "rv": b.get_half(), "bg": b.get_u8() == 1, "sg": b.get_half(),
-		"car": b.get_8(), "seat": b.get_u8() - 1, "inj": b.get_u8(), "tr": b.get_half(), "bt": b.get_half(),
+		"car": b.get_8(), "seat": b.get_u8() - 1, "inj": b.get_u8(), "tr": b.get_half(), "bt": b.get_half(), "cf": b.get_half(),
 	}
 
 
@@ -1302,6 +1385,7 @@ func apply_state(s: Dictionary) -> void:
 	pouch = s.inj >> 4
 	treat_t = s.tr
 	_boot_t = s.bt
+	cuff_t = s.cf
 	seat = s.seat
 	car = null
 	if s.car >= 0 and is_inside_tree():

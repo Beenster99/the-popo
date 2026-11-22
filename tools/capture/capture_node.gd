@@ -245,6 +245,54 @@ func _run() -> void:
 			await RenderingServer.frame_post_draw
 			get_viewport().get_texture().get_image().save_png("%s-wrecked.png" % base)
 			print("saved patrol")
+		"dispatch":
+			# Phase 1.4: a robbery call, a suspect giving up, one cuffed, and
+			# the custody bay.
+			var s := await _scene("res://prototypes/p08_block/block.tscn")
+			s.find_children("*", "NetOverlay", false, false)[0].queue_free()
+			var o: Officer = null
+			for i in 400:
+				await get_tree().physics_frame
+				o = s.sync.my_pawn()
+				if o and s.nav.ready_to_use and not s.dispatch.hide_spots.is_empty():
+					break
+			var box := {"cmd": {"move": Vector2.ZERO, "buttons": 0, "aim_yaw": 0.0}}
+			s.sync.input_source = func(): return box.cmd
+			var base := out.get_basename()
+			var id: int = s.dispatch.start_call(Dispatcher.Kind.ROBBERY)
+			var call: Dictionary = s.dispatch.calls[id]
+			var a: Suspect = s.dispatch.suspects[call.suspects[0]]
+			var b: Suspect = s.dispatch.suspects[call.suspects[1]]
+			s.cam.zoom = 20.0
+			await _frames(60)
+			await RenderingServer.frame_post_draw
+			get_viewport().get_texture().get_image().save_png("%s-call.png" % base)
+			# Close up: one on their knees, one cuffed behind the officer.
+			var spot: Vector3 = s.nav.closest(Vector3(24, BlockGenerator.BASE_Y + 0.05, -1.5))
+			o.global_position = spot
+			o.rotation.y = 0.0
+			a.global_position = spot + Vector3(1.6, 0, 1.4)
+			a.rotation.y = PI
+			a.set_state(Suspect.S.SURRENDER)
+			b.global_position = spot + Vector3(-0.3, 0, -1.2)
+			b.cuff(o)
+			s.cam.zoom = 7.0
+			s.cam.global_position = spot
+			await _frames(90)
+			await RenderingServer.frame_post_draw
+			get_viewport().get_texture().get_image().save_png("%s-arrest.png" % base)
+			# Prisoner in the back of a police car at the custody bay.
+			var pc: PoliceCar = s.cars.cars[0]
+			var bay: Vector3 = s.dispatch.bay_position()
+			pc.global_position = Vector3(bay.x, 1.0, bay.z + 6.0)
+			pc.rotation.y = PI
+			b.put_in_car(pc, 2)
+			o.global_position = bay + Vector3(-3.0, 0.2, 3.0)
+			s.cam.zoom = 14.0
+			await _frames(60)
+			await RenderingServer.frame_post_draw
+			get_viewport().get_texture().get_image().save_png("%s-bay.png" % base)
+			print("saved dispatch ", Suspect.S.keys()[a.state], " ", Suspect.S.keys()[b.state])
 		"yard":
 			var s := await _scene("res://prototypes/p09_yard/yard.tscn")
 			s.find_children("*", "NetOverlay", false, false)[0].queue_free()

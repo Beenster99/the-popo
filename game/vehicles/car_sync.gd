@@ -29,6 +29,9 @@ var sync: PawnSync            # only for its clock when present
 ## Drivers come from the officers in the driver's seats (Phase 1.3), instead
 ## of one car per player slot (the Phase 0.4 car spike).
 var use_seats := false
+## Host: inputs for cars nobody is driving, by car index (the traffic stop's
+## speeding car). Without one, an empty car is parked with the handbrake on.
+var ai_inputs := {}
 var _owner := {}              # car index -> peer id
 var _buffers := {}            # car index -> [[time, state]]
 var _inputs := {}             # host: car index -> latest input dict
@@ -152,7 +155,9 @@ func _physics_process(delta: float) -> void:
 	if use_seats and Net.is_host():
 		# Nobody at the wheel: the car is parked with the handbrake on.
 		for i in cars.size():
-			if car_for_driver_missing(i):
+			if car_for_driver_missing(i) and ai_inputs.has(i):
+				_inputs[i] = ai_inputs[i]
+			elif car_for_driver_missing(i):
 				_inputs[i] = {"throttle": 0.0, "steer": 0.0, "handbrake": true, "horn": false,
 					"lights": cars[i].get("lights") == true, "siren": int(cars[i].get("siren")) if cars[i].get("siren") != null else 0}
 	if Net.is_host():

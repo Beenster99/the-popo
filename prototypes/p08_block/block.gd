@@ -1,6 +1,7 @@
 extends Node3D
 ## The game for now (Single Player and Online start here): a generated city
-## block with two police cars parked on the north road.
+## block with two police cars parked on the north road, and (Phase 1.4) the
+## dispatcher: calls, suspects, the custody bay and the crime level.
 ## Phase 1.1: a generated city block. Roads, pavements and 4 to 6 buildings
 ## from the Wave 1 kit, laid out from a seed; two of them can be entered
 ## (rooms, stairs, upper floor). Everything is breakable: 1 pistol,
@@ -20,6 +21,9 @@ var world: DestructionWorld
 var fader: RoofFader
 var gen: BlockGenerator
 var cars: CarSync
+var nav: BlockNav
+var dispatch: Dispatcher
+var civ_car: Car
 var seed_value := 0
 
 
@@ -53,6 +57,11 @@ func _ready() -> void:
 	add_child(world)
 	fader = RoofFader.new()
 	add_child(fader)
+	# Phase 1.4: calls, suspects and the crime level (before the block is built,
+	# which hands it the layout).
+	dispatch = Dispatcher.new()
+	dispatch.name = "Dispatcher"
+	add_child(dispatch)
 	Net.register(MSG_SEED_ASK, _on_seed_ask)
 	Net.register(MSG_SEED, _on_seed)
 	if Net.is_host():
@@ -69,11 +78,15 @@ func _ready() -> void:
 	var hud := AmmoHud.new()
 	hud.pawn_getter = func(): return sync.my_pawn()
 	add_child(hud)
+	var dhud := DispatchHud.new()
+	dhud.dispatcher = dispatch
+	dhud.pawn_getter = func(): return sync.my_pawn()
+	add_child(dhud)
 	var overlay := NetOverlay.new()
 	overlay.extra_lines = func():
 		var o: Officer = sync.my_pawn()
 		var state: String = Officer.S.keys()[o.state] if o else "-"
-		return "block seed %d   %d pieces   %s\n1 pistol  2 charge [%s]   G new block (host)   %s" % [
+		return "block seed %d   %d pieces   %s\n1 pistol  2 charge [%s]   G new block (host)   J call in a job (host)   %s" % [
 			seed_value, world.pieces.size(), state, "charge" if PlayerInput.alt_tool else "pistol",
 			Controls.help(["stance", "cover", "aim", "fire", "reload", "kick", "interact"])]
 	add_child(overlay)
@@ -101,7 +114,20 @@ func _build(s: int) -> void:
 		pc.rotation_degrees.y = c[1]
 		add_child(pc)
 		cars.add_car(pc)
+	# The traffic stop's car, parked on the south road between calls.
+	civ_car = Car.new()
+	civ_car.color = Color("2f5f9a")
+	civ_car.position = Vector3(20, 0.95, 54)
+	civ_car.rotation_degrees.y = -90.0
+	add_child(civ_car)
+	cars.add_car(civ_car)
 	add_child(sync)
+	nav = BlockNav.new()
+	nav.name = "BlockNav"
+	add_child(nav)
+	if Net.is_host():
+		nav.bake_from(self)
+	dispatch.setup(gen, world, cars, nav, civ_car)
 	# Camera starts over the first enterable building's door.
 	cam.global_position = _spawn_point(0)
 
@@ -134,6 +160,9 @@ func _on_fired(origin: Vector3, dir: Vector3, alt: bool, shooter: Officer) -> vo
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
+	if event.is_pressed() and not event.is_echo() and (event as InputEventKey).physical_keycode == KEY_J and Net.is_host() and dispatch:
+		# Host: call in the next job now (testing).
+		dispatch.start_call(dispatch._pick_kind())
 	if event.is_pressed() and not event.is_echo() and (event as InputEventKey).physical_keycode == KEY_G and Net.is_host():
 		next_seed = randi_range(1, 999999)
 		Net.load_scene_for_all(SCENE)
