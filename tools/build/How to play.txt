@@ -12,7 +12,7 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
-SMOKE, GAS AND GRENADES
+SMOKE, GAS AND GRENADES (0.6.2)
 Buy them at the ARMOURY (Gear): smoke grenades, CS gas and flashbangs. Once
 the station has them, every officer carries two of each, refilled at a
 patrol car's boot or when you respawn.
