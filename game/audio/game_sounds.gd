@@ -368,7 +368,9 @@ func _officer_foley(o: Officer, _delta: float) -> void:
 	# A shot: fewer rounds in the same gun, and not reloading.
 	if gun == st.gun and rounds < st.rounds and o.reload_t <= 0.0:
 		var muzzle := o.muzzle_position()
-		Sfx.shot(parent, muzzle, maxi(gun, 0), own)
+		var kt: Variant = o.get("kit")
+		var weight: float = float(Armoury.pistol_of(int(kt)).weight) if gun == 0 and kt != null else 1.0
+		Sfx.shot(parent, muzzle, maxi(gun, 0), own, weight)
 		eject_casing(o)
 		Feel.muzzle(parent, muzzle, gun == Sfx.SHOTGUN)
 		if own:
@@ -383,9 +385,9 @@ func _officer_foley(o: Officer, _delta: float) -> void:
 		var oid := o.get_instance_id()
 		Sfx.play(parent, "mag_out", p + Vector3(0, 1.1, 0), -6.0, 14.0, 0.04)
 		later(0.35, "mag_drop", p, -4.0, 16.0, 0.08, "", 1.0, oid)
-		later(Officer.RELOAD_TIME * 0.6, "mag_in", p, -5.0, 14.0, 0.04, "", 1.0, oid)
+		later(o.reload_t * 0.6, "mag_in", p, -5.0, 14.0, 0.04, "", 1.0, oid)
 		if empty:
-			later(Officer.RELOAD_TIME * 0.88, "slide_rack", p, -5.0, 14.0, 0.04, "", 1.0, oid)
+			later(o.reload_t * 0.88, "slide_rack", p, -5.0, 14.0, 0.04, "", 1.0, oid)
 	if o.holster_t > 0.0 and st.holster <= 0.0:
 		Sfx.play(parent, "holster", o.global_position + Vector3(0, 1.0, 0), -12.0, 10.0, 0.06)
 	if o.punch_t > 0.3 and st.punch <= 0.0:

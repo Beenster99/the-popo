@@ -12,6 +12,38 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
+POLICE WORK (0.4.0)
+Jobs now depend on where you are and the time of day (the clock is top left:
+a day lasts 48 minutes). Muggings, shoplifters, fights, domestics, drug deals,
+vandals and drunks out on the streets; burglaries, raids, hostage jobs and
+building searches inside, floor by floor. Victims tell you what the suspect
+looks like and which way they went. Some crimes just happen up the street
+without a call: walk up and they're yours.
+Y (d-pad up): shout "Police! Get down!". Unarmed suspects mostly give up on
+the spot; drunks need to be close; armed ones only think about it.
+Big busts: GANG WAR (two crews shooting it out: let them thin each other out,
+then go in) and BANK JOB (armed robbers holding staff, a getaway driver out
+front who drives off when the shooting starts).
+Stories: three running stories (the Vipers gang, Councillor Hale, the Magpie)
+come up between jobs. The same people come back, and if they got away last
+time they're armed and they remember you.
+PAY: every job closed and every suspect brought in pays the station (shown
+next to the clock). Story characters brought in alive pay a bonus.
+THE ARMOURY: walk onto the yellow ARMOURY circle just inside the station door
+and press F. Spend the station's pay on six pistols, bench upgrades (bigger
+mags, compensators, match barrels, speed loaders), hollow point and armour
+piercing rounds, body armour, pouches, a garage, an interceptor, a prisoner
+van, an unmarked car and a firing range. Each of you picks your own pistol,
+rounds and loadout: ammo backpack, breach charges or C4 (press 2, aim and fire
+to stick one on; 1 back to the pistol), or a tactical torch.
+THE RANGE (once bought): out the back of the station. Stand on the blue
+circle and press F for a 30 second run: shoot the red targets, not the blue.
+UNDERCOVER (once plain clothes are bought, from the armoury): crooks take you
+for anyone on the street until you draw your gun, shout, turn up in a marked
+car or hang about too close (watch the suspicion meter). Stings: BAIT CAR
+(let him take it; we shut it down) and SELLING (walk up in plain clothes, hold
+F next to the dealer to buy, then take him).
+
 THE WHOLE CITY (0.3.0)
 The game is now a whole city: six by six blocks, about 370 m across, with
 downtown offices and shops, houses and flats, an industrial district, two

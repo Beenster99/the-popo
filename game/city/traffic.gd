@@ -388,9 +388,11 @@ func _seat_driver(dr: Dictionary) -> void:
 			(mi as GeometryInstance3D).visibility_range_end = 90.0
 		rig.update_pose("sit", "drive", 0.0, 0.016)
 		dr.rig = rig
+		var wr: WeakRef = weakref(rig)   # the city may be gone by then
 		get_tree().create_timer(0.4).timeout.connect(func():
-			if is_instance_valid(rig) and rig.tree:
-				rig.tree.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL)
+			var r := wr.get_ref() as OfficerRig
+			if r and r.tree:
+				r.tree.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL)
 	else:
 		SuspectLook.apply((dr.rig as OfficerRig).model, dr.look)
 	(dr.rig as Node3D).visible = true

@@ -48,6 +48,13 @@ var _tp_height := 1.55
 var _tp_pull := 3.2            # the distance after walls have pushed the camera in
 var _tp_was := false
 var _crosshair: CanvasLayer
+## Wave 3, Phase 3.2: indoors (0..1, eased) the camera comes in closer and
+## tighter to the shoulder and widens a little, so rooms, doorways and
+## stairwells don't fill the screen with wall.
+var _indoor_k := 0.0
+const TP_INDOOR_DIST := 2.0
+const TP_INDOOR_SHOULDER := 0.42
+const TP_INDOOR_FOV := 78.0
 
 
 func _ready() -> void:
@@ -196,7 +203,7 @@ func _process(delta: float) -> void:
 		camera.projection = Camera3D.PROJECTION_PERSPECTIVE if third_person else Camera3D.PROJECTION_ORTHOGONAL
 		camera.fov = TP_FOV
 		camera.near = 0.1 if third_person else 0.5
-		camera.far = 500.0 if third_person else 200.0
+		camera.far = 1000.0 if third_person else 200.0   # Wave 2: the skyline is 470-720 m out
 		if target and is_instance_valid(target):
 			global_position = target.global_position
 			if third_person:
@@ -249,6 +256,13 @@ func _process_third_person(delta: float) -> void:
 			elif o.state in [Officer.S.CROUCH, Officer.S.COVER]:
 				height = 1.15
 		global_position = global_position.lerp(target.global_position, 1.0 - exp(-25.0 * delta))
+		var inside := o != null and o.car == null and Sfx.zone_at(get_tree(), target.global_position + Vector3(0, 1.0, 0)) != null
+		_indoor_k = move_toward(_indoor_k, 1.0 if inside else 0.0, delta * 2.5)
+	if _indoor_k > 0.0:
+		dist = lerpf(dist, minf(dist, TP_INDOOR_DIST), _indoor_k)
+		shoulder = lerpf(shoulder, minf(shoulder, TP_INDOOR_SHOULDER), _indoor_k)
+		height = minf(height, lerpf(height, 1.45, _indoor_k))
+	camera.fov = lerpf(TP_FOV, TP_INDOOR_FOV, _indoor_k)
 	_tp_height = lerpf(_tp_height, height, 1.0 - exp(-10.0 * delta))
 	var b := Basis(Vector3.UP, deg_to_rad(_yaw)) * Basis(Vector3.RIGHT, deg_to_rad(tp_pitch))
 	var pivot := global_position + Vector3(0, _tp_height, 0)

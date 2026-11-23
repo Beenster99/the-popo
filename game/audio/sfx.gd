@@ -265,13 +265,16 @@ static func gunshot(parent: Node, pos: Vector3) -> void:
 ## Close shots also duck the background, and a shot (or blast) right by
 ## your head that is not your own leaves your ears ringing.
 ## kind: 0/1 handgun, 2 shotgun. own: fired by the player listening.
-static func shot(parent: Node, pos: Vector3, kind := 0, own := false) -> void:
+## weight (Phase 3.5): the officer's pistol: a .357 is deeper and booms more,
+## a compact is snappier.
+static func shot(parent: Node, pos: Vector3, kind := 0, own := false, weight := 1.0) -> void:
 	var tree := parent.get_tree()
 	var indoor := zone_at(tree, pos) != null
 	var lis: Variant = listener_position(parent)
 	var d: float = (lis as Vector3).distance_to(pos) if lis != null else 10.0
 	var sg := kind == SHOTGUN
-	var pitch := 0.82 if sg else 1.0
+	var pitch := (0.82 if sg else 1.0) / pow(weight, 0.35)
+	var boom := (weight - 1.0) * 6.0
 	var p: AudioStreamPlayer3D
 	if indoor:
 		p = play(parent, "gun_dry", pos, 5.0, 140.0, 0.04, BUS_INDOOR)
@@ -284,7 +287,7 @@ static func shot(parent: Node, pos: Vector3, kind := 0, own := false) -> void:
 	if p:
 		p.pitch_scale *= pitch
 	if d < 28.0:
-		var thump_db := (6.0 if indoor else 4.0) + (3.0 if sg else 0.0)
+		var thump_db := (6.0 if indoor else 4.0) + (3.0 if sg else 0.0) + boom
 		play(parent, "gun_shotgun_body" if sg else "gun_thump", pos, thump_db, 60.0, 0.08, BUS_INDOOR if indoor else BUS_OUTDOOR)
 	# Wave 2: the front of a close shot cracks like a whip, and a sub-bass
 	# boom underneath you feel in your chest.
@@ -293,7 +296,9 @@ static func shot(parent: Node, pos: Vector3, kind := 0, own := false) -> void:
 		if c and sg:
 			c.pitch_scale *= 0.8
 	if d < 45.0:
-		play(parent, "gun_sub", pos, 7.0 + (3.0 if sg else 0.0) + (2.0 if indoor else 0.0), 90.0, 0.05, BUS_SFX)
+		var sb := play(parent, "gun_sub", pos, 7.0 + (3.0 if sg else 0.0) + (2.0 if indoor else 0.0) + boom, 90.0, 0.05, BUS_SFX)
+		if sb:
+			sb.pitch_scale /= pow(weight, 0.3)
 	# Outdoors the shot rolls round the streets, and from further off that
 	# rolling echo is most of what you hear.
 	if not indoor:

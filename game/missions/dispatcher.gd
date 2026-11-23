@@ -21,8 +21,9 @@ extends Node
 ## No crime meter (beenster, v0.2.11): the job is the calls and whatever
 ## turns up. Arrests and suspects shot count the same: no conduct score.
 
-enum Kind { ROBBERY, ARMED, TRAFFIC, GANG, THEFT, PURSUIT }
-enum CallState { ACTIVE, CLOSED, LOST }
+enum Kind { ROBBERY, ARMED, TRAFFIC, GANG, THEFT, PURSUIT, MUGGING, SHOPLIFT, FIGHT, DOMESTIC, DEAL, VANDAL, DRUNK,
+	BURGLARY, RAID, HOSTAGE, SEARCH, GANGWAR, BANK, BAITCAR, BUY }
+enum CallState { ACTIVE, CLOSED, LOST, HIDDEN }
 
 const MSG_STATE := 80        # host -> all: calls, suspects, dropped guns (10 a second)
 const MSG_RADIO := 81        # host -> all: a line of radio chatter
@@ -40,7 +41,18 @@ const BAY_RADIUS := 4.5
 const BOOK_TIME := 1.2
 ## The speeding car's lap: the middle of the ring road.
 const LAP := [Vector3(-6, 0, -6), Vector3(54, 0, -6), Vector3(54, 0, 54), Vector3(-6, 0, 54)]
-const KIND_NAMES := ["Robbery in progress", "Armed suspect", "Traffic stop", "Shots fired", "Car theft", "Pursuit"]
+const KIND_NAMES := ["Robbery in progress", "Armed suspect", "Traffic stop", "Shots fired", "Car theft", "Pursuit",
+	"Mugging", "Shoplifter", "Fight", "Domestic", "Drug deal", "Vandalism", "Drunk and disorderly",
+	"Burglary", "Raid", "Hostages", "Building search", "Gang war", "Bank job", "Bait car", "Sting: buy"]
+## Phase 3.4: pay. Every job closed pays the station; each suspect brought in
+## (booked or down, the same: no conduct score) pays a bit more. Story
+## characters brought in alive pay a bonus. Spent at the armoury (Phase 3.5).
+const PAY_SUSPECT := 100
+const PAY_STORY_ALIVE := 500
+const PAY_JOB := {Kind.ROBBERY: 200, Kind.ARMED: 250, Kind.TRAFFIC: 150, Kind.GANG: 450, Kind.THEFT: 150,
+	Kind.PURSUIT: 300, Kind.MUGGING: 150, Kind.SHOPLIFT: 100, Kind.FIGHT: 100, Kind.DOMESTIC: 150, Kind.DEAL: 200,
+	Kind.VANDAL: 100, Kind.DRUNK: 80, Kind.BURGLARY: 200, Kind.RAID: 700, Kind.HOSTAGE: 800, Kind.SEARCH: 250,
+	Kind.GANGWAR: 900, Kind.BANK: 1200, Kind.BAITCAR: 500, Kind.BUY: 400}
 ## Wave 2: how long a car thief takes to get into the car.
 const BREAK_IN_TIME := 22.0
 
@@ -72,6 +84,12 @@ var _traffic := {}           # host: {call, phase, t, near_t}
 var _look_counter := 0
 ## Wave 2: the city's traffic (car thefts and chases use its cars).
 var traffic: TrafficSystem
+## Wave 3: templates, the clock and chance encounters.
+var missions: Missions
+var stories: Stories
+## Phase 3.4: the station's earnings (shared by everyone, synced).
+var pay := 0
+signal paid(amount: int, total: int)
 var _thefts := {}            # host: call id -> {dr, suspect, t}
 var guns := {}               # net id -> DroppedGun (everyone)
 var _next_gun_id := 1
@@ -91,6 +109,14 @@ func _ready() -> void:
 	Net.register(MSG_RADIO, _on_radio)
 	Net.register(MSG_SHOT, _on_shot)
 	_build_bay()
+	missions = Missions.new()
+	missions.name = "Missions"
+	missions.dispatcher = self
+	add_child(missions)
+	stories = Stories.new()
+	stories.name = "Stories"
+	stories.dispatcher = self
+	add_child(stories)
 
 
 func _exit_tree() -> void:
@@ -156,6 +182,12 @@ func _active_count() -> int:
 
 
 func _pick_kind() -> Kind:
+	if city and missions:
+		var running: Array = []
+		for c in calls.values():
+			if c.state in [CallState.ACTIVE, CallState.HIDDEN]:
+				running.append(c.kind)
+		return missions.pick_kind(running)
 	var kinds := [Kind.ROBBERY, Kind.ARMED, Kind.TRAFFIC, Kind.GANG]
 	for c in calls.values():
 		if c.state == CallState.ACTIVE:
@@ -173,13 +205,20 @@ func _pick_kind() -> Kind:
 
 
 ## Host: opens a call of this kind. Returns its id (or -1).
-func start_call(kind: Kind) -> int:
+## opts (Wave 3): block (use this block), at (where), hidden (a chance
+## encounter nobody has found yet: no radio until an officer sees it).
+func start_call(kind: Kind, opts := {}) -> int:
 	var c := {"id": _next_call_id, "kind": kind, "state": CallState.ACTIVE, "pos": Vector3.ZERO,
 		"marker": Vector3.ZERO, "t": 0.0, "suspects": [], "text": "", "seen_t": 0.0}
 	if city:
-		if not _pick_area():
+		if opts.has("block"):
+			_use_area(opts.block)
+		elif not _pick_area():
 			return -1
 		c.block = area_block
+	if kind >= Kind.MUGGING:
+		if missions == null or not missions.setup_call(c, opts.get("at", Vector3.INF)):
+			return -1
 	match kind:
 		Kind.ROBBERY:
 			var b := _shop()
@@ -265,7 +304,10 @@ func start_call(kind: Kind) -> int:
 	c.marker = c.pos
 	calls[c.id] = c
 	_next_call_id += 1
-	say("DISPATCH: %s" % c.text)
+	if opts.get("hidden", false):
+		c.state = CallState.HIDDEN
+	else:
+		say("DISPATCH: %s" % c.text)
 	return c.id
 
 
@@ -471,7 +513,12 @@ func _pick_area() -> bool:
 			options.append(k)
 	if options.is_empty():
 		return false
-	area_block = options[_rng.randi_range(0, options.size() - 1)]
+	_use_area(options[_rng.randi_range(0, options.size() - 1)])
+	return true
+
+
+func _use_area(k: int) -> void:
+	area_block = k
 	if not _hide_by_block.has(area_block):
 		hide_spots = []
 		_find_hide_spots()
@@ -479,7 +526,6 @@ func _pick_area() -> bool:
 	hide_spots = _hide_by_block[area_block]
 	var o := _area_offset()
 	lap = LAP.map(func(q): return o + q)
-	return true
 
 
 ## The buildings where calls happen: the area block's (the whole block when
@@ -668,7 +714,18 @@ func book(s: Suspect) -> void:
 		return
 	s.set_state(Suspect.S.BOOKED)
 	s.car = null
-	say("CUSTODY: suspect booked in. Good work.")
+	earn(PAY_SUSPECT)
+	if s.has_meta("story_name"):
+		earn(PAY_STORY_ALIVE)
+		say("CUSTODY: %s booked in, alive and talking. Bonus £%d. Good work." % [s.get_meta("story_name"), PAY_STORY_ALIVE])
+	else:
+		say("CUSTODY: suspect booked in. Good work. +£%d" % PAY_SUSPECT)
+
+
+## Host: money for the station.
+func earn(amount: int) -> void:
+	pay += amount
+	paid.emit(amount, pay)
 
 
 # --- host: calls --------------------------------------------------------------------------
@@ -685,7 +742,8 @@ func _check_calls() -> void:
 				continue
 			if s.state == Suspect.S.DOWN and not s.has_meta("counted"):
 				s.set_meta("counted", true)
-				say("DISPATCH: suspect down.")
+				earn(PAY_SUSPECT)
+				say("DISPATCH: suspect down. +£%d" % PAY_SUSPECT)
 			if not s.is_done():
 				all_done = false
 		# Dispatch keeps the marker on the latest sighting.
@@ -704,7 +762,9 @@ func _check_calls() -> void:
 					break
 		if all_done:
 			c.state = CallState.CLOSED
-			say("DISPATCH: %s call closed. Thanks, units." % KIND_NAMES[c.kind].to_lower())
+			var job: int = PAY_JOB.get(c.kind, 150)
+			earn(job)
+			say("DISPATCH: %s call closed. Thanks, units. +£%d" % [KIND_NAMES[c.kind].to_lower(), job])
 			if c.kind == Kind.TRAFFIC:
 				_traffic.clear()
 		elif c.t > CALL_TIMEOUT:
@@ -853,7 +913,12 @@ func _theft_step(delta: float) -> void:
 		th.t += delta
 		var car: CivilianVehicle = th.dr.car
 		s._face(car.global_position)
-		if th.t > BREAK_IN_TIME and traffic and th.dr.mode == "parked":
+		if th.t > BREAK_IN_TIME and traffic and th.dr.mode == "parked" and th.get("bait", false):
+			# Phase 3.7: he's taken the bait. Missions locks it down.
+			traffic.getaway(th.dr, s)
+			missions.bait_taken(id, th.dr, s)
+			_thefts.erase(id)
+		elif th.t > BREAK_IN_TIME and traffic and th.dr.mode == "parked":
 			traffic.getaway(th.dr, s)
 			calls[id].kind = Kind.PURSUIT
 			say("DISPATCH: they're in the car and away, heading along %s. Pursue." % CityGenerator.street_at(car.global_position))
@@ -911,6 +976,8 @@ func _traffic_bail(_why: String) -> void:
 func _encode_state() -> PackedByteArray:
 	var b := StreamPeerBuffer.new()
 	b.put_double(_clock)
+	b.put_float(missions.minute if missions else 0.0)
+	b.put_u32(pay)
 	var act := calls.values().filter(func(c): return c.state == CallState.ACTIVE)
 	b.put_u8(act.size())
 	for c in act:
@@ -941,6 +1008,13 @@ func _on_state(_from: int, data: PackedByteArray) -> void:
 	var b := StreamPeerBuffer.new()
 	b.data_array = data
 	var t := b.get_double()
+	var mn := b.get_float()
+	var new_pay := b.get_u32()
+	if new_pay != pay:
+		paid.emit(new_pay - pay, new_pay)
+		pay = new_pay
+	if missions and absf(mn - missions.minute) > 2.0:
+		missions.minute = mn
 	var n := b.get_u8()
 	var keep := {}
 	for i in n:

@@ -19,6 +19,7 @@ const RELOAD := 8192
 const HOLSTER := 16384
 const TORCH := 32768   # a state, not a press: the torch is switched on
 const DRAG := 65536    # held: drag a downed teammate by the collar
+const SHOUT := 131072  # "Police! Get down!"
 static var torch_on := false
 
 ## The stance key (Ctrl): tap to crouch or stand back up, hold to lie prone,
@@ -48,7 +49,7 @@ const PAD_AIM_RANGE := 10.0
 const _MAP := {
 	"sprint": SPRINT, "jump": JUMP, "crouch": CROUCH, "prone": PRONE, "dive": DIVE,
 	"cover": COVER, "punch": PUNCH, "kick": KICK, "aim": AIM, "fire": FIRE, "interact": INTERACT,
-	"reload": RELOAD, "holster": HOLSTER, "drag": DRAG,
+	"reload": RELOAD, "holster": HOLSTER, "drag": DRAG, "shout": SHOUT,
 }
 
 

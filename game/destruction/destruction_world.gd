@@ -125,6 +125,7 @@ func add_piece(kind: String, xform: Transform3D, bears := true, tint := Color(0,
 	if not _groups.has(group):
 		_groups[group] = []
 	_groups[group].append(id)
+	_cell_add(id, world_aabb)
 	return id
 
 
@@ -140,6 +141,35 @@ static func surface_for(kind: String) -> String:
 
 
 ## Call once after all pieces are added: works out what rests on what.
+## Wave 3: a grid of 8 m cells over the pieces (id lists), for "what's
+## near here" without looking at every piece in the city.
+const CELL := 8.0
+var _cells := {}
+
+
+func _cell_add(id: int, box: AABB) -> void:
+	var a := Vector2i(floori(box.position.x / CELL), floori(box.position.z / CELL))
+	var b := Vector2i(floori(box.end.x / CELL), floori(box.end.z / CELL))
+	for x in range(a.x, b.x + 1):
+		for z in range(a.y, b.y + 1):
+			var k := Vector2i(x, z)
+			if not _cells.has(k):
+				_cells[k] = []
+			_cells[k].append(id)
+
+
+## Ids of the pieces whose boxes might be within r of p (still standing or not).
+func pieces_near(p: Vector3, r: float) -> Array:
+	var out := {}
+	var a := Vector2i(floori((p.x - r) / CELL), floori((p.z - r) / CELL))
+	var b := Vector2i(floori((p.x + r) / CELL), floori((p.z + r) / CELL))
+	for x in range(a.x, b.x + 1):
+		for z in range(a.y, b.y + 1):
+			for id in _cells.get(Vector2i(x, z), []):
+				out[id] = true
+	return out.keys()
+
+
 func finalize() -> void:
 	# Bucket pieces by the height of their top (5 cm steps), so each piece
 	# only checks the few that could be right under it.
@@ -263,7 +293,8 @@ func explode(at: Vector3, radius: float, damage: float, strength: float) -> void
 	if not Net.is_host():
 		return
 	_send_fx(0, at)
-	for p in pieces.values():
+	for pid in pieces_near(at, radius + 6.0):
+		var p: Dictionary = pieces[pid]
 		if p.state != "intact":
 			continue
 		var d: float = _aabb_distance(p.aabb, at)

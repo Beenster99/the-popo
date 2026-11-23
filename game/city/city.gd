@@ -45,6 +45,11 @@ var traffic: TrafficSystem
 var env: Environment
 var skyline: CitySkyline
 var peds: PedSystem
+## Wave 3, Phase 3.5: what the station has bought, and the vehicles waiting
+## in its yard until it does.
+var armoury: Armoury
+var yard_cars := {}       # armoury item -> PoliceCar
+var _garage: Node3D
 var _alarm_t := 0.0
 var build_ms := 0
 var _names := {}
@@ -86,6 +91,12 @@ func _ready() -> void:
 	dispatch = Dispatcher.new()
 	dispatch.name = "Dispatcher"
 	add_child(dispatch)
+	armoury = Armoury.new()
+	armoury.name = "Armoury"
+	armoury.dispatcher = dispatch
+	armoury.sync = sync
+	add_child(armoury)
+	armoury.changed.connect(_station_grows)
 	Net.register(MSG_SEED_ASK, _on_seed_ask)
 	Net.register(MSG_SEED, _on_seed)
 	Net.register(MSG_FURNISH, _on_furnish)
@@ -117,6 +128,7 @@ func _ready() -> void:
 	add_child(hud)
 	var dhud := DispatchHud.new()
 	dhud.dispatcher = dispatch
+	dhud.armoury = armoury
 	dhud.pawn_getter = func(): return sync.my_pawn()
 	add_child(dhud)
 	var overlay := NetOverlay.new()
@@ -196,6 +208,7 @@ func _build(s: int) -> void:
 		add_child(pc)
 		cars.add_car(pc)
 		police_cars.append(pc)
+	_build_yard(st)
 	# The traffic stop's car, parked on the far side of the station block.
 	civ_car = Car.new()
 	civ_car.color = Color("2f5f9a")
@@ -352,3 +365,128 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if key == KEY_G and Net.is_host():
 		next_seed = randi_range(1, 999999)
 		Net.load_scene_for_all(SCENE)
+
+
+# --- the station grows (Phase 3.5) -------------------------------------------------------
+
+## The armoury counter just inside the door, and the vehicles the station
+## can buy, parked in the yard beside it, locked until it does.
+func _build_yard(st: Dictionary) -> void:
+	var u: Vector3 = st.u
+	var v: Vector3 = st.v
+	var door: Vector3 = st.door
+	armoury.counter = Vector3(door.x, BlockGenerator.BASE_Y, door.z) + v * 2.6
+	var mark := MeshInstance3D.new()
+	var disc := CylinderMesh.new()
+	disc.top_radius = 0.9
+	disc.bottom_radius = 0.9
+	disc.height = 0.02
+	mark.mesh = disc
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(1.0, 0.8, 0.25, 0.55)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mark.material_override = mat
+	mark.position = armoury.counter + Vector3(0, 0.03, 0)
+	add_child(mark)
+	var sign := Label3D.new()
+	sign.text = "ARMOURY"
+	sign.font_size = 48
+	sign.outline_size = 10
+	sign.pixel_size = 0.006
+	sign.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	sign.modulate = Color(1.0, 0.85, 0.35)
+	sign.position = armoury.counter + Vector3(0, 2.3, 0)
+	add_child(sign)
+	var yard: Vector3 = (st.origin as Vector3) + u * (float(st.w) * BlockGenerator.M + 6.0) + Vector3(0, 0.8, 0)
+	var ic := PoliceCar.new()
+	ic.color = Color("1d2433")
+	ic.engine *= 1.4
+	ic.top_speed *= 1.2
+	ic.position = yard + v * 3.5
+	ic.rotation_degrees.y = 180.0
+	var van := CivilianVehicle.new()
+	van.setup("van_panel")
+	van.paint = Color("f0f0ea")
+	van.position = yard + v * 10.5
+	van.rotation_degrees.y = 180.0
+	van.set_meta("prisoner_van", true)
+	var um := CivilianVehicle.new()
+	um.setup("sedan")
+	um.paint = Color("6d7176")
+	um.position = yard + v * 17.5
+	um.rotation_degrees.y = 180.0
+	um.set_meta("unmarked", true)
+	for pair in [[Armoury.INTERCEPTOR, ic], [Armoury.VAN, van], [Armoury.UNMARKED, um]]:
+		var c: PoliceCar = pair[1]
+		c.set_meta("locked", true)
+		add_child(c)
+		cars.add_car(c)
+		yard_cars[pair[0]] = c
+	_station_grows()
+
+
+## Everyone: what's been bought shows up at the station.
+func _station_grows() -> void:
+	for i in yard_cars:
+		var c: PoliceCar = yard_cars[i]
+		if Armoury.owns(i) and c.has_meta("locked"):
+			c.remove_meta("locked")
+	if Armoury.owns(Armoury.GARAGE) and _garage == null and gen:
+		_garage = _make_garage(gen.station())
+	if Armoury.owns(Armoury.RANGE) and gen and get_node_or_null("Range") == null:
+		var r := FiringRange.new()
+		r.name = "Range"
+		r.dispatcher = dispatch
+		add_child(r)
+		r.build(gen.station())
+
+
+## A steel-framed garage over the yard: posts, a roof and a back wall.
+func _make_garage(st: Dictionary) -> Node3D:
+	var u: Vector3 = st.u
+	var v: Vector3 = st.v
+	var corner: Vector3 = (st.origin as Vector3) + u * (float(st.w) * BlockGenerator.M + 1.0)
+	var g := StaticBody3D.new()
+	g.name = "Garage"
+	add_child(g)
+	var w := 10.0
+	var d := 15.0
+	var h := 3.6
+	var steel := StandardMaterial3D.new()
+	steel.albedo_color = Color("3d4a57")
+	var roof := StandardMaterial3D.new()
+	roof.albedo_color = Color("8c9399")
+	var parts := [
+		[Vector3(w, 0.2, d), Vector3(w * 0.5, h, d * 0.5), roof],
+		[Vector3(w, h, 0.25), Vector3(w * 0.5, h * 0.5, d), steel],
+	]
+	for px in [0.2, w - 0.2]:
+		for pz in [0.2, d * 0.5, d - 0.2]:
+			parts.append([Vector3(0.25, h, 0.25), Vector3(px, h * 0.5, pz), steel])
+	for p in parts:
+		var size: Vector3 = p[0]
+		var at: Vector3 = corner + u * (p[1] as Vector3).x + Vector3.UP * (p[1] as Vector3).y + v * (p[1] as Vector3).z
+		var m := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = size
+		m.mesh = bm
+		m.material_override = p[2]
+		m.position = at
+		g.add_child(m)
+		var cs := CollisionShape3D.new()
+		var sh := BoxShape3D.new()
+		sh.size = size
+		cs.shape = sh
+		cs.position = at
+		g.add_child(cs)
+	Cel.apply(g)
+	var sign := Label3D.new()
+	sign.text = "POLICE GARAGE"
+	sign.font_size = 40
+	sign.outline_size = 8
+	sign.pixel_size = 0.008
+	sign.position = corner + u * (w * 0.5) + Vector3.UP * (h + 0.6)
+	sign.rotation.y = atan2(-v.x, -v.z)
+	g.add_child(sign)
+	return g
