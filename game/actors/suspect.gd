@@ -24,7 +24,7 @@ extends CharacterBody3D
 ## dropped on surrender or when they go down; officers can pick them up.
 ## Same skeleton and clips as the officers, dressed as civilians.
 
-enum S { LOITER, ROB, FLEE, HIDE, SHOOT, STAGGER, SURRENDER, CUFFED, IN_CAR, DOWN, BOOKED, DRIVE, COVER, SEEK_COVER, THROW, WANDER, PANIC, COWER, BRAWL }
+enum S { LOITER, ROB, FLEE, HIDE, SHOOT, STAGGER, SURRENDER, CUFFED, IN_CAR, DOWN, BOOKED, DRIVE, COVER, SEEK_COVER, THROW, WANDER, PANIC, COWER, BRAWL, CUFF_RUN }
 ## What a fighter is doing in cover (synced, for the pose).
 enum C { HIDE, PEEK, BLIND, RELOAD }
 
@@ -144,6 +144,14 @@ var brawl_with: Variant = null
 var drunk := false
 var _swing_t := 0.0
 
+## Shouted orders: a cuffed prisoner told to stay put (kneels where they
+## are) rather than walk with their escort. Some, left alone long enough,
+## get up and run for it still in cuffs (CUFF_RUN) until they are caught,
+## knocked down or shouted at.
+var stay := false
+var _runner := false
+var _run_after := 12.0
+
 
 func _init() -> void:
 	add_to_group("suspects")
@@ -199,10 +207,23 @@ func on_alarm(at: Vector3, radius: float) -> void:
 	_goal = _near(global_position + away.normalized() * _rng.randf_range(18.0, 30.0), 3.0)
 
 
-## Host: an officer shouted "Police! Get down!" from `at`.
-func on_shout(at: Vector3, reach: float) -> void:
+## Host: an officer shouted an order from `at`. `target` is who it was
+## aimed at: they answer back (giving up or telling the officer where to
+## go). Whether anyone does as they're told is a roll: the unarmed mostly
+## do, the armed less so, hardened fighters rarely (more when hurt, alone or
+## with guns on them), and every order ignored makes the next more likely.
+func on_shout(at: Vector3, reach: float, target: Suspect = null) -> void:
 	var d := global_position.distance_to(at)
-	if d > reach or not is_free():
+	var aimed := target == self
+	if d > reach:
+		return
+	if state == S.CUFF_RUN:
+		if aimed or d < 10.0:
+			if _rng.randf() < (0.75 if d < 8.0 else 0.45):
+				_stop_running()
+				Voices.say(self, Voices.pick(Voices.Kind.STOPPING), 0.5)
+		return
+	if not is_free():
 		return
 	suspicion = MADE   # "Police!" gives the game away
 	var q := PhysicsRayQueryParameters3D.create(global_position + Vector3(0, 1.5, 0), at + Vector3(0, 1.4, 0), 1, [get_rid()])
@@ -218,18 +239,61 @@ func on_shout(at: Vector3, reach: float) -> void:
 		return
 	if state == S.BRAWL:
 		brawl_with = null   # the fight's over
+	var chance := 0.0
 	if drunk:
+		chance = 0.45 if d < 5.0 else 0.1
 		pressure += 1.2 if d < 5.0 else 0.3
 	elif not armed and not fighter:
-		pressure += 1.8 if d < 10.0 else 0.8
+		chance = 0.7 if d < 10.0 else 0.45
+		pressure += 1.0 if d < 10.0 else 0.5
 	elif not fighter:
+		chance = 0.4
 		pressure += 0.6
 	else:
+		chance = 0.1
+		if hp < MAX_HP * 0.5:
+			chance += 0.25
+		if _mates_near() == 0:
+			chance += 0.15
 		pressure += 0.15
-	if pressure >= SURRENDER_AT and (not armed or not fighter):
+	chance += _guns_on_me() * 0.1 + minf(pressure, 2.0) * 0.1
+	if not aimed:
+		chance *= 0.6
+	if _rng.randf() < minf(chance, 0.9) or (pressure >= SURRENDER_AT and (not armed or not fighter)):
 		set_state(S.SURRENDER)
-	elif state == S.BRAWL:
+		if aimed:
+			Voices.say(self, Voices.pick(Voices.Kind.COMPLY), _rng.randf_range(0.5, 0.8))
+		return
+	pressure += 0.3   # ignored this one; the next is harder to ignore
+	if aimed and _rng.randf() < 0.55:
+		Voices.say(self, Voices.pick(Voices.Kind.DEFY), _rng.randf_range(0.5, 0.8))
+	if state == S.BRAWL:
 		set_state(S.LOITER)
+	elif aimed and not fighter and not drunk and state in [S.LOITER, S.ROB, S.HIDE] and _rng.randf() < 0.4:
+		_bolt(_threat())
+
+
+## Host: fighters on this suspect's side close by (not given up).
+func _mates_near() -> int:
+	var n := 0
+	for o in get_tree().get_nodes_in_group("suspects"):
+		var s := o as Suspect
+		if s and s != self and s.fighter and s.is_free() and not s.civilian and s.global_position.distance_to(global_position) < 15.0:
+			n += 1
+	return n
+
+
+## Host: officers close by pointing a gun this way.
+func _guns_on_me() -> int:
+	var n := 0
+	for o in get_tree().get_nodes_in_group("officers"):
+		var of := o as Officer
+		if of == null or not of.is_aiming() or of.global_position.distance_to(global_position) > 20.0:
+			continue
+		var to := global_position - of.global_position
+		if Vector3(sin(of.aim_yaw), 0, cos(of.aim_yaw)).dot(Vector3(to.x, 0, to.z).normalized()) > 0.95:
+			n += 1
+	return n
 
 
 ## Dealt with: no longer part of the call's trouble.
@@ -308,6 +372,12 @@ func take_damage(amount: float, dir := Vector3.ZERO, _where := "") -> void:
 
 ## A punch, kick or barge: knocked off balance, and much keener to give up.
 func struck(dir: Vector3, damage: float, shove: float) -> void:
+	if state == S.CUFF_RUN:
+		take_damage(damage * 0.5, dir)
+		if state == S.CUFF_RUN:
+			velocity = dir * shove
+			_stop_running()
+		return
 	if not is_free() and state != S.SURRENDER:
 		return
 	take_damage(damage, dir)
@@ -322,12 +392,58 @@ func struck(dir: Vector3, damage: float, shove: float) -> void:
 func cuff(by: Officer) -> void:
 	escort = by
 	escort_peer = by.peer_id
+	stay = false
+	_alone_t = 0.0
+	# Some will do a runner if they're ever left on their own.
+	_runner = _rng.randf() < 0.45
+	_run_after = _rng.randf_range(8.0, 20.0)
 	set_state(S.CUFFED)
+	if _rng.randf() < 0.3:
+		Voices.say(self, Voices.pick(Voices.Kind.PRISONER), 1.0)
+
+
+## Host: told to stay put (they kneel where they are).
+func order_stay() -> void:
+	stay = true
+	_alone_t = 0.0
+	velocity = Vector3.ZERO
+
+
+## Host: told to get up and walk with `by` (who takes them over).
+func order_follow(by: Officer) -> void:
+	stay = false
+	escort = by
+	escort_peer = by.peer_id
+	_alone_t = 0.0
+
+
+## Host: a cuffed runner caught, knocked down or shouted to a stop: down on
+## their knees where they are; their escort can call them over again.
+func _stop_running() -> void:
+	set_state(S.CUFFED)
+	stay = true
+	_alone_t = 0.0
+	_runner = _rng.randf() < 0.25
+	_run_after = _rng.randf_range(10.0, 20.0)
+
+
+func _start_cuff_run(t: Dictionary) -> void:
+	set_state(S.CUFF_RUN)
+	stay = false
+	_stuck_t = 0.0
+	_stuck_n = 0
+	_stuck_p = global_position
+	_check_t = 2.0
+	_goal = _pick_hide(t)
+	_last_spot = _goal
+	if dispatcher and dispatcher.has_method("say"):
+		dispatcher.say("DISPATCH: Your prisoner's done a runner, still in cuffs. Go get them.")
 
 
 func put_in_car(c: PoliceCar, s: int) -> void:
 	car = c
 	seat = s
+	stay = false
 	escort = null
 	escort_peer = 0
 	set_state(S.IN_CAR)
@@ -544,7 +660,14 @@ func _physics_process(delta: float) -> void:
 					pressure = 0.0
 					_bolt(t)
 		S.CUFFED:
-			if escort and is_instance_valid(escort) and escort.state not in [Officer.S.DOWNED, Officer.S.VEHICLE]:
+			var led := not stay and escort and is_instance_valid(escort) and escort.state not in [Officer.S.DOWNED, Officer.S.VEHICLE]
+			if not led:
+				# Sat where they were told (or left): nobody about for a
+				# while and some get up and run for it.
+				_alone_t = _alone_t + delta if (t.o == null or t.d > 14.0) else 0.0
+				if _runner and _alone_t > _run_after and nav:
+					_start_cuff_run(t)
+			if led:
 				var e := escort.global_position
 				var back := Vector3(sin(escort.rotation.y), 0, cos(escort.rotation.y))
 				var spot := e - back * FOLLOW_GAP
@@ -554,6 +677,26 @@ func _physics_process(delta: float) -> void:
 					wish = to.normalized()
 					speed = clampf(to.length() * 2.5, 0.0, RUN)
 				_face(e)
+		S.CUFF_RUN:
+			if _goal != Vector3.INF:
+				wish = _steer(_goal, delta)
+				speed = RUN * 0.8   # hands behind the back: officers catch them
+				if wish == Vector3.ZERO and _arrived():
+					_goal = Vector3.INF   # tucked away, crouched down
+				elif _flee_stuck(delta):
+					_goal = Vector3.INF
+			# Found: most give up, some leg it again.
+			_check_t -= delta
+			if t.o and t.los and t.d < 3.5 and _check_t <= 0.0:
+				_check_t = 1.5
+				if _rng.randf() < 0.6:
+					_stop_running()
+					Voices.say(self, Voices.pick(Voices.Kind.STOPPING), 0.3)
+				else:
+					_stuck_t = 0.0
+					_stuck_p = global_position
+					_goal = _pick_hide(t)
+					_last_spot = _goal
 	# Move.
 	var target := wish * speed
 	velocity.x = move_toward(velocity.x, target.x, ACCEL * delta)
@@ -1358,7 +1501,10 @@ func _process(delta: float) -> void:
 			lower = "idle" if hs < 0.2 else "walk"
 			upper = "aim_hold" if armed else "punch" if fmod(Time.get_ticks_msec() / 1000.0 + net_id * 0.37, 1.3) < 0.55 else "none"
 		S.CUFFED:
-			lower = "idle" if hs < 0.2 else ("walk" if hs < 2.2 else "run")
+			lower = ("kneel" if stay else "idle") if hs < 0.2 else ("walk" if hs < 2.2 else "run")
+			upper = "cuffed"
+		S.CUFF_RUN:
+			lower = "crouch_idle" if hs < 0.2 else ("walk" if hs < 2.2 else "run")
 			upper = "cuffed"
 		S.IN_CAR:
 			lower = "sit"
@@ -1370,6 +1516,10 @@ func _process(delta: float) -> void:
 			elif armed and state == S.LOITER:
 				upper = "ready_hold"
 	rig.update_pose(lower, upper, hs, delta, aim_at)
+	if rig.procedural:
+		# "Hands on your head!": fingers on the crown while they kneel.
+		rig.procedural.head_hands = move_toward(rig.procedural.head_hands, 1.0 if state == S.SURRENDER else 0.0, delta * 2.5)
+		rig.procedural.head_hands_fwd = global_transform.basis.z
 
 
 # --- network (the Dispatcher sends these) -----------------------------------------------
@@ -1378,7 +1528,7 @@ func encode(b: StreamPeerBuffer) -> void:
 	b.put_u16(net_id)
 	b.put_u8(look)
 	b.put_u8(state)
-	b.put_u8(cphase | (weapon << 2) | (16 if holding else 0) | (32 if fighter else 0) | (64 if civilian else 0))
+	b.put_u8(cphase | (weapon << 2) | (16 if holding else 0) | (32 if fighter else 0) | (64 if civilian else 0) | (128 if stay else 0))
 	b.put_float(global_position.x)
 	b.put_float(global_position.y)
 	b.put_float(global_position.z)
@@ -1404,6 +1554,7 @@ static func decode(b: StreamPeerBuffer) -> Dictionary:
 	d.holding = (fl & 16) != 0
 	d.fighter = (fl & 32) != 0
 	d.civilian = (fl & 64) != 0
+	d.stay = (fl & 128) != 0
 	d.armed = d.weapon != EnemyGuns.NONE
 	d.pos = Vector3(b.get_float(), b.get_float(), b.get_float())
 	d.yaw = b.get_half()
@@ -1429,6 +1580,7 @@ func apply_net(d: Dictionary) -> void:
 	holding = d.holding
 	fighter = d.fighter
 	civilian = d.get("civilian", false)
+	stay = d.get("stay", false)
 	aim_at = d.aim
 	hp = d.hp
 	seat = d.seat
