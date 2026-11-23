@@ -110,7 +110,9 @@ func test_flashbang_stuns_a_suspect() -> void:
 	var s := dispatch.spawn_suspect(p, Suspect.S.LOITER, true)
 	s.fighter = true
 	await _frames(3)
-	var o := _officer(nav.closest(p + Vector3(-14, 0, 0)))
+	# Far enough off that they have not spotted the officer yet (armed ones
+	# watch about 38 m of street since the tactical pass).
+	var o := _officer(nav.closest(p + Vector3(-45, 0, 0)))
 	o.hp = 1.0e6
 	# Thrown right at their feet.
 	var fwd := Vector3(sin(s.rotation.y), 0, cos(s.rotation.y))
