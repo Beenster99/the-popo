@@ -55,6 +55,34 @@ func _plain_stage(cam_at: Vector3, look: Vector3) -> Node3D:
 
 func _run() -> void:
 	match shot:
+		"station_armoury", "station_yard":
+			# Wave 3: the armoury screen, and the station grown (garage, range).
+			City.next_seed = 4242
+			var s := await _scene("res://game/city/city.tscn")
+			await _frames(10)
+			s.find_children("*", "NetOverlay", false, false)[0].queue_free()
+			(s.dispatch as Dispatcher).enabled = false
+			s.dispatch.pay = 9000
+			for i in [2, Armoury.EXT_MAG, Armoury.HOLLOW, Armoury.GARAGE, Armoury.INTERCEPTOR, Armoury.RANGE, Armoury.PLAIN]:
+				s.armoury._buy(i)
+			var o: Officer = s.sync.my_pawn()
+			if shot == "station_armoury":
+				o.global_position = s.armoury.counter
+				await _frames(30)
+				ArmouryScreen.open(get_tree(), s.armoury, func(): return o)
+			else:
+				var st: Dictionary = s.gen.station()
+				var cam := Camera3D.new()
+				s.add_child(cam)
+				cam.far = 1000.0
+				var c: Vector3 = (st.origin as Vector3) + Vector3(18, 0, 22)
+				cam.look_at_from_position(c + Vector3(0, 80, 0.1), c) if OS.has_environment("TOPDOWN") else cam.look_at_from_position(c + Vector3(30, 16, -30), c + Vector3(0, 0, 4))
+				cam.current = true
+				var r := s.get_node("Range") as FiringRange
+				for tg in r.targets_list():
+					tg.set_up(true, tg.index % 3 == 1)
+			await _frames(60)
+			await _save()
 		"city_aerial", "city_street", "city_inside", "city_docks", "city_downtown", "city_traffic", "city_skyline":
 			# Wave 2: the whole city.
 			City.next_seed = 4242
