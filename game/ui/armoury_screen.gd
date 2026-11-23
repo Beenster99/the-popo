@@ -11,6 +11,13 @@ var _cat := 0
 var _list: VBoxContainer
 var _money: Label
 var _tabs: HBoxContainer
+## The 3D inspection bench beside the list, and what it shows: a pistol
+## (the one you carry until you point at another) and an upgrade to try on.
+var _bench: GunBench
+var _bench_name: Label
+var _bench_parts: Label
+var _look_pistol := -1
+var _try := -1
 
 
 static func open(tree: SceneTree, a: Armoury, pawn: Callable) -> void:
@@ -42,7 +49,7 @@ func _ready() -> void:
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.add_child(center)
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(980, 620)
+	panel.custom_minimum_size = Vector2(1500, 780)
 	center.add_child(panel)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)
@@ -63,12 +70,32 @@ func _ready() -> void:
 		b.text = Armoury.CAT_NAMES[i]
 		b.toggle_mode = true
 		b.custom_minimum_size = Vector2(140, 42)
-		b.pressed.connect(func(): _cat = i; _fill())
+		b.pressed.connect(func(): _cat = i; _try = -1; _look_pistol = -1; _fill(); _show_bench())
 		_tabs.add_child(b)
+	var split := HBoxContainer.new()
+	split.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	split.add_theme_constant_override("separation", 16)
+	box.add_child(split)
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	box.add_child(scroll)
+	split.add_child(scroll)
+	var side := VBoxContainer.new()
+	side.custom_minimum_size.x = 640
+	side.add_theme_constant_override("separation", 6)
+	split.add_child(side)
+	_bench = GunBench.new()
+	_bench.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_bench.custom_minimum_size = Vector2(640, 440)
+	side.add_child(_bench)
+	_bench_name = UiTheme.title("", 24, UiTheme.ACCENT)
+	side.add_child(_bench_name)
+	_bench_parts = UiTheme.title("", 16)
+	_bench_parts.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_bench_parts.custom_minimum_size.y = 46
+	side.add_child(_bench_parts)
+	side.add_child(UiTheme.title("Drag to turn it, wheel to zoom.  Pad: right stick turns, triggers zoom.", 14, UiTheme.DIM))
 	_list = VBoxContainer.new()
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_list.add_theme_constant_override("separation", 8)
@@ -88,6 +115,7 @@ func _ready() -> void:
 	if armoury and armoury.dispatcher:
 		armoury.dispatcher.paid.connect(func(_a, _t): _fill())
 	_fill()
+	_show_bench()
 	(_tabs.get_child(0) as Button).grab_focus.call_deferred()
 
 
@@ -131,6 +159,7 @@ func _fill() -> void:
 			func(): armoury.set_kit(o.kit & 7, Armoury.Ammo.STANDARD))
 		_list.add_child(row)
 		_list.move_child(row, 0)
+	_show_bench()
 
 
 func _row(i: int, it: Dictionary, pay: int, o: Officer) -> Control:
@@ -140,6 +169,7 @@ func _row(i: int, it: Dictionary, pay: int, o: Officer) -> Control:
 		about += "\n%d rounds · %.0f damage · %d shots a second · %.1f s reload" % [
 			Armoury.mag_size(it.pistol), float(p.dmg), int(round(1.0 / float(p.gap))), Armoury.reload_time(it.pistol)]
 	var row := _row_frame(Armoury.item_name(i), about, "" if Armoury.owns(i) else "£%s" % DispatchHud._money(int(it.price)))
+	_bench_hover(row, i, it)
 	var why := Armoury.why_not(i, pay)
 	if Armoury.owns(i):
 		if it.has("pistol"):
@@ -189,6 +219,76 @@ func _row_button(row: HBoxContainer, text: String, enabled: bool, cb: Callable) 
 	b.disabled = not enabled
 	b.pressed.connect(cb)
 	row.add_child(b)
+
+
+## Pointing at a row (mouse over it, or its button focused on a pad) puts
+## that pistol on the bench, or tries that upgrade on.
+func _bench_hover(row: Control, i: int, it: Dictionary) -> void:
+	var look := func():
+		if it.has("pistol"):
+			_look_pistol = int(it.pistol)
+			_try = -1
+		elif i in [Armoury.EXT_MAG, Armoury.COMPENSATOR, Armoury.MATCH_BARREL, Armoury.SPEED_LOAD]:
+			_try = i
+		elif i == Armoury.GEAR_ITEM[Armoury.Gear.TORCH]:
+			_try = GunBench.TORCH
+		else:
+			return
+		_show_bench()
+	row.mouse_entered.connect(look)
+	row.mouse_filter = Control.MOUSE_FILTER_PASS
+	row.child_entered_tree.connect(func(c: Node):
+		if c is Button:
+			(c as Button).focus_entered.connect(look)
+			(c as Button).mouse_entered.connect(look))
+
+
+## What the bench shows: the pistol, with the station's upgrades fitted, the
+## torch if you carry it, and whatever upgrade you're pointing at.
+func _show_bench() -> void:
+	if _bench == null:
+		return
+	var o := _officer()
+	var p := _look_pistol
+	if p < 0:
+		p = (o.kit & 7) if o else 0
+	p = clampi(p, 0, Armoury.PISTOLS.size() - 1)
+	var mask := 0
+	var names: PackedStringArray = []
+	for bit in [Armoury.EXT_MAG, Armoury.COMPENSATOR, Armoury.MATCH_BARREL, Armoury.SPEED_LOAD]:
+		if Armoury.owns(bit):
+			mask |= 1 << bit
+			names.append(_part_name(bit, p))
+	var torch_on := o != null and Armoury.gear_of(o.kit) == Armoury.Gear.TORCH
+	if torch_on:
+		mask |= 1 << GunBench.TORCH
+		names.append("tactical torch")
+	var trying := ""
+	if _try >= 0 and (mask & (1 << _try)) == 0:
+		mask |= 1 << _try
+		trying = _part_name(_try, p)
+	_bench.show_gun(p, mask)
+	var carried := o != null and (o.kit & 7) == p
+	_bench_name.text = String(Armoury.PISTOLS[p].name) + ("  (yours)" if carried else "")
+	var t := "Fitted: " + (", ".join(names) if names.size() > 0 else "nothing yet, it's factory standard")
+	if trying != "":
+		t += "\nTrying on: " + trying + ("" if _try == GunBench.TORCH or Armoury.owns(_try) else " (not bought)")
+	_bench_parts.text = t
+
+
+func _part_name(bit: int, p: int) -> String:
+	match bit:
+		Armoury.EXT_MAG:
+			return "9-shot cylinder" if p == 3 else "extended magazine"
+		Armoury.COMPENSATOR:
+			return "compensator"
+		Armoury.MATCH_BARREL:
+			return "match barrel"
+		Armoury.SPEED_LOAD:
+			return "speed loader" if p == 3 else "flared magwell"
+		GunBench.TORCH:
+			return "tactical torch"
+	return ""
 
 
 func _unhandled_input(event: InputEvent) -> void:
