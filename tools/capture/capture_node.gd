@@ -55,6 +55,27 @@ func _plain_stage(cam_at: Vector3, look: Vector3) -> Node3D:
 
 func _run() -> void:
 	match shot:
+		"city_night", "city_rain":
+			# Wave 4: the street at night under the lamps, and in the rain.
+			City.next_seed = 4242
+			var s := await _scene("res://game/city/city.tscn")
+			await _frames(10)
+			s.find_children("*", "NetOverlay", false, false)[0].queue_free()
+			(s.dispatch as Dispatcher).enabled = false
+			var w: CityWeather = s.weather
+			s.dispatch.missions.minute = 23 * 60.0 if shot == "city_night" else 17 * 60.0
+			if shot == "city_rain":
+				w.set_weather(CityWeather.W.STORM)
+				w.rain = 1.0
+				w.wet = 1.0
+			var cam := Camera3D.new()
+			s.add_child(cam)
+			cam.far = 1000.0
+			var j := CityGenerator.junction(2, 4)
+			cam.look_at_from_position(j + Vector3(-14, 4.0, -10), j + Vector3(4, 0.5, 6))
+			cam.current = true
+			await _frames(80)
+			await _save()
 		"station_armoury", "station_yard":
 			# Wave 3: the armoury screen, and the station grown (garage, range).
 			City.next_seed = 4242

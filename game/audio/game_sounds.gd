@@ -87,6 +87,8 @@ func _ready() -> void:
 	# Wave 2: each district has its own sound under the street.
 	for k in DISTRICT_BEDS:
 		_amb_player(k, DISTRICT_BEDS[k][0], Sfx.BUS_AMBIENCE_OUT, -80.0)
+	# Wave 4: rain (CityWeather sets how hard).
+	_amb_player("rain", "amb_rain", Sfx.BUS_AMBIENCE_OUT, -80.0)
 	if world:
 		world.piece_broken.connect(_on_piece_broken)
 		world.fx.connect(_on_world_fx)
@@ -225,6 +227,10 @@ func _background(delta: float) -> void:
 			var w: float = _bed[k]
 			(_amb[k] as AudioStreamPlayer).volume_db = DISTRICT_BEDS[k][1] + linear_to_db(maxf(w, 0.0001))
 		var want: float = STREET_DB.get(here, -11.0)
+		var wx := CityWeather.current
+		var rn: float = wx.rain if wx else 0.0
+		(_amb.rain as AudioStreamPlayer).volume_db = -4.0 + linear_to_db(maxf(rn, 0.0001))
+		want -= rn * 5.0   # the rain drowns the street out a bit
 		var st := _amb.street as AudioStreamPlayer
 		st.volume_db = move_toward(st.volume_db, want, delta * 3.0)
 

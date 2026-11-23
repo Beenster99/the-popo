@@ -187,3 +187,7 @@ sfx/gun_tail_city_3.wav,Made by tools/audio/make_wave2.py from gun_far_1..4 (Son
 sfx/amb_docks_1.wav,Made by tools/audio/make_wave2.py,Project's own (no third-party audio),"docks: water on the quay, creaks, a far ship's horn (loops)"
 sfx/amb_industrial_1.wav,Made by tools/audio/make_wave2.py,Project's own (no third-party audio),"industrial: hum, fan, metal clanks (loops)"
 sfx/amb_park_1.wav,Made by tools/audio/make_wave2.py,Project's own (no third-party audio),"park: wind in the trees, birds (loops)"
+sfx/amb_rain_1.wav,Made by tools/audio/make_wave4.py,Project's own (no third-party audio),"rain on the streets: hiss, patter, drips (loops)"
+sfx/thunder_1.wav,Made by tools/audio/make_wave4.py,Project's own (no third-party audio),thunder: a close crack rolling into a long rumble
+sfx/thunder_2.wav,Made by tools/audio/make_wave4.py,Project's own (no third-party audio),thunder: a close crack rolling into a long rumble
+sfx/thunder_3.wav,Made by tools/audio/make_wave4.py,Project's own (no third-party audio),thunder: a close crack rolling into a long rumble

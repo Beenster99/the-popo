@@ -16,6 +16,8 @@ const VIEW_RANGE := 170.0       # m: pieces drawn up to here
 const SMALL_RANGE := 110.0      # m: small pieces (glass, doors, rails)
 const MARGIN := 8.0
 
+## Wave 4: the far towers' material (CityWeather darkens it at night).
+var tower_mat: StandardMaterial3D
 var gen: CityGenerator
 var world: DestructionWorld
 var _boxes := {}                # building index -> MeshInstance3D
@@ -135,6 +137,7 @@ func _towers() -> void:
 		mm.set_instance_transform(i, xfs[i])
 		mm.set_instance_color(i, cols[i])
 	var mat := StandardMaterial3D.new()
+	tower_mat = mat
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.vertex_color_use_as_albedo = true
 	mat.disable_fog = true
