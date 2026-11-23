@@ -14,9 +14,7 @@ var _last_y := 0.0
 
 func _ready() -> void:
 	top_level = true
-	var m := StandardMaterial3D.new()
-	m.albedo_color = Color("2a2c30")
-	m.roughness = 0.9
+	var m := Cel.material(Color("2a2c30"), false)
 	_line = MeshInstance3D.new()
 	var c := CylinderMesh.new()
 	c.top_radius = 0.012
@@ -29,9 +27,7 @@ func _ready() -> void:
 	_line.visible = false
 	add_child(_line)
 	_hook = MeshInstance3D.new()
-	var hm := StandardMaterial3D.new()
-	hm.albedo_color = Color("8a8d92")
-	hm.metallic = 0.8
+	var hm := Cel.material(Color("8a8d92"))
 	var hb := BoxMesh.new()
 	hb.size = Vector3(0.28, 0.08, 0.28)
 	_hook.mesh = hb

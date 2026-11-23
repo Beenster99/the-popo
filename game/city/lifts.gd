@@ -120,11 +120,7 @@ func _box(parent: Node3D, size: Vector3, at: Vector3, colour: Color, solid: bool
 	var bm := BoxMesh.new()
 	bm.size = size
 	mi.mesh = bm
-	var m := StandardMaterial3D.new()
-	m.albedo_color = colour
-	m.metallic = 0.5
-	m.roughness = 0.35
-	mi.material_override = m
+	mi.material_override = Cel.material(colour)
 	mi.position = at
 	parent.add_child(mi)
 	if solid:
