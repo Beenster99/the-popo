@@ -213,8 +213,13 @@ func test_arrests_pay_and_big_busts() -> void:
 		var sh: Suspect = d.suspects[d.calls[id].suspects[0]]
 		o.global_position = sh.global_position + Vector3(0, 0, 3)
 		await get_tree().physics_frame
+		# Not everyone listens first time; a second order always does it.
 		o.shout()
 		await get_tree().physics_frame
+		if sh.state != Suspect.S.SURRENDER:
+			o.shout_t = 0.0
+			o.shout()
+			await get_tree().physics_frame
 		t.check(sh.state == Suspect.S.SURRENDER, "shout at a shoplifter: hands up (%s)" % Suspect.S.keys()[sh.state])
 		# Pay: book them and close the job.
 		var before := d.pay

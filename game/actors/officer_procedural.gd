@@ -32,6 +32,10 @@ var ledge_point := Vector3.ZERO
 var ledge_right := Vector3.RIGHT
 ## Dragging a teammate: the left hand in their collar (world point).
 var collar_weight := 0.0
+## Shouted orders: a surrendered suspect's fingers laced on top of their
+## head (over the hands-up clip). 0..1; head_hands_fwd is the body's forward.
+var head_hands := 0.0
+var head_hands_fwd := Vector3(0, 0, 1)
 var collar_point := Vector3.ZERO
 
 var _legs := [["thigh.L", "shin.L", "foot.L"], ["thigh.R", "shin.R", "foot.R"]]
@@ -66,6 +70,7 @@ func _process_modification() -> void:
 	_reload_hand(sk)
 	_ledge_hands(sk)
 	_collar_hand(sk)
+	_head_hands(sk)
 
 
 func _rotate_global(sk: Skeleton3D, bone: int, q: Quaternion) -> void:
@@ -213,6 +218,29 @@ func _collar_hand(sk: Skeleton3D) -> void:
 	var cur := sk.get_bone_global_pose(hand).origin
 	var grip: Vector3 = sk.global_transform.affine_inverse() * collar_point
 	_two_bone(sk, _idx["upper_arm.L"], _idx["forearm.L"], hand, cur.lerp(grip, collar_weight))
+
+
+func _head_hands(sk: Skeleton3D) -> void:
+	if head_hands <= 0.001 or not _idx.has("head_2") or _idx["head_2"] < 0:
+		return
+	var xf := sk.global_transform
+	var head := xf * sk.get_bone_global_pose(_idx["head_2"]).origin
+	var fwd := Vector3(head_hands_fwd.x, 0, head_hands_fwd.z).normalized()
+	var right := fwd.cross(Vector3.UP).normalized()
+	var inv := xf.affine_inverse()
+	for side in [["L", -1.0], ["R", 1.0]]:
+		var hand: int = _idx["hand." + side[0]]
+		if hand < 0 or _idx["upper_arm." + side[0]] < 0:
+			continue
+		var cur := sk.get_bone_global_pose(hand).origin
+		# Wrists either side of the crown, a little behind it.
+		var grip: Vector3 = inv * (head + Vector3.UP * HEAD_HANDS_UP + right * (HEAD_HANDS_SIDE * side[1]) - fwd * HEAD_HANDS_BACK)
+		_two_bone(sk, _idx["upper_arm." + side[0]], _idx["forearm." + side[0]], hand, cur.lerp(grip, head_hands))
+
+
+const HEAD_HANDS_UP := 0.15
+const HEAD_HANDS_SIDE := 0.11
+const HEAD_HANDS_BACK := 0.04
 
 
 ## Analytic two-bone IK in skeleton space. Keeps the joint bending the way

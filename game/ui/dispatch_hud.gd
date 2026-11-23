@@ -124,6 +124,10 @@ func _draw_arrows() -> void:
 		targets.append([call.marker, Color("ff5050") if call.kind not in [Dispatcher.Kind.TRAFFIC, Dispatcher.Kind.THEFT, Dispatcher.Kind.PURSUIT] else Color("ffb030")])
 	if _has_prisoner():
 		targets.append([dispatcher.bay_position(), Color("4a8cff")])
+	# A prisoner doing a runner in cuffs.
+	for s in dispatcher.suspects.values():
+		if (s as Suspect).state == Suspect.S.CUFF_RUN:
+			targets.append([(s as Suspect).global_position, Color("ff8030")])
 	var rect := _arrows.get_rect()
 	var centre := rect.size * 0.5
 	var o: Node3D = pawn_getter.call() if pawn_getter.is_valid() else null

@@ -15,7 +15,7 @@ const STEPS := [
 	{"id": "car", "title": "Patrol car", "text": "Get in one of the patrol cars out front: walk up and press {interact}."},
 	{"id": "siren", "title": "Lights and siren", "text": "Lights and siren: {torch} in the car (press again to change the siren, again for off). {horn} is the horn. Traffic pulls over for the siren."},
 	{"id": "call", "title": "Your first call", "text": "Dispatch has a job for you. Drive to the marker (the radio says where)."},
-	{"id": "arrest", "title": "Make the arrest", "text": "Shout {shout} (\"Police! Get down!\"). When they give up, hold {interact} next to them to cuff them. If they run: chase, {punch} or {kick}."},
+	{"id": "arrest", "title": "Make the arrest", "text": "Shout orders with {shout} (\"Hands on your head!\"). Not everyone listens first time: shout again. When they give up, hold {interact} next to them to cuff them. If they run: chase, {punch} or {kick}."},
 	{"id": "escort", "title": "Bring them in", "text": "They follow you while cuffed. Walk them to a patrol car and press {interact} to put them in."},
 	{"id": "book", "title": "Booking", "text": "Drive to the custody bay at the side of the station (the marker) and stop there. They're booked when you stop."},
 	{"id": "done", "title": "Shift's yours", "text": "That's the job. Calls will come in on the radio now. Spend the station's pay at the armoury counter inside the door (F)."},

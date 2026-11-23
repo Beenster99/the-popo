@@ -133,6 +133,10 @@ var punch_t := 0.0
 ## Phase 3.4: "Police! Get down!" (s until the next shout).
 var shout_t := 0.0
 const SHOUT_RANGE := 16.0
+## Shout held this long: orders for your prisoners (stay / with me).
+const SHOUT_HOLD := 0.45
+const PRISONER_RANGE := 7.0
+var _shout_hold := 0.0
 var rig: OfficerRig
 
 # Traversal bookkeeping (part of the synced state so prediction replays it).
@@ -379,8 +383,12 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 		elif _pressed(PlayerInput.KICK):
 			_set_state(S.KICK)
 			return
-	if _pressed(PlayerInput.SHOUT) and shout_t <= 0.0 and state not in [S.DOWNED, S.VEHICLE]:
-		shout()
+	_shout_hold = _shout_hold + delta if buttons & PlayerInput.SHOUT else 0.0
+	if state not in [S.DOWNED, S.VEHICLE]:
+		if _pressed(PlayerInput.SHOUT) and shout_t <= 0.0:
+			shout()
+		elif _shout_hold >= SHOUT_HOLD and _shout_hold - delta < SHOUT_HOLD:
+			shout(true)
 	if _pressed(PlayerInput.PUNCH) and state in [S.MOVE, S.CROUCH, S.AIR] and punch_t <= 0.0:
 		punch_t = 0.55
 		# Sprinting: a shoulder barge, a lunge that knocks things over.
@@ -858,6 +866,8 @@ func cuff_target() -> Suspect:
 			continue
 		if s.state == Suspect.S.SURRENDER and s.part == "":
 			return s
+		if s.state == Suspect.S.CUFF_RUN:
+			return s   # a cuffed runner caught up with: grab them
 		if s.state == Suspect.S.CUFFED and s.escort_peer != peer_id and not _escort_here(s):
 			return s
 	return null
@@ -1861,25 +1871,93 @@ func _update_torch() -> void:
 				_torch.look_at(target, Vector3.UP)
 
 
-## Phase 3.4: "Police! Get down!" Everyone in earshot hears it: unarmed
+## Phase 3.4: shouted orders. Everyone in earshot hears them: unarmed
 ## suspects mostly give up on the spot, the armed ones think about it,
 ## brawlers stop brawling, drunks have to be close. Civilians get down.
-func shout() -> void:
-	shout_t = 1.4
-	var l := Label3D.new()
-	l.text = "POLICE! GET DOWN!"
-	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	l.no_depth_test = true
-	l.fixed_size = true
-	l.pixel_size = 0.0016
-	l.font_size = 30
-	l.outline_size = 8
-	l.modulate = Color(1.0, 0.95, 0.6)
-	l.position = Vector3(0, 2.3, 0)
-	add_child(l)
-	var tw := l.create_tween()
-	tw.tween_property(l, "position:y", 2.7, 1.3)
-	tw.parallel().tween_property(l, "modulate:a", 0.0, 1.3).set_delay(0.6)
-	tw.tween_callback(l.queue_free)
-	if Net.is_host() and is_inside_tree():
-		get_tree().call_group("suspects", "on_shout", global_position, SHOUT_RANGE)
+## The host picks the order for whoever you're facing: "Drop the weapon!"
+## at someone armed, "Hold it right there!" at a runner, "Hands on your
+## head!" at the rest, and "This is the Popo!" with nobody about. With a
+## prisoner by you and no one else to shout at (or holding the button), it's
+## an order for the prisoner instead: "Stay right there!" or "With me!".
+func shout(held := false) -> void:
+	if not held:
+		shout_t = 1.4
+	if not Net.is_host() or not is_inside_tree():
+		return
+	if held or (_bark_target() == null and not _prisoners_near().is_empty()):
+		_order_prisoners()
+		_shout_hold = -99.0   # this press was the order: holding on adds nothing
+		return
+	if held:
+		return
+	var target := _bark_target()
+	var kind := Voices.Kind.GENERIC
+	if target:
+		if target.armed:
+			kind = Voices.Kind.ARMED
+		elif target.state in [Suspect.S.FLEE, Suspect.S.CUFF_RUN, Suspect.S.SEEK_COVER]:
+			kind = Voices.Kind.STOP
+		else:
+			kind = Voices.Kind.HANDS
+	Voices.say(self, Voices.pick(kind))
+	get_tree().call_group("suspects", "on_shout", global_position, SHOUT_RANGE, target)
+
+
+## Host: who a shout is aimed at: the nearest crook you're facing, in earshot
+## and in the open (or close).
+func _bark_target() -> Suspect:
+	var fwd := Vector3(sin(aim_yaw), 0, cos(aim_yaw))
+	var best: Suspect = null
+	var best_score := INF
+	var space := get_world_3d().direct_space_state
+	for n in get_tree().get_nodes_in_group("suspects"):
+		var s := n as Suspect
+		if s == null or s.civilian or s.part != "" or not (s.is_free() or s.state == Suspect.S.CUFF_RUN):
+			continue
+		var to := s.global_position - global_position
+		to.y *= 0.5
+		var d := to.length()
+		if d > SHOUT_RANGE:
+			continue
+		var facing := fwd.dot(Vector3(to.x, 0, to.z).normalized()) if d > 0.1 else 1.0
+		if d > 6.0:
+			if facing < 0.0:
+				continue
+			var q := PhysicsRayQueryParameters3D.create(global_position + Vector3(0, 1.5, 0), s.global_position + Vector3(0, 1.4, 0), 1, [get_rid(), s.get_rid()])
+			if not space.intersect_ray(q).is_empty():
+				continue
+		var score := d - facing * 8.0
+		if score < best_score:
+			best_score = score
+			best = s
+	return best
+
+
+## Host: cuffed suspects close by that this officer can give orders to:
+## their own prisoners, and anyone's who has been left sitting.
+func _prisoners_near() -> Array:
+	var out := []
+	for n in get_tree().get_nodes_in_group("suspects"):
+		var s := n as Suspect
+		if s and s.state == Suspect.S.CUFFED and s.global_position.distance_to(global_position) < PRISONER_RANGE \
+				and (s.escort_peer == peer_id or s.stay):
+			out.append(s)
+	return out
+
+
+## Host: anyone walking with you sits down and stays; if they're all sat,
+## they get up and come with you.
+func _order_prisoners() -> void:
+	var near := _prisoners_near()
+	if near.is_empty():
+		return
+	var walking := near.filter(func(s): return s.escort_peer == peer_id and not s.stay)
+	if not walking.is_empty():
+		for s in walking:
+			(s as Suspect).order_stay()
+		Voices.say(self, Voices.pick(Voices.Kind.STAY))
+	else:
+		for s in near:
+			(s as Suspect).order_follow(self)
+		Voices.say(self, Voices.pick(Voices.Kind.FOLLOW))
+	shout_t = maxf(shout_t, 0.8)
