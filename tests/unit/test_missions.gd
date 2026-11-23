@@ -247,10 +247,15 @@ func test_arrests_pay_and_big_busts() -> void:
 		var gang: Array = d.calls[gid].suspects.map(func(x): return d.suspects[x])
 		t.check(gang.size() == 6 and gang.all(func(g): return g.state == Suspect.S.BRAWL and g.armed), "six armed, squared up")
 		o.global_position = (gang[0] as Suspect).global_position + Vector3(150, 0, 0)
-		for i in 60 * 12:
+		# Up to 20 s: at 15-20 m with pistols most shots miss, and in 12 s it
+		# was sometimes none (on main too).
+		var hurt := 0
+		for i in 60 * 20:
 			await get_tree().physics_frame
-		var hurt := gang.filter(func(g): return g.hp < Suspect.MAX_HP or g.is_done()).size()
-		print("    after 12 s: %d of 6 hit" % hurt)
+			hurt = gang.filter(func(g): return g.hp < Suspect.MAX_HP or g.is_done()).size()
+			if hurt >= 2:
+				break
+		print("    %d of 6 hit" % hurt)
 		t.check(hurt >= 1, "they're hitting each other (%d hurt)" % hurt)
 	# Bank job: robbers inside with staff, a driver at the kerb.
 	o.global_position = s._spawn_point(0)

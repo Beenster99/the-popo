@@ -61,7 +61,7 @@ const TEMPLATES := {
 }
 const BAIT_LOCK := 5.0       # s of driving before the bait car is shut down
 const BUY_TIME := 2.0        # s close to the dealer, holding interact, to make the buy
-const FLOOR_NAMES := ["Ground floor", "First floor", "Second floor", "Third floor", "Fourth floor", "Fifth floor"]
+const FLOOR_NAMES := ["Ground floor", "First floor", "Second floor", "Third floor", "Fourth floor", "Fifth floor", "Sixth floor", "Seventh floor", "Eighth floor", "Ninth floor"]
 const DISTRICTS := ["downtown", "residential", "industrial", "docks"]
 
 var dispatcher: Dispatcher
@@ -242,7 +242,7 @@ func setup_call(c: Dictionary, at := Vector3.INF) -> bool:
 			c.pos = b.door
 			c.text = "Burglary at a %s on %s. Neighbours heard glass go; they're still inside." % [b.type, CityGenerator.street_at(b.door)]
 		Dispatcher.Kind.RAID:
-			var b := _inside_building(["flats", "warehouse", "garage", "office"], true)
+			var b := _inside_building(["flats", "warehouse", "garage", "office", "tower"], true)
 			if b.is_empty():
 				return false
 			var n := _rng.randi_range(3, 5)
@@ -256,7 +256,7 @@ func setup_call(c: Dictionary, at := Vector3.INF) -> bool:
 			c.pos = b.door
 			c.text = "Raid: warrant on the %s on %s. Expect %d inside, most of them armed, doors locked. Breach and clear it floor by floor." % [b.type, CityGenerator.street_at(b.door), n]
 		Dispatcher.Kind.HOSTAGE:
-			var b := _inside_building(["shop", "office"])
+			var b := _inside_building(["shop", "office", "tower"])
 			if b.is_empty():
 				return false
 			var room := _pick_room(b, 0)
@@ -274,7 +274,7 @@ func setup_call(c: Dictionary, at := Vector3.INF) -> bool:
 			c.pos = b.door
 			c.text = "Hostages at the %s on %s: two armed, %d held inside. Get them out alive." % [b.type, CityGenerator.street_at(b.door), hostages.size()]
 		Dispatcher.Kind.SEARCH:
-			var b := _inside_building(["warehouse", "office", "flats", "garage"])
+			var b := _inside_building(["warehouse", "office", "flats", "garage", "tower"])
 			if b.is_empty():
 				return false
 			var p := _room_spot(b, _pick_room(b, b.storeys - 1))
@@ -311,7 +311,7 @@ func setup_call(c: Dictionary, at := Vector3.INF) -> bool:
 			c.pos = (p + p2) * 0.5
 			c.text = "Gang war %s: two crews shooting it out, six armed at least. Let them thin each other out, or go in hard." % d._side_name(c.pos)
 		Dispatcher.Kind.BANK:
-			var b := _inside_building(["office", "shop"])
+			var b := _inside_building(["office", "tower", "shop"])
 			if b.is_empty():
 				return false
 			var room := _pick_room(b, 0)
@@ -589,7 +589,7 @@ func _room_spot(b: Dictionary, room: Dictionary) -> Vector3:
 
 ## Which floor each suspect is on, so dispatch can call each floor clear.
 func _note_floor(c: Dictionary, s: Suspect, b: Dictionary) -> void:
-	var f := clampi(int(floorf((s.global_position.y - b.origin.y + 0.5) / BlockGenerator.STOREY)), 0, 5)
+	var f := clampi(int(floorf((s.global_position.y - b.origin.y + 0.5) / BlockGenerator.STOREY)), 0, FLOOR_NAMES.size() - 1)
 	if not c.has("floors"):
 		c.floors = {}
 		c.storeys = b.storeys

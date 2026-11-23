@@ -468,14 +468,15 @@ func _shop() -> Dictionary:
 
 ## A pavement spot near the street, away from the officers.
 func _street_spot() -> Vector3:
-	var e := BlockGenerator.N * BlockGenerator.M
+	var sz := _area_size()
 	var ao := _area_offset()
-	var best := ao + Vector3(e * 0.5, BlockGenerator.BASE_Y, 1.0)
+	var best := ao + Vector3(sz.x * 0.5, BlockGenerator.BASE_Y, 1.0)
 	var best_d := -1.0
 	for i in 8:
-		var along := _rng.randf_range(4.0, e - 4.0)
+		var ax := _rng.randf_range(4.0, sz.x - 4.0)
+		var az := _rng.randf_range(4.0, sz.y - 4.0)
 		var side := _rng.randi_range(0, 3)
-		var p: Vector3 = ao + [Vector3(along, 0, 1.2), Vector3(along, 0, e - 1.2), Vector3(1.2, 0, along), Vector3(e - 1.2, 0, along)][side]
+		var p: Vector3 = ao + [Vector3(ax, 0, 1.2), Vector3(ax, 0, sz.y - 1.2), Vector3(1.2, 0, az), Vector3(sz.x - 1.2, 0, az)][side]
 		p.y = BlockGenerator.BASE_Y + 0.05
 		p = nav.closest(p)
 		var d := INF
@@ -557,6 +558,13 @@ func _area_offset() -> Vector3:
 	return city.blocks[area_block].offset
 
 
+## The area's lot size (x, z) in metres (city lots vary since v0.10.0).
+func _area_size() -> Vector2:
+	if city == null or area_block < 0:
+		return Vector2.ONE * BlockGenerator.N * BlockGenerator.M
+	return (city.blocks[area_block].rect as Rect2).size
+
+
 ## Places to hide: every room of the enterable buildings (upstairs too), and
 ## yards and alleys behind the others.
 func _find_hide_spots() -> void:
@@ -572,10 +580,10 @@ func _find_hide_spots() -> void:
 					var q := nav.closest(p)
 					if q.distance_to(p) < 0.8:
 						hide_spots.append(q)
-	var e := BlockGenerator.N * M
+	var sz := _area_size()
 	for i in 6:
 		for j in 6:
-			var p := ao + Vector3(6.0 + i * (e - 12.0) / 5.0, BlockGenerator.BASE_Y + 0.05, 6.0 + j * (e - 12.0) / 5.0)
+			var p := ao + Vector3(6.0 + i * (sz.x - 12.0) / 5.0, BlockGenerator.BASE_Y + 0.05, 6.0 + j * (sz.y - 12.0) / 5.0)
 			var inside := false
 			for b in _area_buildings():
 				if (b.bounds as AABB).grow(0.5).has_point(p + Vector3(0, 0.5, 0)):
