@@ -82,7 +82,7 @@ const PAD_AXES := {
 ## Actions the player can rebind on the Controls screen, with their names.
 const REBINDABLE := [
 	["move_forward", "Move forward"], ["move_back", "Move back"], ["move_left", "Move left"],
-	["move_right", "Move right"], ["sprint", "Sprint"], ["walk", "Walk / run (toggle)"], ["jump", "Jump / vault / climb"],
+	["move_right", "Move right"], ["sprint", "Sprint"], ["walk", "Walk / run (toggle; controller: tap L3)"], ["jump", "Jump / vault / climb"],
 	["stance", "Tap crouch / stand, hold prone, hold while running roll"],
 	["crouch", "Crouch"], ["prone", "Lie prone"], ["dive", "Roll (slide when sprinting)"],
 	["cover", "Take cover (with a direction: run to the next cover)"], ["reload", "Reload"],

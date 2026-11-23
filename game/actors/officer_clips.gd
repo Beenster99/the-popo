@@ -8,6 +8,10 @@ extends RefCounted
 ## every machine (root motion without depending on playback).
 
 const MOCAP_PATH := "res://assets/models/characters/mocap/officer_mocap.glb"
+## Walk cycles from the 100STYLE motion capture dataset (Ian Mason, CC BY 4.0),
+## retargeted by tools/blender/mocap/build_walks.py: walk (relaxed), and the
+## tactical walk_ready / walk_back / walk_left / walk_right.
+const WALKS_PATH := "res://assets/models/characters/mocap/officer_walks.glb"
 const ROOT_MOTION_CLIPS := ["roll", "mantle", "climb", "slide"]
 
 static var _library: AnimationLibrary
@@ -30,29 +34,15 @@ static func library(template: AnimationPlayer, skeleton: Skeleton3D) -> Animatio
 	_library = AnimationLibrary.new()
 	for n in base.get_animation_list():
 		_library.add_animation(n, base.get_animation(n))
-	if ResourceLoader.exists(MOCAP_PATH):
-		var moc: Node = (load(MOCAP_PATH) as PackedScene).instantiate()
-		var ap: AnimationPlayer = moc.find_children("*", "AnimationPlayer", true, false)[0]
-		for n in ap.get_animation_list():
-			var a: Animation = ap.get_animation(n).duplicate(true)
-			# Drop tracks for bones our model does not have (IK controls, gun, flash).
-			for i in range(a.get_track_count() - 1, -1, -1):
-				var bone := String(a.track_get_path(i).get_concatenated_subnames())
-				if skeleton.find_bone(bone) < 0:
-					a.remove_track(i)
-			if _library.has_animation(n):
-				_library.add_animation("hk_" + n, _library.get_animation(n))
-				_library.remove_animation(n)
-			_library.add_animation(n, a)
-			mocap_clips.append(n)
-		moc.free()
-		# The mocap aim holds a steady sight picture from about 2.0 s to 4.0 s:
-		# that slice becomes the upper-body aim loop.
-		if _library.has_animation("aim"):
-			if _library.has_animation("aim_hold"):
-				_library.add_animation("hk_aim_hold", _library.get_animation("aim_hold"))
-				_library.remove_animation("aim_hold")
-			_library.add_animation("aim_hold", slice(_library.get_animation("aim"), 2.05, 3.95))
+	for path in [MOCAP_PATH, WALKS_PATH]:
+		_merge_mocap(path, skeleton)
+	# The mocap aim holds a steady sight picture from about 2.0 s to 4.0 s:
+	# that slice becomes the upper-body aim loop.
+	if _library.has_animation("aim"):
+		if _library.has_animation("aim_hold"):
+			_library.add_animation("hk_aim_hold", _library.get_animation("aim_hold"))
+			_library.remove_animation("aim_hold")
+		_library.add_animation("aim_hold", slice(_library.get_animation("aim"), 2.05, 3.95))
 	for n in LIFT_CLIPS:
 		if _library.has_animation(n):
 			var flat := _library.get_animation(n).duplicate(true)
@@ -66,6 +56,28 @@ static func library(template: AnimationPlayer, skeleton: Skeleton3D) -> Animatio
 			_library.remove_animation(n)
 			_library.add_animation(n, flat)
 	return _library
+
+
+## Adds one mocap file's clips to the library; a clip with the same name as
+## a hand-keyed one replaces it (the hand-keyed one stays as hk_<name>).
+static func _merge_mocap(path: String, skeleton: Skeleton3D) -> void:
+	if not ResourceLoader.exists(path):
+		return
+	var moc: Node = (load(path) as PackedScene).instantiate()
+	var ap: AnimationPlayer = moc.find_children("*", "AnimationPlayer", true, false)[0]
+	for n in ap.get_animation_list():
+		var a: Animation = ap.get_animation(n).duplicate(true)
+		# Drop tracks for bones our model does not have (IK controls, gun, flash).
+		for i in range(a.get_track_count() - 1, -1, -1):
+			var bone := String(a.track_get_path(i).get_concatenated_subnames())
+			if skeleton.find_bone(bone) < 0:
+				a.remove_track(i)
+		if _library.has_animation(n):
+			_library.add_animation("hk_" + n, _library.get_animation(n))
+			_library.remove_animation(n)
+		_library.add_animation(n, a)
+		mocap_clips.append(n)
+	moc.free()
 
 
 ## Takes the hips' rise out of a clip (in place) and returns it as a curve.

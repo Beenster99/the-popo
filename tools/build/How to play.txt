@@ -12,6 +12,15 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
+WALK MODE (0.9.1)
+Alt switches between walking and running (controller: tap L3; holding L3 is
+still sprint, and tilting the stick part way still walks). Shift sprints
+even in walk mode.
+The walks are real motion capture now. Gun holstered, the officer strolls.
+Gun out, it's a tactical walk: knees soft, weight low, pistol at the ready.
+Aiming (right mouse / LT) you can back off and sidestep facing your target,
+a bit slower than walking forwards.
+
 SMOKE, GAS AND GRENADES (0.6.2)
 Buy them at the ARMOURY (Gear): smoke grenades, CS gas and flashbangs. Once
 the station has them, every officer carries two of each, refilled at a
