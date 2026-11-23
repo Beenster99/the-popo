@@ -172,8 +172,7 @@ func _on_broken(id: int) -> void:
 func _towers() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = gen.seed_value * 3 + 11
-	var c := CityGenerator.city_extent() * 0.5
-	var centre := Vector3(c, 0, c)
+	var centre := Vector3(CityGenerator.extent_x() * 0.5, 0, CityGenerator.extent_z() * 0.5)
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.use_colors = true

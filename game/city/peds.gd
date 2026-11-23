@@ -42,7 +42,7 @@ func _exit_tree() -> void:
 static func route_near(g: CityGenerator, p: Vector3, rng: RandomNumberGenerator) -> Array:
 	var c := CityGenerator.block_at(p)
 	if c.x < 0:
-		c = Vector2i(clampi(int(p.x / CityGenerator.PITCH), 0, CityGenerator.GRID - 1), clampi(int(p.z / CityGenerator.PITCH), 0, CityGenerator.GRID - 1))
+		c = CityGenerator.block_at(Vector3(clampf(p.x, 20.0, CityGenerator.extent_x() - 20.0), 0, clampf(p.z, 20.0, CityGenerator.extent_z() - 20.0)))
 	return route_for(g, g.block_index(c.x, c.y), rng)
 
 

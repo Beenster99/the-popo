@@ -65,6 +65,8 @@ const ITEMS := [
 	{"cat": Cat.GEAR, "name": "Smoke grenades", "price": 300, "about": "Two each. A thick grey cloud for half a minute: crooks can't shoot what they can't see. Throw with Q (pad: D-pad right), 3 picks which."},
 	{"cat": Cat.GEAR, "name": "CS gas", "price": 500, "about": "Two each. A stinging cloud: anyone in it coughs and can't aim, and most crooks stumble out and give up. Mind your mates."},
 	{"cat": Cat.GEAR, "name": "Flashbangs", "price": 700, "about": "Two each. A blinding flash and a deafening bang: anyone looking is stunned for a few seconds."},
+	# v0.10.0: rooftops.
+	{"cat": Cat.GEAR, "name": "Grapple hook", "price": 1500, "about": "Everyone carries a grapple launcher and rope. Aim at a roof edge and press the use key to be hauled up onto the roof. At a roof edge, press the use key to abseil down; W/S to climb or slide, Shift to drop fast, Space to swing in through a window."},
 ]
 enum Gear { NONE, BACKPACK, BREACH, C4, TORCH }
 const GEAR_NAMES := ["Nothing", "Ammo backpack", "Breach charges", "C4", "Tactical torch"]
@@ -88,6 +90,7 @@ const GAS_ITEM := 25
 const FLASH_ITEM := 26
 ## Item of each throwable (Grenades.Kind smoke, gas, flash).
 const NADE_ITEMS := [SMOKE_ITEM, GAS_ITEM, FLASH_ITEM]
+const GRAPPLE := 27
 
 const MSG_BUY := 100      # client -> host: buy item (u8)
 const MSG_KIT := 101      # client -> host: my kit (u8)

@@ -74,7 +74,7 @@ func _start(k: int) -> void:
 	nm.cell_size = CELL
 	nm.cell_height = CELL_H
 	nm.filter_baking_aabb = AABB(Vector3(r.position.x - MARGIN, -1.0, r.position.y - MARGIN),
-		Vector3(r.size.x + MARGIN * 2.0, 22.0, r.size.y + MARGIN * 2.0))
+		Vector3(r.size.x + MARGIN * 2.0, 36.0, r.size.y + MARGIN * 2.0))
 	var src := NavigationMeshSourceGeometryData3D.new()
 	# The road under it all and the lot's pavement slab.
 	_add_box(src, Vector3(r.get_center().x, -0.25, r.get_center().y), Vector3(r.size.x + MARGIN * 2.0 + 2.0, 0.5, r.size.y + MARGIN * 2.0 + 2.0))

@@ -242,7 +242,7 @@ func _district_here() -> String:
 	var p := listener.global_position
 	var c := CityGenerator.block_at(p)
 	if c.x < 0:
-		return "docks" if p.z > CityGenerator.city_extent() - 20.0 else "outskirts"
+		return "docks" if p.z > CityGenerator.extent_z() - 20.0 else "outskirts"
 	var b: Dictionary = city.blocks[city.block_index(c.x, c.y)]
 	if b.style == "park":
 		return "park"

@@ -346,6 +346,9 @@ func _lower_state(o: Officer) -> String:
 		Officer.S.CROUCH: return "crouch_walk" if hs > 0.2 else "crouch_idle"
 		Officer.S.DOWNED: return "prone_idle"
 		Officer.S.VEHICLE: return "sit"
+		Officer.S.GRAPPLE: return "climb" if o.state_t > 0.5 else "idle"
+		Officer.S.ROPE: return "fall" if o.state_t < Officer.ROPE_OVER else ("crouch_idle" if absf(o.velocity.y) < 0.1 else "fall")
+		Officer.S.SWING: return "jump"
 		Officer.S.COVER:
 			if o.is_aiming():
 				return "idle"   # feet planted; the body leans out (procedural)
@@ -362,7 +365,7 @@ func _lower_state(o: Officer) -> String:
 
 
 func _upper_state(o: Officer) -> String:
-	if o.state in [Officer.S.ROLL, Officer.S.SLIDE, Officer.S.VAULT, Officer.S.CLIMB, Officer.S.PRONE, Officer.S.KICK, Officer.S.DOWNED] or o.is_reviving():
+	if o.state in [Officer.S.ROLL, Officer.S.SLIDE, Officer.S.VAULT, Officer.S.CLIMB, Officer.S.PRONE, Officer.S.KICK, Officer.S.DOWNED, Officer.S.GRAPPLE, Officer.S.SWING] or o.is_reviving():
 		return "none"
 	if o.state == Officer.S.VEHICLE and o.seat == 0:
 		return "drive"
