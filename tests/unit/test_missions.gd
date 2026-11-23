@@ -111,3 +111,53 @@ func test_victims_talk_and_encounters_wait_to_be_found() -> void:
 		t.check(c.state == Dispatcher.CallState.ACTIVE, "walk up to it and it's yours")
 	s.queue_free()
 	await get_tree().process_frame
+
+
+func test_indoor_jobs() -> void:
+	var s := await _city()
+	var d := s.dispatch
+	var K := Dispatcher.Kind
+	var said: Array = []
+	d.radio.connect(func(x): said.append(x))
+	for k in [K.BURGLARY, K.RAID, K.HOSTAGE, K.SEARCH]:
+		var id := d.start_call(k)
+		t.check(id > 0, "%s: %s" % [Dispatcher.KIND_NAMES[k], d.calls[id].text if id > 0 else "-"])
+		if id <= 0:
+			continue
+		var c: Dictionary = d.calls[id]
+		var inside := 0
+		for sid in c.suspects:
+			var sus: Suspect = d.suspects[sid]
+			if Sfx.zone_at(get_tree(), sus.global_position + Vector3(0, 1.0, 0)) != null:
+				inside += 1
+		t.check(inside == c.suspects.size(), "  everyone is inside (%d of %d)" % [inside, c.suspects.size()])
+		if k == K.HOSTAGE:
+			var hs: Array = d.missions.people[id].hostages
+			t.check(hs.size() >= 2 and hs.all(func(h): return h.state == Suspect.S.SURRENDER), "  hostages held, kneeling")
+			var o: Officer = s.sync.my_pawn()
+			o.global_position = (hs[0] as Suspect).global_position + Vector3(0.8, 0, 0)
+			await get_tree().physics_frame
+			t.check(o.cuff_target() == null, "  an officer can't cuff a hostage")
+			o.global_position = s._spawn_point(0)
+		if k == K.RAID:
+			# Clear the ground floor: dispatch says so.
+			var floors: Dictionary = c.floors
+			t.check(floors.size() >= 1, "  suspects spread over %d floor(s)" % floors.size())
+			if floors.size() >= 2:
+				for sid in floors[floors.keys()[0]]:
+					(d.suspects[sid] as Suspect).set_state(Suspect.S.DOWN)
+				for i in 3:
+					await get_tree().physics_frame
+				t.check(said.any(func(x): return String(x).contains("clear. Keep going")), "  a floor is called clear")
+	# Hostages walk free once the takers are dealt with.
+	var hc: Array = d.calls.values().filter(func(c): return c.kind == K.HOSTAGE)
+	if not hc.is_empty():
+		var hostages: Array = d.missions.people[hc[0].id].hostages
+		for sid in hc[0].suspects:
+			(d.suspects[sid] as Suspect).set_state(Suspect.S.BOOKED)
+		for i in 10:
+			await get_tree().physics_frame
+		t.check(said.any(func(x): return String(x).contains("hostages out safe")), "hostages out safe")
+		t.check((hostages[0] as Suspect).state == Suspect.S.WANDER, "and they walk away")
+	s.queue_free()
+	await get_tree().process_frame

@@ -21,7 +21,8 @@ extends Node
 ## No crime meter (beenster, v0.2.11): the job is the calls and whatever
 ## turns up. Arrests and suspects shot count the same: no conduct score.
 
-enum Kind { ROBBERY, ARMED, TRAFFIC, GANG, THEFT, PURSUIT, MUGGING, SHOPLIFT, FIGHT, DOMESTIC, DEAL, VANDAL, DRUNK }
+enum Kind { ROBBERY, ARMED, TRAFFIC, GANG, THEFT, PURSUIT, MUGGING, SHOPLIFT, FIGHT, DOMESTIC, DEAL, VANDAL, DRUNK,
+	BURGLARY, RAID, HOSTAGE, SEARCH }
 enum CallState { ACTIVE, CLOSED, LOST, HIDDEN }
 
 const MSG_STATE := 80        # host -> all: calls, suspects, dropped guns (10 a second)
@@ -41,7 +42,8 @@ const BOOK_TIME := 1.2
 ## The speeding car's lap: the middle of the ring road.
 const LAP := [Vector3(-6, 0, -6), Vector3(54, 0, -6), Vector3(54, 0, 54), Vector3(-6, 0, 54)]
 const KIND_NAMES := ["Robbery in progress", "Armed suspect", "Traffic stop", "Shots fired", "Car theft", "Pursuit",
-	"Mugging", "Shoplifter", "Fight", "Domestic", "Drug deal", "Vandalism", "Drunk and disorderly"]
+	"Mugging", "Shoplifter", "Fight", "Domestic", "Drug deal", "Vandalism", "Drunk and disorderly",
+	"Burglary", "Raid", "Hostages", "Building search"]
 ## Wave 2: how long a car thief takes to get into the car.
 const BREAK_IN_TIME := 22.0
 

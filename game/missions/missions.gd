@@ -43,7 +43,13 @@ const TEMPLATES := {
 	Dispatcher.Kind.DEAL: {"d": [1, 1, 2, 2], "h": [0.2, 0.5, 2, 3], "encounter": true},
 	Dispatcher.Kind.VANDAL: {"d": [2, 2, 2, 1], "h": [0.3, 0.5, 2, 3], "encounter": true},
 	Dispatcher.Kind.DRUNK: {"d": [4, 1, 0.5, 1], "h": [0.2, 0.5, 2, 4], "encounter": true},
+	# Phase 3.2: inside buildings.
+	Dispatcher.Kind.BURGLARY: {"d": [1, 3, 2, 1], "h": [0.5, 1, 2, 3]},
+	Dispatcher.Kind.RAID: {"d": [1, 2, 3, 3], "h": [3, 1, 1, 1]},
+	Dispatcher.Kind.HOSTAGE: {"d": [3, 1, 1, 0.5], "h": [1, 1.5, 1, 0.5]},
+	Dispatcher.Kind.SEARCH: {"d": [1, 2, 3, 2], "h": [1, 1, 1, 1]},
 }
+const FLOOR_NAMES := ["Ground floor", "First floor", "Second floor", "Third floor", "Fourth floor", "Fifth floor"]
 const DISTRICTS := ["downtown", "residential", "industrial", "docks"]
 
 var dispatcher: Dispatcher
@@ -85,6 +91,7 @@ func _physics_process(delta: float) -> void:
 	if dispatcher == null or dispatcher.city == null:
 		return
 	_talk_step()
+	_floors_step()
 	_hidden_step(delta)
 	if enabled and dispatcher.enabled:
 		_encounter_t -= delta
@@ -202,9 +209,135 @@ func setup_call(c: Dictionary, at := Vector3.INF) -> bool:
 			c.suspects.append(s.net_id)
 			c.pos = street
 			c.text = "Drunk and disorderly %s, shouting at traffic. Bring him in." % d._side_name(street)
+		Dispatcher.Kind.BURGLARY:
+			var b := _inside_building(["house", "flats", "shop"])
+			if b.is_empty():
+				return false
+			for i in (1 if _rng.randf() < 0.5 else 2):
+				var p := _room_spot(b, _pick_room(b, -1))
+				var s := d.spawn_suspect(p, Suspect.S.ROB, _rng.randf() < 0.25, c.id)
+				c.suspects.append(s.net_id)
+				_note_floor(c, s, b)
+			c.pos = b.door
+			c.text = "Burglary at a %s on %s. Neighbours heard glass go; they're still inside." % [b.type, CityGenerator.street_at(b.door)]
+		Dispatcher.Kind.RAID:
+			var b := _inside_building(["flats", "warehouse", "garage", "office"], true)
+			if b.is_empty():
+				return false
+			var n := _rng.randi_range(3, 5)
+			for i in n:
+				var p := _room_spot(b, _pick_room(b, i % b.storeys))
+				var s := d.spawn_suspect(p, Suspect.S.LOITER, _rng.randf() < 0.8, c.id)
+				s.fighter = true
+				s.role = Suspect.ROLE_PIN if i % 2 == 0 else Suspect.ROLE_FLANK
+				c.suspects.append(s.net_id)
+				_note_floor(c, s, b)
+			c.pos = b.door
+			c.text = "Raid: warrant on the %s on %s. Expect %d inside, most of them armed, doors locked. Breach and clear it floor by floor." % [b.type, CityGenerator.street_at(b.door), n]
+		Dispatcher.Kind.HOSTAGE:
+			var b := _inside_building(["shop", "office"])
+			if b.is_empty():
+				return false
+			var room := _pick_room(b, 0)
+			var hostages: Array = []
+			for i in _rng.randi_range(2, 3):
+				var h := _bystander(_room_spot(b, room), "hostage", c)
+				h.set_state(Suspect.S.SURRENDER)
+				hostages.append(h)
+			people[c.id].hostages = hostages
+			for i in 2:
+				var s := d.spawn_suspect(_room_spot(b, room if i == 0 else _pick_room(b, -1)), Suspect.S.LOITER, true, c.id)
+				s.fighter = true
+				c.suspects.append(s.net_id)
+				_note_floor(c, s, b)
+			c.pos = b.door
+			c.text = "Hostages at the %s on %s: two armed, %d held inside. Get them out alive." % [b.type, CityGenerator.street_at(b.door), hostages.size()]
+		Dispatcher.Kind.SEARCH:
+			var b := _inside_building(["warehouse", "office", "flats", "garage"])
+			if b.is_empty():
+				return false
+			var p := _room_spot(b, _pick_room(b, b.storeys - 1))
+			var s := d.spawn_suspect(p, Suspect.S.HIDE, _rng.randf() < 0.4, c.id)
+			s.home = p
+			c.suspects.append(s.net_id)
+			_note_floor(c, s, b)
+			c.pos = b.door
+			c.text = "Wanted man seen going into the %s on %s. Search it, every floor." % [b.type, CityGenerator.street_at(b.door)]
 		_:
 			return false
 	return true
+
+
+# --- inside buildings (Phase 3.2) --------------------------------------------------------
+
+## An enterable building of one of these types in the call's block (any
+## type if none). prefer_locked: one with its door shut, to breach.
+func _inside_building(types: Array, prefer_locked := false) -> Dictionary:
+	var pick: Array = []
+	for b in dispatcher._area_buildings():
+		if b.enterable and b.type in types and not (b.get("rooms", []) as Array).is_empty():
+			pick.append(b)
+	if pick.is_empty():
+		for b in dispatcher._area_buildings():
+			if b.enterable and not (b.get("rooms", []) as Array).is_empty() and b.type != "station":
+				pick.append(b)
+	if pick.is_empty():
+		return {}
+	if prefer_locked:
+		var locked := pick.filter(func(b): return b.get("locked", false))
+		if not locked.is_empty():
+			pick = locked
+	return pick[_rng.randi_range(0, pick.size() - 1)]
+
+
+## A room on that floor (-1: any floor).
+func _pick_room(b: Dictionary, floor_i: int) -> Dictionary:
+	var rooms: Array = b.rooms
+	var on := rooms.filter(func(r): return floor_i < 0 or r.floor == floor_i)
+	if on.is_empty():
+		on = rooms
+	return on[_rng.randi_range(0, on.size() - 1)]
+
+
+## Somewhere inside a room (snapped to the walking routes when there are).
+func _room_spot(b: Dictionary, room: Dictionary) -> Vector3:
+	var r: Rect2 = room.rect
+	var x := r.position.x + r.size.x * _rng.randf_range(0.3, 0.7)
+	var z := r.position.y + r.size.y * _rng.randf_range(0.3, 0.7)
+	var p: Vector3 = b.origin + b.u * x + b.v * z + Vector3.UP * (room.floor * BlockGenerator.STOREY + 0.05)
+	var nav := dispatcher.nav
+	if nav and nav.ready_to_use:
+		var q := nav.closest(p)
+		if q.distance_to(p) < 2.5:
+			return q
+	return p
+
+
+## Which floor each suspect is on, so dispatch can call each floor clear.
+func _note_floor(c: Dictionary, s: Suspect, b: Dictionary) -> void:
+	var f := clampi(int(floorf((s.global_position.y - b.origin.y + 0.5) / BlockGenerator.STOREY)), 0, 5)
+	if not c.has("floors"):
+		c.floors = {}
+		c.storeys = b.storeys
+	if not c.floors.has(f):
+		c.floors[f] = []
+	c.floors[f].append(s.net_id)
+
+
+func _floors_step() -> void:
+	for c in dispatcher.calls.values():
+		if c.state != Dispatcher.CallState.ACTIVE or not c.has("floors"):
+			continue
+		for f in c.floors.keys():
+			var done := true
+			for sid in c.floors[f]:
+				var s: Suspect = dispatcher.suspects.get(sid)
+				if s and not s.is_done() and s.state not in [Suspect.S.CUFFED, Suspect.S.IN_CAR]:
+					done = false
+			if done:
+				c.floors.erase(f)
+				if not c.floors.is_empty():
+					dispatcher.say("DISPATCH: %s clear. Keep going." % FLOOR_NAMES[f])
 
 
 func _side(dist: float) -> Vector3:
@@ -222,7 +355,8 @@ func _bystander(p: Vector3, role: String, c: Dictionary) -> Suspect:
 	s._calm_t = 9999.0
 	if not people.has(c.id):
 		people[c.id] = {"victim": null, "witness": null, "said": {}}
-	people[c.id][role] = s
+	if role in ["victim", "witness"]:
+		people[c.id][role] = s
 	return s
 
 
@@ -307,8 +441,21 @@ static func _compass(v: Vector3) -> String:
 	return names[int(roundf(a / (TAU / 8.0))) % 8 if a >= 0 else int(roundf((a + TAU) / (TAU / 8.0))) % 8]
 
 
-## The job's over: victims and witnesses get on with their day.
+## The job's over: victims and witnesses get on with their day (hostages
+## are freed, and dispatch says how many came out).
 func _release(e: Dictionary) -> void:
+	var hs: Array = e.get("hostages", [])
+	if not hs.is_empty():
+		var alive := 0
+		for h in hs:
+			if is_instance_valid(h) and (h as Suspect).state != Suspect.S.DOWN:
+				alive += 1
+				(h as Suspect).set_state(Suspect.S.WANDER)
+		e.victim = null
+		dispatcher.say("DISPATCH: %d of %d hostages out safe." % [alive, hs.size()] if alive < hs.size() else "DISPATCH: all %d hostages out safe. Good work." % hs.size())
+		for h in hs:
+			if is_instance_valid(h) and (h as Suspect).state == Suspect.S.WANDER:
+				_release({"witness": h})
 	for role in ["victim", "witness"]:
 		var s: Suspect = e.get(role)
 		if s == null or not is_instance_valid(s) or s.state == Suspect.S.DOWN:

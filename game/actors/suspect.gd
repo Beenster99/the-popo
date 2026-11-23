@@ -466,7 +466,9 @@ func _physics_process(delta: float) -> void:
 		S.SURRENDER:
 			# Nobody watching for a while: some get up and run again.
 			_alone_t = _alone_t + delta if (t.o == null or t.d > 18.0) else 0.0
-			if civilian and _alone_t > 6.0:
+			if civilian and part == "hostage":
+				_alone_t = 0.0      # held: they stay down until it's over
+			elif civilian and _alone_t > 6.0:
 				_alone_t = 0.0
 				pressure = 0.0
 				_back_to_route()

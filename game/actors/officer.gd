@@ -717,7 +717,7 @@ func cuff_target() -> Suspect:
 		var s := n as Suspect
 		if s == null or s.global_position.distance_to(global_position) > CUFF_RANGE:
 			continue
-		if s.state == Suspect.S.SURRENDER:
+		if s.state == Suspect.S.SURRENDER and s.part == "":
 			return s
 		if s.state == Suspect.S.CUFFED and s.escort_peer != peer_id and not _escort_here(s):
 			return s
