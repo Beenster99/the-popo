@@ -752,9 +752,9 @@ func _try_seat_prisoner() -> bool:
 		return false
 	var best: PoliceCar = null
 	var best_d := ENTER_RANGE + 0.4
-	for c in get_tree().get_nodes_in_group("police_cars"):
+	for c in get_tree().get_nodes_in_group("vehicles"):
 		var pc := c as PoliceCar
-		for i in 4:
+		for i in pc.doors.size():
 			var dp := pc.door_point(i)
 			var d := Vector2(dp.x - global_position.x, dp.z - global_position.z).length()
 			if d < best_d:
@@ -764,6 +764,8 @@ func _try_seat_prisoner() -> bool:
 		return false
 	var taken := best.occupants()
 	for s in [2, 3, 1]:
+		if s >= best.seats.size():
+			continue
 		if not taken.has(s):
 			if Net.is_host():
 				pr.put_in_car(best, s)
@@ -794,9 +796,11 @@ func _try_enter_car() -> bool:
 	var best: PoliceCar = null
 	var best_d := ENTER_RANGE
 	var best_door := -1
-	for c in get_tree().get_nodes_in_group("police_cars"):
+	for c in get_tree().get_nodes_in_group("vehicles"):
 		var pc := c as PoliceCar
-		for i in 4:
+		if not pc.can_enter():
+			continue
+		for i in pc.doors.size():
 			var dp := pc.door_point(i)
 			var d := Vector2(dp.x - global_position.x, dp.z - global_position.z).length()
 			if d < best_d:
@@ -814,7 +818,7 @@ func _try_enter_car() -> bool:
 	if taken.has(s):
 		s = -1
 		var dd := INF
-		for i in 4:
+		for i in best.seats.size():
 			if not taken.has(i):
 				var d := best.door_point(i).distance_to(global_position)
 				if d < dd:
@@ -822,6 +826,7 @@ func _try_enter_car() -> bool:
 					s = i
 	if s < 0:
 		return false
+	best.commandeer(self)
 	_enter_seat(best, s)
 	return true
 
@@ -851,8 +856,9 @@ func _vehicle_step() -> void:
 		return
 	if _pressed(PlayerInput.CROUCH) or _pressed(PlayerInput.STAND) or _pressed(PlayerInput.PRONE) or _pressed(PlayerInput.DIVE):
 		var taken := car.occupants()
-		for k in range(1, 4):
-			var j := (seat + k) % 4
+		var n: int = car.seats.size()
+		for k in range(1, n):
+			var j := (seat + k) % n
 			if not taken.has(j):
 				seat = j
 				break
@@ -862,7 +868,7 @@ func _vehicle_step() -> void:
 func _place_in_seat() -> void:
 	if car == null:
 		return
-	var local: Vector3 = PoliceCar.SEATS[seat]
+	var local: Vector3 = car.seats[seat]
 	if is_aiming():
 		# Leaning out of the window, sat on the sill.
 		local.x += signf(local.x) * 0.42
@@ -886,7 +892,10 @@ func _leave_car(forced := false) -> void:
 		_set_state(S.MOVE)
 		return
 	var spot := Vector3.INF
+	var nd: int = c.doors.size()
 	for d in [s, s ^ 1, (s + 2) % 4, (s + 2) % 4 ^ 1]:
+		if d >= nd:
+			continue
 		var p := c.door_point(d)
 		if _room_at(p):
 			spot = p
@@ -1620,7 +1629,7 @@ func apply_state(s: Dictionary) -> void:
 	seat = s.seat
 	car = null
 	if s.car >= 0 and is_inside_tree():
-		for c in get_tree().get_nodes_in_group("police_cars"):
+		for c in get_tree().get_nodes_in_group("vehicles"):
 			if c.net_id == s.car:
 				car = c
 	collision_mask = 0 if state in [S.VAULT, S.CLIMB, S.VEHICLE] else (1 | 4 | 16)
@@ -1648,7 +1657,7 @@ func _process(delta: float) -> void:
 			rig.set_downed(state == S.DOWNED)
 		if state == S.VEHICLE and car:
 			_place_in_seat()   # stay in the seat between ticks (and on remote copies)
-			car.set_window_down(PoliceCar.SEAT_WINDOW[seat], is_aiming())
+			car.set_window_down(car.seat_windows[seat], is_aiming())
 		rig.update_from(self, delta)
 		if _shown_gun != gun:
 			_shown_gun = gun

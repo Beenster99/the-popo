@@ -36,6 +36,7 @@ var _names := {}     # peer id -> name, to say who came and went
 
 
 func _ready() -> void:
+	BlockState.save_path = "user://saves/block.save"
 	ProtoWorld.environment(self)
 	var sun := ProtoWorld.sun(self)
 	sun.directional_shadow_max_distance = 120.0

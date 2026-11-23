@@ -71,6 +71,12 @@ var _look_counter := 0
 var guns := {}               # net id -> DroppedGun (everyone)
 var _next_gun_id := 1
 var _backup := []            # host: [{call, t, at}]
+## Wave 2: the city. Calls happen in one block near the officers (area_block),
+## which has its own hiding places; the traffic stop laps that block.
+var city: CityGenerator
+var area_block := -1
+var _hide_by_block := {}     # block index -> Array of spots
+var lap: Array = LAP
 
 
 func _ready() -> void:
@@ -94,11 +100,18 @@ func setup(g: BlockGenerator, w: DestructionWorld, c: CarSync, n: BlockNav, civ:
 	cars = c
 	nav = n
 	civ_car = civ
+	if g is CityGenerator:
+		city = g
+		if _bay_node:
+			_bay_node.queue_free()
+		_build_bay()
 	if civ_car and Net.is_host():
 		civ_car.dented.connect(func(_p, _d, _a): _traffic_bail("rammed"))
 
 
 func bay_position() -> Vector3:
+	if city:
+		return city.custody_bay()
 	return Vector3(BAY.x, BlockGenerator.BASE_Y - 0.15, BAY.z)
 
 
@@ -111,7 +124,7 @@ func _physics_process(delta: float) -> void:
 		_interpolate()
 		_update_markers()
 		return
-	if nav and nav.ready_to_use and hide_spots.is_empty() and gen:
+	if nav and nav.ready_to_use and hide_spots.is_empty() and gen and city == null:
 		_find_hide_spots()
 	# Calls coming in.
 	if enabled and gen and nav and nav.ready_to_use:
@@ -152,6 +165,10 @@ func _pick_kind() -> Kind:
 func start_call(kind: Kind) -> int:
 	var c := {"id": _next_call_id, "kind": kind, "state": CallState.ACTIVE, "pos": Vector3.ZERO,
 		"marker": Vector3.ZERO, "t": 0.0, "suspects": [], "text": "", "seen_t": 0.0}
+	if city:
+		if not _pick_area():
+			return -1
+		c.block = area_block
 	match kind:
 		Kind.ROBBERY:
 			var b := _shop()
@@ -159,7 +176,8 @@ func start_call(kind: Kind) -> int:
 				return -1
 			var inside: Vector3 = b.origin + b.u * (b.w * BlockGenerator.M * 0.5) + b.v * (BlockGenerator.M * 0.9) + Vector3(0, 0.05, 0)
 			c.pos = inside
-			c.text = "Robbery in progress at the %s on the %s side. Two suspects." % [b.type, b.side]
+			c.text = "Robbery in progress at the %s on the %s side. Two suspects." % [b.type, b.side] if city == null else \
+				"Robbery in progress at the %s on %s. Two suspects." % [b.type, CityGenerator.street_at(b.door)]
 			for i in 2:
 				var p: Vector3 = inside + b.u * (1.4 * (i * 2 - 1))
 				c.suspects.append(spawn_suspect(p, Suspect.S.ROB, _rng.randf() < 0.25, c.id).net_id)
@@ -190,10 +208,16 @@ func start_call(kind: Kind) -> int:
 		Kind.TRAFFIC:
 			if civ_car == null or not _traffic.is_empty():
 				return -1
+			if city:
+				# Wave 2: the speeder starts on the far side of the call's block.
+				civ_car.global_transform = Transform3D(Basis(Vector3.UP, -PI / 2), (lap[2] as Vector3) + Vector3(-12, 0.95, 0))
+				civ_car.linear_velocity = Vector3.ZERO
+				civ_car.angular_velocity = Vector3.ZERO
 			var s := spawn_suspect(civ_car.global_position, Suspect.S.DRIVE, _rng.randf() < 0.4, c.id)
 			c.suspects.append(s.net_id)
 			c.pos = civ_car.global_position
-			c.text = "Speeding car lapping the block. Get behind it with your lights on and pull it over."
+			c.text = "Speeding car lapping the block. Get behind it with your lights on and pull it over." if city == null else \
+				"Speeding car going round and round the block by %s. Get behind it with your lights on and pull it over." % CityGenerator.street_at(c.pos)
 			_traffic = {"call": c.id, "phase": "drive", "t": 0.0, "near_t": 0.0, "suspect": s.net_id}
 	c.marker = c.pos
 	calls[c.id] = c
@@ -337,7 +361,7 @@ func take_gun(g: DroppedGun) -> void:
 ## An enterable shop if there is one, else any enterable building.
 func _shop() -> Dictionary:
 	var pick: Dictionary = {}
-	for b in gen.buildings:
+	for b in _area_buildings():
 		if b.enterable and (pick.is_empty() or (b.type == "shop" and pick.type != "shop")):
 			pick = b
 	return pick
@@ -346,12 +370,13 @@ func _shop() -> Dictionary:
 ## A pavement spot near the street, away from the officers.
 func _street_spot() -> Vector3:
 	var e := BlockGenerator.N * BlockGenerator.M
-	var best := Vector3(e * 0.5, BlockGenerator.BASE_Y, 1.0)
+	var ao := _area_offset()
+	var best := ao + Vector3(e * 0.5, BlockGenerator.BASE_Y, 1.0)
 	var best_d := -1.0
 	for i in 8:
 		var along := _rng.randf_range(4.0, e - 4.0)
 		var side := _rng.randi_range(0, 3)
-		var p: Vector3 = [Vector3(along, 0, 1.2), Vector3(along, 0, e - 1.2), Vector3(1.2, 0, along), Vector3(e - 1.2, 0, along)][side]
+		var p: Vector3 = ao + [Vector3(along, 0, 1.2), Vector3(along, 0, e - 1.2), Vector3(1.2, 0, along), Vector3(e - 1.2, 0, along)][side]
 		p.y = BlockGenerator.BASE_Y + 0.05
 		p = nav.closest(p)
 		var d := INF
@@ -364,6 +389,8 @@ func _street_spot() -> Vector3:
 
 
 func _side_name(p: Vector3) -> String:
+	if city:
+		return "on " + CityGenerator.street_at(p)
 	var e := BlockGenerator.N * BlockGenerator.M
 	var dn := [p.z, e - p.z, p.x, e - p.x]
 	var names := ["north", "south", "west", "east"]
@@ -374,11 +401,65 @@ func _side_name(p: Vector3) -> String:
 	return "%s side" % names[i]
 
 
+## Wave 2: picks the block the next call happens in: one next to the
+## officers (or the one they are in), whose walking routes are ready, and
+## not a park. Sets area_block, the hiding places and the traffic lap.
+func _pick_area() -> bool:
+	var officers := get_tree().get_nodes_in_group("officers")
+	var centre := Vector3.ZERO
+	for o in officers:
+		centre += (o as Node3D).global_position
+	centre = centre / maxf(1.0, officers.size()) if not officers.is_empty() else city.custody_bay()
+	var here := CityGenerator.block_at(centre)
+	if here.x < 0:
+		here = CityGenerator.block_at(city.custody_bay() + Vector3(0, 0, 8))
+	var options: Array = []
+	for dz in range(-1, 2):
+		for dx in range(-1, 2):
+			var c := here + Vector2i(dx, dz)
+			if c.x < 0 or c.y < 0 or c.x >= CityGenerator.GRID or c.y >= CityGenerator.GRID:
+				continue
+			var k := city.block_index(c.x, c.y)
+			var blk: Dictionary = city.blocks[k]
+			if blk.style in ["park", "carpark", "station"] or blk.buildings_to == blk.buildings_from:
+				continue
+			if nav is CityNav and not (nav as CityNav).block_ready(k):
+				continue
+			options.append(k)
+	if options.is_empty():
+		return false
+	area_block = options[_rng.randi_range(0, options.size() - 1)]
+	if not _hide_by_block.has(area_block):
+		hide_spots = []
+		_find_hide_spots()
+		_hide_by_block[area_block] = hide_spots
+	hide_spots = _hide_by_block[area_block]
+	var o := _area_offset()
+	lap = LAP.map(func(q): return o + q)
+	return true
+
+
+## The buildings where calls happen: the area block's (the whole block when
+## there is no city).
+func _area_buildings() -> Array:
+	if city == null or area_block < 0:
+		return gen.buildings
+	var blk: Dictionary = city.blocks[area_block]
+	return gen.buildings.slice(blk.buildings_from, blk.buildings_to)
+
+
+func _area_offset() -> Vector3:
+	if city == null or area_block < 0:
+		return Vector3.ZERO
+	return city.blocks[area_block].offset
+
+
 ## Places to hide: every room of the enterable buildings (upstairs too), and
 ## yards and alleys behind the others.
 func _find_hide_spots() -> void:
 	var M := BlockGenerator.M
-	for b in gen.buildings:
+	var ao := _area_offset()
+	for b in _area_buildings():
 		if not b.enterable:
 			continue
 		for s in b.storeys:
@@ -391,9 +472,9 @@ func _find_hide_spots() -> void:
 	var e := BlockGenerator.N * M
 	for i in 6:
 		for j in 6:
-			var p := Vector3(6.0 + i * (e - 12.0) / 5.0, BlockGenerator.BASE_Y + 0.05, 6.0 + j * (e - 12.0) / 5.0)
+			var p := ao + Vector3(6.0 + i * (e - 12.0) / 5.0, BlockGenerator.BASE_Y + 0.05, 6.0 + j * (e - 12.0) / 5.0)
 			var inside := false
-			for b in gen.buildings:
+			for b in _area_buildings():
 				if (b.bounds as AABB).grow(0.5).has_point(p + Vector3(0, 0.5, 0)):
 					inside = true
 			if inside:
@@ -668,9 +749,9 @@ func lap_input(car: Car) -> Dictionary:
 	var best_i := 0
 	var best_t := 0.0
 	var best_d := INF
-	for i in LAP.size():
-		var a: Vector3 = LAP[i]
-		var b: Vector3 = LAP[(i + 1) % LAP.size()]
+	for i in lap.size():
+		var a: Vector3 = lap[i]
+		var b: Vector3 = lap[(i + 1) % lap.size()]
 		var ab := b - a
 		var t := clampf((p - a).dot(ab) / ab.length_squared(), 0.0, 1.0)
 		var q := a + ab * t
@@ -681,14 +762,14 @@ func lap_input(car: Car) -> Dictionary:
 			best_t = t
 	var ahead := 7.0
 	var i := best_i
-	var a0: Vector3 = LAP[i]
-	var b0: Vector3 = LAP[(i + 1) % LAP.size()]
+	var a0: Vector3 = lap[i]
+	var b0: Vector3 = lap[(i + 1) % lap.size()]
 	var pos := a0.lerp(b0, best_t)
 	var left := (b0 - pos).length()
 	var target := pos
 	var to_corner := left
 	while ahead > 0.0:
-		var bb: Vector3 = LAP[(i + 1) % LAP.size()]
+		var bb: Vector3 = lap[(i + 1) % lap.size()]
 		var seg := (bb - pos).length()
 		if seg >= ahead:
 			target = pos + (bb - pos).normalized() * ahead
@@ -696,7 +777,7 @@ func lap_input(car: Car) -> Dictionary:
 		else:
 			ahead -= seg
 			pos = bb
-			i = (i + 1) % LAP.size()
+			i = (i + 1) % lap.size()
 	var lt := car.global_transform.affine_inverse() * Vector3(target.x, car.global_position.y, target.z)
 	var steer := clampf(atan2(lt.x, lt.z) * 1.8, -1.0, 1.0)
 	var want := 5.0 if to_corner < 12.0 else 10.0

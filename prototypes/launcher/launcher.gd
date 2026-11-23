@@ -94,11 +94,12 @@ func _ready() -> void:
 	start.custom_minimum_size = Vector2(320, 56)
 	start.add_theme_font_size_override("font_size", 22)
 	_list.add_child(start)
+	BlockState.save_path = City.SAVE_PATH
 	var saved := BlockState.peek()
 	if not saved.is_empty():
-		start.text = "Start on a new block"
-		var cont := _button("Continue the saved block (%d)" % saved.seed, func():
-			Block.resume = true
+		start.text = "Start in a new city"
+		var cont := _button("Continue the saved city (%d)" % saved.seed, func():
+			City.resume = true
 			_start(Scenes.GAME))
 		cont.custom_minimum_size = Vector2(320, 56)
 		cont.add_theme_font_size_override("font_size", 22)

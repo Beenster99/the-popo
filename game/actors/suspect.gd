@@ -255,7 +255,7 @@ func put_in_car(c: PoliceCar, s: int) -> void:
 func _place_in_seat() -> void:
 	if car == null or not is_instance_valid(car):
 		return
-	global_position = car.global_transform * (PoliceCar.SEATS[seat] as Vector3)
+	global_position = car.global_transform * (car.seats[seat] as Vector3)
 	var f := car.global_transform.basis.z
 	rotation.y = atan2(f.x, f.z)
 	velocity = car.linear_velocity

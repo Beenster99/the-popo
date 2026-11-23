@@ -47,10 +47,44 @@ func add_building(bounds: AABB, meshes: Array) -> void:
 	buildings.append({"bounds": bounds, "meshes": meshes})
 
 
+## Wave 2: a whole city of building meshes, so third person only looks at
+## the few in grid cells round the line from the officer to the camera.
+const CELL := 8.0
+var _grid := {}   # Vector2i -> Array of MeshInstance3D
+
+
+## Wave 2: registers a whole city in one pass: each building's pieces (by the
+## generator's building index) and every piece as something in the way.
+func add_city(world: DestructionWorld, gen: BlockGenerator) -> void:
+	var per: Array = []
+	per.resize(gen.buildings.size())
+	for i in per.size():
+		per[i] = []
+	var i := 0
+	for id in world.pieces:
+		var p: Dictionary = world.pieces[id]
+		var gp: Dictionary = gen.pieces[id - 1] if id - 1 < gen.pieces.size() else {}
+		for mi in p.node.find_children("*", "MeshInstance3D", false, false):
+			_register(mi, p.aabb, String(p.kind))
+			if gp.get("building", -1) >= 0:
+				per[gp.building].append(mi)
+		i += 1
+	for bi in gen.buildings.size():
+		buildings.append({"bounds": gen.buildings[bi].bounds, "meshes": per[bi]})
+
+
 func _register(mi: MeshInstance3D, box: AABB, kind: String) -> void:
 	if _seen.has(mi):
 		return
 	_seen[mi] = true
+	var c0 := Vector2i(floori(box.position.x / CELL), floori(box.position.z / CELL))
+	var c1 := Vector2i(floori(box.end.x / CELL), floori(box.end.z / CELL))
+	for cx in range(c0.x, c1.x + 1):
+		for cz in range(c0.y, c1.y + 1):
+			var k := Vector2i(cx, cz)
+			if not _grid.has(k):
+				_grid[k] = []
+			_grid[k].append(mi)
 	mi.set_meta("bottom_y", box.position.y)
 	mi.set_meta("box", box)
 	mi.set_meta("kind", kind)
@@ -83,7 +117,30 @@ func _process(delta: float) -> void:
 	var tp := IsoCamera.third_person and cam != null
 	var eye := -view
 	var probes := [p + Vector3(0, 0.3, 0), p + Vector3(0, 1.0, 0), p + Vector3(0, 1.75, 0)]
-	for m in _all:
+	var candidates: Array = _all
+	if tp:
+		# Only what is near the line to the camera, and whatever is still
+		# faded from before (so it comes back).
+		var seen := {}
+		candidates = []
+		var a := probes[2] as Vector3
+		var c := cam.global_position
+		var c0 := Vector2i(floori((minf(a.x, c.x) - 2.0) / CELL), floori((minf(a.z, c.z) - 2.0) / CELL))
+		var c1 := Vector2i(floori((maxf(a.x, c.x) + 2.0) / CELL), floori((maxf(a.z, c.z) + 2.0) / CELL))
+		for cx in range(c0.x, c1.x + 1):
+			for cz in range(c0.y, c1.y + 1):
+				for m in _grid.get(Vector2i(cx, cz), []):
+					if not seen.has(m):
+						seen[m] = true
+						candidates.append(m)
+		for m in _state.keys():
+			if not is_instance_valid(m):
+				_state.erase(m)
+				continue
+			if not seen.has(m) and (_state[m] < 0.999 or _shadow.has(m)):
+				seen[m] = true
+				candidates.append(m)
+	for m in candidates:
 		# Pieces that broke or fell are gone; skip them (no typed loop
 		# variable, which would choke on a freed mesh).
 		if not is_instance_valid(m):
@@ -219,6 +276,8 @@ func _fade(mi: MeshInstance3D, target: float, delta: float) -> void:
 	var cur: float = _state.get(mi, 1.0)
 	if is_equal_approx(cur, target):
 		_set_shadow_copy(mi, cur < 0.999)
+		if cur >= 0.999:
+			_state.erase(mi)
 		return
 	cur = move_toward(cur, target, delta * fade_speed)
 	_state[mi] = cur

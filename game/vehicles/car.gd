@@ -31,6 +31,23 @@ const STEER_MAX := 0.6      # rad at low speed
 const STEER_MIN := 0.12     # rad at top speed
 
 @export var color := Color("ecebe6")
+## Wave 2 (Phase 2.4): every vehicle type sets its own size and handling
+## before it enters the tree (the constants above are the Phase 0.4 car's).
+var size := SIZE
+var wheel_radius := WHEEL_RADIUS
+var rest := REST
+var spring := SPRING
+var damp := DAMP
+var engine := ENGINE
+var top_speed := TOP_SPEED
+var brake_force := BRAKE
+var steer_max := STEER_MAX
+var steer_min := STEER_MIN
+var yaw_assist := YAW_ASSIST
+## Upper body collider (the cabin): [size, centre].
+var cabin_box := [Vector3(1.6, 0.6, 2.1), Vector3(0, 0.75, -0.2)]
+## Wheel mounts in car space, or empty for the Phase 0.4 four.
+var wheel_mounts: Array = []
 ## Driving input, set by whoever simulates this car.
 var throttle := 0.0
 var steer := 0.0
@@ -81,29 +98,37 @@ func _ready() -> void:
 	horn_wav.loop_begin = 0
 	horn_wav.loop_end = horn_wav.data.size() / 2  # 16-bit mono frames
 	_horn_player.stream = horn_wav
-	_horn_player.position = Vector3(0, 0.6, SIZE.z * 0.45)
+	_horn_player.position = Vector3(0, 0.6, size.z * 0.45)
 	_horn_player.unit_size = 8.0
 	_horn_player.max_distance = 120.0
 	_horn_player.bus = "SFX"
 	add_child(_horn_player)
 	var cs := CollisionShape3D.new()
 	var bs := BoxShape3D.new()
-	bs.size = SIZE
+	bs.size = size
 	cs.shape = bs
 	add_child(cs)
-	var cabin := CollisionShape3D.new()
-	var cbs := BoxShape3D.new()
-	cbs.size = Vector3(1.6, 0.6, 2.1)
-	cabin.shape = cbs
-	cabin.position = Vector3(0, 0.75, -0.2)
-	add_child(cabin)
+	if not cabin_box.is_empty():
+		var cabin := CollisionShape3D.new()
+		var cbs := BoxShape3D.new()
+		cbs.size = cabin_box[0]
+		cabin.shape = cbs
+		cabin.position = cabin_box[1]
+		add_child(cabin)
 	_build_body()
-	for x in [-0.8, 0.8]:
-		for z in [1.35, -1.35]:
-			var holder := Node3D.new()
-			holder.add_child(_make_wheel())
-			add_child(holder)
-			_wheels.append({"pos": Vector3(x, -0.25, z), "front": z > 0, "node": holder, "compress": 0.0, "spin": 0.0})
+	if wheel_mounts.is_empty():
+		for x in [-0.8, 0.8]:
+			for z in [1.35, -1.35]:
+				wheel_mounts.append(Vector3(x, -0.25, z))
+	var front_z := -INF
+	for m in wheel_mounts:
+		front_z = maxf(front_z, (m as Vector3).z)
+	for m in wheel_mounts:
+		var holder := Node3D.new()
+		holder.add_child(_make_wheel())
+		add_child(holder)
+		var front: bool = absf((m as Vector3).z - front_z) < 0.3
+		_wheels.append({"pos": m, "front": front, "node": holder, "compress": 0.0, "spin": 0.0})
 
 
 ## The car's look: the Phase 0.4 box car. PoliceCar replaces it.
@@ -399,24 +424,24 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	var up := xf.basis.y
 	var vel := state.linear_velocity
 	var fwd_speed := vel.dot(fwd)
-	var speed_t: float = clamp(absf(fwd_speed) / TOP_SPEED, 0.0, 1.0)
+	var speed_t: float = clamp(absf(fwd_speed) / top_speed, 0.0, 1.0)
 	_steer_smooth = move_toward(_steer_smooth, steer, dt * 3.5)
-	var steer_angle: float = _steer_smooth * lerpf(STEER_MAX, STEER_MIN, speed_t)
+	var steer_angle: float = _steer_smooth * lerpf(steer_max, steer_min, speed_t)
 	var space := state.get_space_state()
 	var grounded := 0
 	for w in _wheels:
 		var mount: Vector3 = xf * (w.pos as Vector3)
-		var q := PhysicsRayQueryParameters3D.create(mount, mount - up * (REST + WHEEL_RADIUS), 1 | 4 | 16 | 32, [get_rid()])
+		var q := PhysicsRayQueryParameters3D.create(mount, mount - up * (rest + wheel_radius), 1 | 4 | 16 | 32, [get_rid()])
 		var hit := space.intersect_ray(q)
 		if hit.is_empty():
 			w.compress = 0.0
 			continue
 		grounded += 1
-		var dist: float = (hit.position as Vector3).distance_to(mount) - WHEEL_RADIUS
-		var compress := REST - dist
+		var dist: float = (hit.position as Vector3).distance_to(mount) - wheel_radius
+		var compress := rest - dist
 		var comp_speed: float = (compress - w.compress) / dt
 		w.compress = compress
-		var load: float = max(0.0, SPRING * compress + DAMP * comp_speed)
+		var load: float = max(0.0, spring * compress + damp * comp_speed)
 		var contact: Vector3 = hit.position
 		var rel := contact - xf.origin
 		state.apply_force(up * load, rel)
@@ -437,12 +462,12 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		var lat_f := -lat_v * grip * load / 9.81 * 0.5
 		var lon_f := 0.0
 		if not w.front:
-			var drive := throttle * ENGINE * 0.5 * (1.0 - speed_t * speed_t)
+			var drive := throttle * engine * 0.5 * (1.0 - speed_t * speed_t)
 			if throttle < 0.0:
-				drive = throttle * ENGINE * 0.35 * (1.0 if fwd_speed > -9.0 else 0.0)
+				drive = throttle * engine * 0.35 * (1.0 if fwd_speed > -9.0 else 0.0)
 			lon_f += drive
 		if brake > 0.0 or (handbrake and not w.front):
-			var b := (BRAKE * 0.25 * brake) + (BRAKE * HANDBRAKE_LOCK if handbrake and not w.front else 0.0)
+			var b := (brake_force * 0.25 * brake) + (brake_force * HANDBRAKE_LOCK if handbrake and not w.front else 0.0)
 			lon_f -= sign(lon_v) * min(b, absf(lon_v) * mass * 2.0)
 		# Off the throttle the engine drags the driven wheels, and every tyre
 		# has a little rolling resistance, so a coasting car comes to rest
@@ -459,14 +484,14 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		if f.length() > limit:
 			f = f.normalized() * limit
 		state.apply_force(wright * f.x + wfwd * f.y, rel)
-		w.spin += lon_v * dt / WHEEL_RADIUS
+		w.spin += lon_v * dt / wheel_radius
 	if grounded >= 2:
 		# Assists: a little downforce and yaw damping so it reads well from above.
 		state.apply_central_force(-up * vel.length_squared() * 2.5)
 		var yaw_rate := state.angular_velocity.dot(up)
 		# It asks for more rotation than the tyres can follow, so the tail
 		# steps out (oversteer); the handbrake asks for much more again.
-		var wanted_yaw := _steer_smooth * fwd_speed * YAW_ASSIST * (HANDBRAKE_YAW if handbrake else 1.0)
+		var wanted_yaw := _steer_smooth * fwd_speed * yaw_assist * (HANDBRAKE_YAW if handbrake else 1.0)
 		state.apply_torque(up * (wanted_yaw - yaw_rate) * mass * 0.9)
 	_detect_impacts(state)
 	_update_wheel_visuals(dt, true, steer_angle)
@@ -492,7 +517,7 @@ func _detect_impacts(state: PhysicsDirectBodyState3D) -> void:
 func _update_wheel_visuals(dt: float, simulated: bool, steer_angle := 0.0) -> void:
 	for w in _wheels:
 		var node: Node3D = w.node
-		var drop: float = REST - w.compress if simulated else REST * 0.5
+		var drop: float = rest - w.compress if simulated else rest * 0.5
 		node.position = (w.pos as Vector3) + Vector3(0, -drop, 0)
 		node.rotation = Vector3(w.spin, steer_angle if w.front else 0.0, 0)
 

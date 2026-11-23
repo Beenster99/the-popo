@@ -55,6 +55,38 @@ func _plain_stage(cam_at: Vector3, look: Vector3) -> Node3D:
 
 func _run() -> void:
 	match shot:
+		"city_aerial", "city_street", "city_inside", "city_docks", "city_downtown":
+			# Wave 2: the whole city.
+			City.next_seed = 4242
+			var s := await _scene("res://game/city/city.tscn")
+			await _frames(10)
+			s.find_children("*", "NetOverlay", false, false)[0].queue_free()
+			(s.dispatch as Dispatcher).enabled = false
+			var o: Officer = s.sync.my_pawn()
+			var e := CityGenerator.city_extent()
+			match shot:
+				"city_aerial":
+					var cam := Camera3D.new()
+					s.add_child(cam)
+					cam.far = 2000.0
+					cam.look_at_from_position(Vector3(e * 0.5 - 160, 260, e + 170), Vector3(e * 0.5, 0, e * 0.45))
+					cam.current = true
+				"city_docks", "city_downtown":
+					var cam := Camera3D.new()
+					s.add_child(cam)
+					cam.far = 2000.0
+					if shot == "city_docks":
+						cam.look_at_from_position(Vector3(130, 30, e + 40), Vector3(170, 0, e - 40))
+					else:
+						cam.look_at_from_position(Vector3(70, 22, 100), Vector3(160, 6, 160))
+					cam.current = true
+				"city_inside":
+					var b: Dictionary = s.gen.buildings.filter(func(x): return x.type == "office" and x.storeys >= 3)[0]
+					o.global_position = b.origin + b.u * ((b.w - 0.5) * 4.0) + b.v * ((b.d - 1.5) * 4.0) + Vector3(0, 0.05, 0)
+					s._furnish_near(false)
+					s.cam.tp_pitch = -12.0
+			await _frames(90)
+			await _save()
 		"drag":
 			# v0.2.11: dragging a downed teammate by the collar.
 			var root := _plain_stage(Vector3(4.5, 2.2, 4.5), Vector3(2.5, 0.4, 0))

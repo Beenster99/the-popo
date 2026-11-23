@@ -22,6 +22,16 @@ const BOOT := Vector3(0, 0, -2.75)
 const PANEL_LIMIT := 0.55
 const LIGHTS_RATE := 2.6        # flash cycles a second
 
+## Wave 2 (Phase 2.4): civilian vehicles are this class too (seats, doors,
+## glass, dents and parts work the same), with their own model, seats and
+## doors and no lights, siren or boot kit.
+var model_scene: PackedScene = MODEL
+var seats: Array = SEATS
+var doors: Array = DOORS
+var seat_windows: Array = SEAT_WINDOW
+var boot := BOOT
+var is_police := true
+
 var lights := false
 var siren := 0                  # 0 off, 1 wail, 2 yelp
 var glass := {}                 # window name -> {node, box, broken: bool}
@@ -39,15 +49,21 @@ var _flash_t := 0.0
 
 func _init() -> void:
 	super._init()
-	add_to_group("police_cars")
+	add_to_group("vehicles")
 	color = Color("eeeeea")
 
 
+func _enter_tree() -> void:
+	if is_police and not is_in_group("police_cars"):
+		add_to_group("police_cars")
+
+
 func _build_body() -> void:
-	var model: Node3D = MODEL.instantiate()
+	var model: Node3D = model_scene.instantiate()
 	model.name = "Model"
 	add_child(model)
 	Cel.apply(model)
+	_style_model(model)
 	_wheel_proto = model.find_child("wheel", true, false)
 	if _wheel_proto:
 		_wheel_proto.get_parent().remove_child(_wheel_proto)
@@ -105,6 +121,12 @@ func _build_body() -> void:
 	add_child(_siren_player)
 
 
+## Wave 2: civilian vehicles recolour their paint here, before the panels
+## are made dentable.
+func _style_model(_model: Node3D) -> void:
+	pass
+
+
 func _make_wheel() -> Node3D:
 	if _wheel_proto:
 		return _wheel_proto.duplicate()
@@ -132,6 +154,8 @@ func _part(root: Node, n: String, limit: float, m: float) -> void:
 
 ## Driver's T: off -> lights -> lights and wail -> lights and yelp -> off.
 func cycle_lights() -> void:
+	if not is_police:
+		return
 	if not lights:
 		lights = true
 		siren = 0
@@ -247,21 +271,34 @@ func occupants() -> Dictionary:
 	return out
 
 
+## Wave 2: officers can get into any vehicle (commandeering). Whoever is
+## driving it (a civilian) is pulled out first: see TrafficSystem.
+signal commandeered(by: Node)
+
+
+func can_enter() -> bool:
+	return true
+
+
+func commandeer(by: Node) -> void:
+	commandeered.emit(by)
+
+
 func seat_free(i: int) -> bool:
 	return not occupants().has(i)
 
 
 ## World position of a seat or door.
 func seat_point(i: int) -> Vector3:
-	return global_transform * (SEATS[i] as Vector3)
+	return global_transform * (seats[i] as Vector3)
 
 
 func door_point(i: int) -> Vector3:
-	return global_transform * (DOORS[i] as Vector3)
+	return global_transform * (doors[i] as Vector3)
 
 
 func boot_point() -> Vector3:
-	return global_transform * BOOT
+	return global_transform * boot
 
 
 # --- network ---------------------------------------------------------------

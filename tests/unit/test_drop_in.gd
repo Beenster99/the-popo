@@ -93,8 +93,8 @@ func test_the_block_is_saved_and_continue_brings_it_back() -> void:
 
 
 func test_a_broken_save_is_ignored() -> void:
-	DirAccess.make_dir_recursive_absolute(BlockState.SAVE_PATH.get_base_dir())
-	var f := FileAccess.open(BlockState.SAVE_PATH, FileAccess.WRITE)
+	DirAccess.make_dir_recursive_absolute(BlockState.save_path.get_base_dir())
+	var f := FileAccess.open(BlockState.save_path, FileAccess.WRITE)
 	f.store_string("not a save at all, just some words")
 	f.close()
 	t.check(not BlockState.has_save(), "a file that isn't a save is no save")
@@ -106,6 +106,8 @@ func test_a_broken_save_is_ignored() -> void:
 
 
 func test_the_menu_offers_continue() -> void:
+	# The menu offers the city's save (Wave 2).
+	BlockState.save_path = City.SAVE_PATH
 	BlockState.delete_save()
 	var m: Node = load("res://game/ui/main_menu.tscn").instantiate()
 	add_child(m)
@@ -113,6 +115,7 @@ func test_the_menu_offers_continue() -> void:
 	t.check(not _has_button(m, "Continue"), "no save, no Continue")
 	m.queue_free()
 	var a: Node = await _block(555, false)
+	BlockState.save_path = City.SAVE_PATH
 	a.state.save()
 	a.queue_free()
 	await _frames(3)
@@ -120,7 +123,7 @@ func test_the_menu_offers_continue() -> void:
 	add_child(m)
 	await _frames(2)
 	t.check(_has_button(m, "Continue"), "with a save, Continue")
-	t.check(_has_button(m, "New Block"), "and New Block")
+	t.check(_has_button(m, "New City"), "and New City")
 	Net.last_notice = "Lost the connection to the host."
 	m.queue_free()
 	m = load("res://game/ui/main_menu.tscn").instantiate()
