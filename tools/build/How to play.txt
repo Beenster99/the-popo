@@ -12,6 +12,10 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
+EVERYTHING TOGETHER (0.11.1)
+One build with all of the below: the frame rate work, the taller city, walk
+mode, and the slower, more tactical fights with one job at a time.
+
 FRAME RATE (0.11.0)
 Big performance pass. Settings > Graphics > Apply a preset: Epic is the one
 to play on at 4K (it upscales from 77% with FSR 2, which also smooths the
@@ -50,6 +54,21 @@ The walks are real motion capture now. Gun holstered, the officer strolls.
 Gun out, it's a tactical walk: knees soft, weight low, pistol at the ready.
 Aiming (right mouse / LT) you can back off and sidestep facing your target,
 a bit slower than walking forwards.
+
+SLOWER, MORE TACTICAL FIGHTS (0.9.0)
+Officers jog rather than dash, and speed up and slow down with more weight.
+A gun just brought up takes a moment to settle, and shooting on the move
+goes wide: stop, aim, then fire. A head shot drops a crook. Getting hit
+hurts more too, so use cover.
+Crooks with guns watch the whole street now and react to gunfire and being
+shot: they get into cover behind cars and walls, peek and shoot, blind fire,
+flank and fall back instead of standing in the road.
+One job at a time: after each job there's a quiet spell (a minute and a
+half to three) before the next call comes in. Chance encounters and story
+jobs only turn up when nothing else is on.
+The radio: dispatch reads each job out in a clear voice (the details are on
+screen). Other units only talk now and then, quietly, between jobs.
+Wounds now sit on the body (no more dark blob by a shot crook's head).
 
 SHOUTED ORDERS (0.8.0)
 Y (d-pad up) shouts an order at whoever you're facing, out loud for

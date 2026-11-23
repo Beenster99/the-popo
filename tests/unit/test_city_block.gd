@@ -58,7 +58,7 @@ func test_officer_walks_upstairs() -> void:
 	o.global_position = start - b.v * 0.6
 	var dir: Vector3 = b.v
 	var mv := Vector2(dir.x, dir.z)
-	for i in 240:
+	for i in 300:   # 5 s at the tactical jog
 		o.sim_step({"move": mv, "buttons": 0, "aim_yaw": atan2(dir.x, dir.z)}, 1.0 / 60.0)
 		await get_tree().physics_frame
 	var floor_y: float = b.origin.y + BlockGenerator.STOREY

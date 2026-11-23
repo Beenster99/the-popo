@@ -15,13 +15,15 @@ enum S { MOVE, CROUCH, PRONE, COVER, AIR, ROLL, SLIDE, VAULT, CLIMB, KICK, DOWNE
 ## What a melee strike was (see struck).
 enum Strike { PUNCH, KICK, BARGE }
 
-const RUN := 3.6
-const SPRINT := 5.6
-const WALK_AIM := 1.8
+## 2026-11-23 (beenster: "it should feel more tactical rather than a shoot
+## and run game"): a jog, not a dash; slower aimed walk; weightier starts.
+const RUN := 3.0
+const SPRINT := 5.0
+const WALK_AIM := 1.4
 const CROUCH_SPEED := 1.5
 const CRAWL_SPEED := 0.6
 const COVER_SPEED := 1.2
-const ACCEL := 30.0
+const ACCEL := 16.0
 const AIR_ACCEL := 6.0
 const JUMP_V := 4.6
 const GRAVITY := 16.0
@@ -192,6 +194,9 @@ var holstered := true          # officers start the game with the gun holstered
 var holster_t := 0.0      # seconds of holstering / drawing left
 var drawing := false      # holster_t counts down a draw (else a holster)
 var bloom := 0.0          # grows with rapid fire, widens the spread
+## Tactical pass: bringing the gun up takes a moment to settle (1 just
+## raised, 0 steady), and shooting on the move is looser than standing.
+var aim_settle := 1.0
 ## Cosmetic: chest kick after a shot, and how long the gun stays up after a
 ## blind-fire shot from cover.
 var recoil := 0.0
@@ -314,7 +319,8 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 	_cooldown -= delta
 	recoil = maxf(0.0, recoil - delta * 7.0)
 	blind_t = maxf(0.0, blind_t - delta)
-	bloom = maxf(0.0, bloom - delta * 2.5)
+	bloom = maxf(0.0, bloom - delta * 1.6)
+	aim_settle = maxf(0.0, aim_settle - delta * 2.2) if is_aiming() else 1.0
 	stagger_t = maxf(0.0, stagger_t - delta)
 	_weapon(delta)
 
@@ -1299,7 +1305,9 @@ func _weapon(delta: float) -> void:
 ## Bullets go where you point, give or take: steady aimed shots are tight,
 ## rapid fire opens up, blind fire from cover is wild.
 func _spread(dir: Vector3, blind: bool) -> Vector3:
-	var deg := Armoury.spread(kit) + bloom * 1.2 + (9.0 if blind else 0.0) + (2.2 if injuries & ARM else 0.0)
+	var deg := Armoury.spread(kit) + bloom * 1.5 + (9.0 if blind else 0.0) + (2.2 if injuries & ARM else 0.0)
+	# Snap shots and running and gunning go wide; a steady, planted shot doesn't.
+	deg += aim_settle * 3.5 + Vector2(velocity.x, velocity.z).length() * 1.2
 	if state == S.VEHICLE:
 		deg += 1.0 + car.linear_velocity.length() * 0.08 if car else 1.0
 	if state == S.PRONE:
@@ -1321,6 +1329,9 @@ func _step_up(wanted: Vector3, done: Vector3) -> void:
 	var left := h - h.normalized() * clampf(got.dot(h.normalized()), 0.0, h.length())
 	if left.length() < 0.002:
 		return
+	# Feel for the tread a little way ahead even at a slow walk (a jog moves
+	# only 5 cm a tick, not enough to clear the nosing).
+	left = left.normalized() * maxf(left.length(), 0.1)
 	var xf := global_transform
 	var up := Vector3(0, STEP_MAX, 0)
 	if test_move(xf, up):

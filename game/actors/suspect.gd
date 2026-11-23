@@ -29,12 +29,17 @@ enum S { LOITER, ROB, FLEE, HIDE, SHOOT, STAGGER, SURRENDER, CUFFED, IN_CAR, DOW
 enum C { HIDE, PEEK, BLIND, RELOAD }
 
 const WALK := 1.4
-const RUN := 4.4              # officers sprint at 5.6, so they can catch one
+const RUN := 3.9              # officers sprint at 5.0, so they can catch one
 const ACCEL := 20.0
 const GRAVITY := 16.0
 const MAX_HP := 60.0
 const CAPSULE_H := 1.75
 const NOTICE := 14.0          # m: sees an officer coming
+## 2026-11-23 (beenster: "the bad guys just stand in the middle of the
+## road"): anyone armed watches the whole street, not just 14 m of it, and
+## gunfire anywhere near sets them off.
+const NOTICE_ARMED := 38.0
+const HEAR_SHOTS := 45.0
 const CLOSE := 5.0            # m: notices an officer even out of sight
 const SURRENDER_AT := 1.6     # pressure that makes them give up
 const SHOT_GAP := 0.9         # s between an armed suspect's shots
@@ -198,7 +203,11 @@ func is_free() -> bool:
 ## Host: something loud and dangerous at `at` (a shot, a blast, a building
 ## coming down). Civilians in reach run from it or cower.
 func on_alarm(at: Vector3, radius: float) -> void:
-	if not civilian or state not in [S.WANDER, S.PANIC, S.COWER]:
+	if not civilian:
+		if global_position.distance_to(at) < minf(radius, HEAR_SHOTS) and _idle() and is_host_side():
+			_startled(at)
+		return
+	if state not in [S.WANDER, S.PANIC, S.COWER]:
 		return
 	var d := global_position.distance_to(at)
 	if d > radius:
@@ -382,6 +391,8 @@ func take_damage(amount: float, dir := Vector3.ZERO, _where := "") -> void:
 		return
 	pressure += (0.4 if fighter else 1.0) if hp > MAX_HP * 0.5 else (1.0 if fighter else 2.0)
 	_suppressed_t = SUPPRESS_TIME
+	if dir != Vector3.ZERO:
+		_startled(global_position - dir * 20.0)
 
 
 ## A punch, kick or barge: knocked off balance, and much keener to give up.
@@ -538,6 +549,13 @@ func _physics_process(delta: float) -> void:
 			if t.o:
 				_face(t.o.global_position)
 				aim_at = (t.o as Officer).global_position + Vector3(0, 1.2, 0)
+				# Not a statue: side-step while shooting, switching now and then.
+				var to_o: Vector3 = (t.o as Officer).global_position - global_position
+				to_o.y = 0.0
+				if to_o.length() > 0.1:
+					var side := Vector3(-to_o.z, 0, to_o.x).normalized() * (1.0 if int(state_t * 0.8 + net_id) % 2 == 0 else -1.0)
+					wish = (side - to_o.normalized() * 0.3).normalized()
+					speed = WALK * 1.3
 				if _shoot_t <= 0.0 and t.los and t.d < SHOOT_RANGE:
 					_fire(t.o)
 			if state_t > 2.5 or t.o == null:
@@ -858,7 +876,25 @@ func _threat() -> Dictionary:
 
 
 func _notices(t: Dictionary) -> bool:
-	return t.o != null and ((t.los and t.d < NOTICE) or t.d < CLOSE)
+	return t.o != null and ((t.los and t.d < (NOTICE_ARMED if (armed or fighter) else NOTICE)) or t.d < CLOSE)
+
+
+## Not yet in the fight (hanging about or robbing; a gang war keeps its own head).
+func _idle() -> bool:
+	return state in [S.LOITER, S.ROB] and not drunk and not civilian and part == ""
+
+
+## Shot at, hit, or gunfire close by while not yet fighting: into it now,
+## towards where it came from.
+func _startled(from: Vector3) -> void:
+	if not _idle():
+		return
+	_last_seen = from
+	brawl_with = null
+	var t := _threat()
+	if t.o == null:
+		t = {"o": null, "d": INF, "los": false}
+	_react(t)
 
 
 ## An officer aiming at them, close and in sight, wears them down.
@@ -1028,7 +1064,7 @@ func _fire_at(target: Vector3, spread_k: float) -> void:
 	var spread := target.distance_to(muzzle) * spread_k
 	target += Vector3(_rng.randf_range(-1, 1), _rng.randf_range(-0.6, 0.6), _rng.randf_range(-1, 1)) * spread
 	var dir := (target - muzzle).normalized()
-	var dmg: float = EnemyGuns.DAMAGE[weapon] * 0.7
+	var dmg: float = EnemyGuns.DAMAGE[weapon] * 0.9   # tactical pass: getting hit hurts
 	var first := true
 	for d in EnemyGuns.pellet_dirs(weapon, dir, _rng):
 		dispatcher.suspect_shot(self, muzzle, d, dmg, first)
@@ -1055,6 +1091,9 @@ func suppress() -> void:
 		return
 	_suppressed_t = SUPPRESS_TIME
 	pressure += 0.06 if fighter else 0.25
+	var t := _threat()
+	if t.o:
+		_startled((t.o as Officer).global_position)
 
 
 # --- host: fighting ------------------------------------------------------------------
@@ -1087,7 +1126,11 @@ func _take_cover(t: Dictionary, mode: String) -> bool:
 	var c := _find_cover(tp, mode)
 	if c.is_empty():
 		if mode == "near":
-			# No cover about: stand and shoot, then think again.
+			# Nothing close: somewhere further back will do, even without a
+			# good firing spot, rather than standing out in the open.
+			if armed and _take_cover(t, "retreat"):
+				return true
+			# Nothing at all: shoot on the move, then think again.
 			if armed and t.o and t.los:
 				set_state(S.SHOOT)
 			else:

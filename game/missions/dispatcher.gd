@@ -31,9 +31,12 @@ const MSG_RADIO := 81        # host -> all: a line of radio chatter
 const MSG_SHOT := 82         # host -> all: a suspect fired (origin, end)
 const BACKUP_DELAY := 9.0    # s after the first fighter takes cover
 
-const FIRST_CALL := 20.0     # s after the block loads
-const CALL_GAP := Vector2(25.0, 50.0)
-const MAX_CALLS := 2
+## 2026-11-23 (beenster: "the crime seems a bit non stop, it should be less
+## often or mission by mission"): one job at a time, and a quiet spell after
+## each one before the next comes in (the clock only runs while nothing is on).
+const FIRST_CALL := 40.0     # s after the block loads
+const CALL_GAP := Vector2(90.0, 180.0)
+const MAX_CALLS := 1
 const CALL_TIMEOUT := 300.0
 const SHOT_DAMAGE := 16.0
 ## The custody bay: drive prisoners here (east road, half way along).
@@ -161,8 +164,9 @@ func _physics_process(delta: float) -> void:
 		_find_hide_spots()
 	# Calls coming in.
 	if enabled and gen and nav and nav.ready_to_use:
-		_next_call_t -= delta
-		if _next_call_t <= 0.0 and _active_count() < MAX_CALLS:
+		if quiet():
+			_next_call_t -= delta
+		if _next_call_t <= 0.0 and quiet():
 			_next_call_t = _rng.randf_range(CALL_GAP.x, CALL_GAP.y)
 			start_call(_pick_kind())
 	_traffic_step(delta)
@@ -173,6 +177,14 @@ func _physics_process(delta: float) -> void:
 	_update_markers()
 	if _tick % 6 == 0 and Net.is_online():
 		Net.broadcast(MSG_STATE, _encode_state(), Net.ORDERED, 4)
+
+
+## Nothing on: no job running and no chance encounter waiting to be found.
+func quiet() -> bool:
+	for c in calls.values():
+		if c.state in [CallState.ACTIVE, CallState.HIDDEN]:
+			return false
+	return true
 
 
 func _active_count() -> int:

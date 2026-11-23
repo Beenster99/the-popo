@@ -21,7 +21,9 @@ static func resolve(world: DestructionWorld, cars: CarSync, origin: Vector3, dir
 		o.take_damage(shooter.shot_damage(), dir, o.body_part_at(hit.position))
 	elif hit and hit.collider is Suspect:
 		var sp := hit.collider as Suspect
-		sp.take_damage(shooter.shot_damage(), dir)
+		# Tactical pass: a head shot drops them; a careful shot is rewarded.
+		var head := (hit.position as Vector3).y - sp.global_position.y > 1.42
+		sp.take_damage(shooter.shot_damage() * (3.0 if head else 1.0), dir)
 	elif hit and hit.collider.has_method("on_bullet"):
 		hit.collider.on_bullet(hit.position, shooter)   # a range target
 	elif hit and hit.collider is Car and cars:

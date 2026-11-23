@@ -1,0 +1,216 @@
+{
+ "_note": "Spoken radio lines (2026-11-23). 'match' is the start of a DISPATCH/CUSTODY line on screen; the first match wins. Made by tools/audio/make_radio.py; an ElevenLabs take with the same file name replaces one. Matched case-insensitively anywhere in the line; status lines come first so 'robbery in progress call closed' is heard as a close.",
+ "dispatch": [
+  [
+   "dsp_found",
+   "you've come across it",
+   "Copy that, you've found it yourselves. Deal with it."
+  ],
+  [
+   "dsp_closed",
+   "call closed. Thanks",
+   "That's the call closed. Thanks, units."
+  ],
+  [
+   "dsp_lost",
+   "we've lost them",
+   "We've lost them. Call closed."
+  ],
+  [
+   "dsp_down",
+   "suspect down",
+   "Suspect down. Noted."
+  ],
+  [
+   "dsp_friends",
+   "they're on the phone",
+   "They're calling friends. Expect more of them."
+  ],
+  [
+   "dsp_backup",
+   "backup's arrived for them",
+   "Their backup's arrived. Two more, armed."
+  ],
+  [
+   "dsp_running",
+   "driver's out and running",
+   "Driver's out and running!"
+  ],
+  [
+   "dsp_shots_stop",
+   "shots fired at the traffic stop",
+   "Shots fired at the traffic stop!"
+  ],
+  [
+   "dsp_armed_driver",
+   "driver's out, and armed",
+   "Driver's out, and armed. Watch yourselves."
+  ],
+  [
+   "dsp_pull_over",
+   "the car is pulling over",
+   "The car's pulling over. Go and talk to the driver."
+  ],
+  [
+   "dsp_pursue",
+   "they're in the car and away",
+   "They're in the car and away. Pursue."
+  ],
+  [
+   "dsp_getaway",
+   "the getaway car",
+   "The getaway car's off. Stop it."
+  ],
+  [
+   "dsp_hostages_out",
+   "hostages out safe",
+   "All hostages out safe. Good work."
+  ],
+  [
+   "cus_booked",
+   "suspect booked in",
+   "Custody. Suspect booked in. Good work."
+  ],
+  [
+   "dsp_robbery",
+   "Robbery in progress",
+   "All units, robbery in progress. Two suspects. Location on your map."
+  ],
+  [
+   "dsp_armed",
+   "Armed suspect",
+   "All units, armed suspect on the street. Approach with care."
+  ],
+  [
+   "dsp_shots",
+   "Shots fired",
+   "Shots fired, shots fired. Several armed, they're dug in. Use cover."
+  ],
+  [
+   "dsp_speeding",
+   "Speeding car",
+   "Speeding car going round the block. Get behind it and pull it over."
+  ],
+  [
+   "dsp_theft",
+   "Someone breaking into",
+   "Report of someone breaking into a car. Get there before they're away."
+  ],
+  [
+   "dsp_stolen",
+   "Stolen",
+   "Stolen vehicle spotted, driving dangerously. Stop it."
+  ],
+  [
+   "dsp_mugging",
+   "Mugging",
+   "Mugging reported. Victim's still on scene. Suspect may be armed."
+  ],
+  [
+   "dsp_shoplift",
+   "Shoplifter",
+   "Shoplifter. The shopkeeper's holding the door."
+  ],
+  [
+   "dsp_fight",
+   "Fight in the street",
+   "Fight in the street. Two men going at it."
+  ],
+  [
+   "dsp_domestic",
+   "Domestic",
+   "Domestic disturbance. Shouting, things breaking. Go in carefully."
+  ],
+  [
+   "dsp_deal",
+   "Drug deal",
+   "Drug deal going down. One of them is carrying."
+  ],
+  [
+   "dsp_vandal",
+   "Someone smashing",
+   "Someone smashing windows. Location on your map."
+  ],
+  [
+   "dsp_drunk",
+   "Drunk and disorderly",
+   "Drunk and disorderly, shouting at traffic. Bring him in."
+  ],
+  [
+   "dsp_burglary",
+   "Burglary",
+   "Burglary in progress. They're still inside."
+  ],
+  [
+   "dsp_raid",
+   "Raid",
+   "Warrant is signed. Raid the building, most of them armed. Clear it floor by floor."
+  ],
+  [
+   "dsp_hostage",
+   "Hostages",
+   "Hostage situation. Two armed, people held inside. Get them out alive."
+  ],
+  [
+   "dsp_search",
+   "Wanted man",
+   "Wanted man seen going into a building. Search every floor."
+  ],
+  [
+   "dsp_gangwar",
+   "Gang war",
+   "Two crews shooting it out. Six armed, at least. Your call how you go in."
+  ],
+  [
+   "dsp_bank",
+   "Bank job",
+   "Bank job in progress. Armed inside, staff held, getaway car out front. Box the car in first."
+  ],
+  [
+   "dsp_sting",
+   "Sting",
+   "Sting operation. Plain clothes only. Keep the marked cars out of sight."
+  ],
+  [
+   "dsp_crash",
+   "Road accident",
+   "Road traffic accident. Secure the scene."
+  ],
+  [
+   "dsp_fire",
+   "Fire at",
+   "Building fire, people still coming out. Keep everyone back till the brigade arrives."
+  ],
+  [
+   "dsp_alarm",
+   "Alarm going off",
+   "Alarm going off. Probably nothing. Have a look."
+  ]
+ ],
+ "chatter": [
+  [
+   "cht_1",
+   "Control, unit four. Show us clear and available."
+  ],
+  [
+   "cht_2",
+   "Unit seven, en route to the custody suite with one."
+  ],
+  [
+   "cht_3",
+   "Control to unit two, can you take a noise complaint on the estate?"
+  ],
+  [
+   "cht_4",
+   "Unit nine, stopping a vehicle on the ring road. Will update."
+  ],
+  [
+   "cht_5",
+   "All units, be aware, the bridge is closed for roadworks."
+  ],
+  [
+   "cht_6",
+   "Unit three, refreshment break, back in thirty."
+  ]
+ ]
+}
