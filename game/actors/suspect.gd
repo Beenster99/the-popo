@@ -24,7 +24,7 @@ extends CharacterBody3D
 ## dropped on surrender or when they go down; officers can pick them up.
 ## Same skeleton and clips as the officers, dressed as civilians.
 
-enum S { LOITER, ROB, FLEE, HIDE, SHOOT, STAGGER, SURRENDER, CUFFED, IN_CAR, DOWN, BOOKED, DRIVE, COVER, SEEK_COVER, THROW, WANDER, PANIC, COWER }
+enum S { LOITER, ROB, FLEE, HIDE, SHOOT, STAGGER, SURRENDER, CUFFED, IN_CAR, DOWN, BOOKED, DRIVE, COVER, SEEK_COVER, THROW, WANDER, PANIC, COWER, BRAWL }
 ## What a fighter is doing in cover (synced, for the pose).
 enum C { HIDE, PEEK, BLIND, RELOAD }
 
@@ -131,6 +131,19 @@ var _panic_from := Vector3.INF
 var _calm_t := 0.0
 var _pace := 1.0
 
+## Wave 3, Phase 3.1: parts people play in a job.
+##  part: "" (a suspect or a passer-by), "victim" (stays put, shaken, and
+##        tells the first officer to reach them what happened), "witness"
+##        (stands by and points the way).
+##  brawl_with: someone to fight (BRAWL: squared up, swinging); a Vector3
+##        target instead means smashing whatever is there (vandal).
+##  drunk: doesn't run from the police, sways about, has to be talked down
+##        (aimed at) or wrestled.
+var part := ""
+var brawl_with: Variant = null
+var drunk := false
+var _swing_t := 0.0
+
 
 func _init() -> void:
 	add_to_group("suspects")
@@ -160,7 +173,7 @@ func is_host_side() -> bool:
 
 
 func is_free() -> bool:
-	return state in [S.LOITER, S.ROB, S.FLEE, S.HIDE, S.SHOOT, S.STAGGER, S.COVER, S.SEEK_COVER, S.THROW, S.WANDER, S.PANIC, S.COWER]
+	return state in [S.LOITER, S.ROB, S.FLEE, S.HIDE, S.SHOOT, S.STAGGER, S.COVER, S.SEEK_COVER, S.THROW, S.WANDER, S.PANIC, S.COWER, S.BRAWL]
 
 
 ## Host: something loud and dangerous at `at` (a shot, a blast, a building
@@ -329,7 +342,18 @@ func _physics_process(delta: float) -> void:
 	aim_at = Vector3.ZERO
 	match state:
 		S.LOITER:
-			if _notices(t):
+			if drunk:
+				# Sways about near where they are; the police don't scare them.
+				_wander_t -= delta
+				if _wander_t <= 0.0 or _goal == Vector3.INF:
+					_wander_t = _rng.randf_range(3.0, 6.0)
+					_goal = _near(home, 3.0)
+				wish = _steer(_goal, delta)
+				wish = (wish + Vector3(sin(state_t * 1.7) * 0.6, 0, cos(state_t * 1.3) * 0.6)).normalized() if wish != Vector3.ZERO else wish
+				speed = WALK * 0.6
+				if t.o and t.d < 2.0 and _rng.randf() < delta * 0.5:
+					set_state(S.STAGGER)   # takes a wild swing and falls about
+			elif _notices(t):
 				_react(t)
 			elif armed:
 				_wander_t -= delta
@@ -402,6 +426,24 @@ func _physics_process(delta: float) -> void:
 			var r := _throw_step(t, delta)
 			wish = r[0]
 			speed = r[1]
+		S.BRAWL:
+			if _notices(t) and _rng.randf() < delta * 1.5:
+				brawl_with = null
+				_react(t)
+			else:
+				var at := _brawl_point()
+				if at == Vector3.INF:
+					set_state(S.LOITER)
+				else:
+					_face(at)
+					var gap := Vector2(at.x - global_position.x, at.z - global_position.z).length()
+					if gap > 1.1:
+						wish = _steer(at, delta)
+						speed = WALK * 1.5
+					_swing_t -= delta
+					if _swing_t <= 0.0 and gap < 1.6:
+						_swing_t = _rng.randf_range(0.9, 1.6)
+						_land_swing()
 		S.WANDER:
 			if route.is_empty():
 				pass
@@ -462,6 +504,41 @@ func _physics_process(delta: float) -> void:
 		_face(aim_at)
 	move_and_slide()
 	_step_up(target)
+
+
+## Where the fight is: the other brawler, or the thing being smashed.
+func _brawl_point() -> Vector3:
+	if brawl_with is Vector3:
+		return brawl_with
+	if brawl_with is Suspect and is_instance_valid(brawl_with) and (brawl_with as Suspect).is_free():
+		return (brawl_with as Suspect).global_position
+	return Vector3.INF
+
+
+## A punch at whoever they're fighting, or a kick at the window.
+func _land_swing() -> void:
+	if brawl_with is Suspect:
+		var o := brawl_with as Suspect
+		o.take_damage(4.0, (o.global_position - global_position).normalized())
+		if o.state == Suspect.S.DOWN:
+			brawl_with = null
+	elif brawl_with is Vector3 and dispatcher and dispatcher.world:
+		var w: DestructionWorld = dispatcher.world
+		var at: Vector3 = brawl_with
+		var best := -1
+		var bd := 2.6
+		for id in w.pieces_near(at, 2.6):
+			var p: Dictionary = w.pieces[id]
+			if p.state != "intact":
+				continue
+			var d := (p.aabb as AABB).get_center().distance_to(at)
+			if d < bd and (String(p.kind).begins_with("glass") or p.kind in ["bollard", "lamp_post"]):
+				bd = d
+				best = id
+		if best >= 0:
+			w.damage_piece(best, 60.0, at, 1.0)
+		else:
+			brawl_with = null    # nothing left to smash: on their way
 
 
 ## A civilian picks up their walk again from the nearest point of it.
@@ -1157,6 +1234,9 @@ func _process(delta: float) -> void:
 		S.COWER:
 			lower = "crouch_idle"
 			upper = "hands_up"
+		S.BRAWL:
+			lower = "idle" if hs < 0.2 else "walk"
+			upper = "punch" if fmod(Time.get_ticks_msec() / 1000.0 + net_id * 0.37, 1.3) < 0.55 else "none"
 		S.CUFFED:
 			lower = "idle" if hs < 0.2 else ("walk" if hs < 2.2 else "run")
 			upper = "cuffed"

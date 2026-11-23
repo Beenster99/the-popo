@@ -65,6 +65,8 @@ func _process(delta: float) -> void:
 	_radio.visible = _radio_t > 0.0
 	var o: Node3D = pawn_getter.call() if pawn_getter.is_valid() else null
 	var lines := PackedStringArray()
+	if dispatcher.missions and dispatcher.city:
+		lines.append(dispatcher.missions.clock_text())
 	for call in dispatcher.active_calls():
 		var d := ""
 		if o:

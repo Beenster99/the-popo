@@ -21,8 +21,8 @@ extends Node
 ## No crime meter (beenster, v0.2.11): the job is the calls and whatever
 ## turns up. Arrests and suspects shot count the same: no conduct score.
 
-enum Kind { ROBBERY, ARMED, TRAFFIC, GANG, THEFT, PURSUIT }
-enum CallState { ACTIVE, CLOSED, LOST }
+enum Kind { ROBBERY, ARMED, TRAFFIC, GANG, THEFT, PURSUIT, MUGGING, SHOPLIFT, FIGHT, DOMESTIC, DEAL, VANDAL, DRUNK }
+enum CallState { ACTIVE, CLOSED, LOST, HIDDEN }
 
 const MSG_STATE := 80        # host -> all: calls, suspects, dropped guns (10 a second)
 const MSG_RADIO := 81        # host -> all: a line of radio chatter
@@ -40,7 +40,8 @@ const BAY_RADIUS := 4.5
 const BOOK_TIME := 1.2
 ## The speeding car's lap: the middle of the ring road.
 const LAP := [Vector3(-6, 0, -6), Vector3(54, 0, -6), Vector3(54, 0, 54), Vector3(-6, 0, 54)]
-const KIND_NAMES := ["Robbery in progress", "Armed suspect", "Traffic stop", "Shots fired", "Car theft", "Pursuit"]
+const KIND_NAMES := ["Robbery in progress", "Armed suspect", "Traffic stop", "Shots fired", "Car theft", "Pursuit",
+	"Mugging", "Shoplifter", "Fight", "Domestic", "Drug deal", "Vandalism", "Drunk and disorderly"]
 ## Wave 2: how long a car thief takes to get into the car.
 const BREAK_IN_TIME := 22.0
 
@@ -72,6 +73,8 @@ var _traffic := {}           # host: {call, phase, t, near_t}
 var _look_counter := 0
 ## Wave 2: the city's traffic (car thefts and chases use its cars).
 var traffic: TrafficSystem
+## Wave 3: templates, the clock and chance encounters.
+var missions: Missions
 var _thefts := {}            # host: call id -> {dr, suspect, t}
 var guns := {}               # net id -> DroppedGun (everyone)
 var _next_gun_id := 1
@@ -91,6 +94,10 @@ func _ready() -> void:
 	Net.register(MSG_RADIO, _on_radio)
 	Net.register(MSG_SHOT, _on_shot)
 	_build_bay()
+	missions = Missions.new()
+	missions.name = "Missions"
+	missions.dispatcher = self
+	add_child(missions)
 
 
 func _exit_tree() -> void:
@@ -156,6 +163,12 @@ func _active_count() -> int:
 
 
 func _pick_kind() -> Kind:
+	if city and missions:
+		var running: Array = []
+		for c in calls.values():
+			if c.state in [CallState.ACTIVE, CallState.HIDDEN]:
+				running.append(c.kind)
+		return missions.pick_kind(running)
 	var kinds := [Kind.ROBBERY, Kind.ARMED, Kind.TRAFFIC, Kind.GANG]
 	for c in calls.values():
 		if c.state == CallState.ACTIVE:
@@ -173,13 +186,20 @@ func _pick_kind() -> Kind:
 
 
 ## Host: opens a call of this kind. Returns its id (or -1).
-func start_call(kind: Kind) -> int:
+## opts (Wave 3): block (use this block), at (where), hidden (a chance
+## encounter nobody has found yet: no radio until an officer sees it).
+func start_call(kind: Kind, opts := {}) -> int:
 	var c := {"id": _next_call_id, "kind": kind, "state": CallState.ACTIVE, "pos": Vector3.ZERO,
 		"marker": Vector3.ZERO, "t": 0.0, "suspects": [], "text": "", "seen_t": 0.0}
 	if city:
-		if not _pick_area():
+		if opts.has("block"):
+			_use_area(opts.block)
+		elif not _pick_area():
 			return -1
 		c.block = area_block
+	if kind >= Kind.MUGGING:
+		if missions == null or not missions.setup_call(c, opts.get("at", Vector3.INF)):
+			return -1
 	match kind:
 		Kind.ROBBERY:
 			var b := _shop()
@@ -265,7 +285,10 @@ func start_call(kind: Kind) -> int:
 	c.marker = c.pos
 	calls[c.id] = c
 	_next_call_id += 1
-	say("DISPATCH: %s" % c.text)
+	if opts.get("hidden", false):
+		c.state = CallState.HIDDEN
+	else:
+		say("DISPATCH: %s" % c.text)
 	return c.id
 
 
@@ -471,7 +494,12 @@ func _pick_area() -> bool:
 			options.append(k)
 	if options.is_empty():
 		return false
-	area_block = options[_rng.randi_range(0, options.size() - 1)]
+	_use_area(options[_rng.randi_range(0, options.size() - 1)])
+	return true
+
+
+func _use_area(k: int) -> void:
+	area_block = k
 	if not _hide_by_block.has(area_block):
 		hide_spots = []
 		_find_hide_spots()
@@ -479,7 +507,6 @@ func _pick_area() -> bool:
 	hide_spots = _hide_by_block[area_block]
 	var o := _area_offset()
 	lap = LAP.map(func(q): return o + q)
-	return true
 
 
 ## The buildings where calls happen: the area block's (the whole block when
@@ -911,6 +938,7 @@ func _traffic_bail(_why: String) -> void:
 func _encode_state() -> PackedByteArray:
 	var b := StreamPeerBuffer.new()
 	b.put_double(_clock)
+	b.put_float(missions.minute if missions else 0.0)
 	var act := calls.values().filter(func(c): return c.state == CallState.ACTIVE)
 	b.put_u8(act.size())
 	for c in act:
@@ -941,6 +969,9 @@ func _on_state(_from: int, data: PackedByteArray) -> void:
 	var b := StreamPeerBuffer.new()
 	b.data_array = data
 	var t := b.get_double()
+	var mn := b.get_float()
+	if missions and absf(mn - missions.minute) > 2.0:
+		missions.minute = mn
 	var n := b.get_u8()
 	var keep := {}
 	for i in n:
