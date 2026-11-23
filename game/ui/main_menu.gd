@@ -40,6 +40,7 @@ func _ready() -> void:
 		var when := Time.get_datetime_string_from_unix_time(int(saved.saved) + _utc_offset(), true)
 		_home.add_child(UiTheme.big_button("Continue   (city %d, saved %s)" % [saved.seed, when.substr(5, 11)], func(): _play(Scenes.GAME, true)))
 	_home.add_child(UiTheme.big_button("Single Player" if saved.is_empty() else "New City", func(): _play(Scenes.GAME)))
+	_home.add_child(UiTheme.big_button("First Shift   (how to play)", func(): City.tutorial = true; _play(Scenes.GAME)))
 	_home.add_child(UiTheme.big_button("Online", func(): get_tree().change_scene_to_file("res://prototypes/launcher/launcher.tscn")))
 	_home.add_child(UiTheme.big_button("Settings", _open_settings))
 	_home.add_child(UiTheme.big_button("Quit", func(): get_tree().quit()))

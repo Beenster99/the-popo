@@ -39,6 +39,8 @@ var name_of: Callable
 ## Kit waiting for an officer who hasn't turned up yet: name -> [kit, plain].
 var kits := {}
 var _career_hash := 0
+## The tutorial city is never saved over the player's own.
+var no_save := false
 ## Host: whether anything has changed since the last save.
 var dirty := false
 var _save_t := SAVE_EVERY
@@ -220,6 +222,8 @@ func _give_kit(id: int, p: Node) -> void:
 # --- Saving ----------------------------------------------------------------------
 
 func save() -> bool:
+	if no_save:
+		return false
 	var b := StreamPeerBuffer.new()
 	b.put_u32(MAGIC)
 	b.put_u16(VERSION)
