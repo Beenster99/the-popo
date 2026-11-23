@@ -139,6 +139,31 @@ const KINDS := {
 			[Vector3(0.5, 0.26, 0.22), Vector3(0.1, 0.94, 0.02), "3f6b3a"]]},
 	"water_cooler": {"size": Vector3(-0.17, 1.3, 0), "mass": 22.0, "hp": 20.0, "surface": "glass", "throw": false, "flammable": false,
 		"parts": [[Vector3(0.34, 0.9, 0.34), Vector3(0, -0.2, 0), "e8e6e0"], [Vector3(-0.15, 0.38, 0), Vector3(0, 0.45, 0), "9fd0e8"]]},
+	# v0.7.0: up on the roofs (reached by the stairs, the lifts' towers, or
+	# a grapple): cover and clutter for rooftop fights.
+	"ac_unit": {"size": Vector3(1.3, 1.0, 0.9), "mass": 260.0, "hp": 260.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(1.3, 1.0, 0.9), Vector3.ZERO, "c9ccd0"], [Vector3(-0.32, 0.04, 0), Vector3(-0.28, 0.0, 0.45), "2a2c30"],
+			[Vector3(0.5, 0.75, 0.02), Vector3(0.35, 0.0, 0.46), "8a8d92"], [Vector3(1.34, 0.05, 0.94), Vector3(0, 0.5, 0), "a9acb0"],
+			[Vector3(0.12, 0.12, 0.6), Vector3(0.5, -0.4, -0.7), "6b6f72"]]},
+	"roof_vent": {"size": Vector3(-0.3, 1.2, 0), "mass": 40.0, "hp": 160.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(-0.22, 0.95, 0), Vector3(0, -0.12, 0), "9aa0a6"], [Vector3(-0.32, 0.12, 0), Vector3(0, 0.42, 0), "7d8388"],
+			[Vector3(-0.36, 0.05, 0), Vector3(0, 0.56, 0), "6b6f72"], [Vector3(-0.3, 0.06, 0), Vector3(0, -0.57, 0), "5e6266"]]},
+	"water_tank": {"size": Vector3(-1.1, 3.0, 0), "mass": 2400.0, "hp": 900.0, "surface": "wood", "throw": false, "flammable": true,
+		"parts": [[Vector3(-1.1, 2.0, 0), Vector3(0, 0.45, 0), "7a5a3c"], [Vector3(-1.15, 0.08, 0), Vector3(0, 0.3, 0), "3a3d42"],
+			[Vector3(-1.15, 0.08, 0), Vector3(0, 1.1, 0), "3a3d42"], [Vector3(-0.9, 0.35, 0), Vector3(0, 1.62, 0), "5e4630"],
+			[Vector3(0.12, 1.0, 0.12), Vector3(-0.7, -1.0, -0.7), "3a3d42"], [Vector3(0.12, 1.0, 0.12), Vector3(0.7, -1.0, -0.7), "3a3d42"],
+			[Vector3(0.12, 1.0, 0.12), Vector3(-0.7, -1.0, 0.7), "3a3d42"], [Vector3(0.12, 1.0, 0.12), Vector3(0.7, -1.0, 0.7), "3a3d42"],
+			[Vector3(0.06, 2.6, 0.4), Vector3(1.15, -0.2, 0), "5e6266"]]},
+	"sat_dish": {"size": Vector3(0.9, 1.3, 0.6), "mass": 25.0, "hp": 40.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(0.6, 0.06, 0.6), Vector3(0, -0.62, 0), "5e6266"], [Vector3(0.06, 0.9, 0.06), Vector3(0, -0.15, 0), "8a8d92"],
+			[Vector3(-0.42, 0.06, 0), Vector3(0, 0.35, 0.05), "e8e6e0"], [Vector3(0.03, 0.03, 0.45), Vector3(0, 0.35, 0.25), "6b6f72"]]},
+	"aerial": {"size": Vector3(0.3, 2.6, 0.3), "mass": 12.0, "hp": 30.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(0.04, 2.6, 0.04), Vector3.ZERO, "6b6f72"], [Vector3(1.0, 0.03, 0.03), Vector3(0, 0.9, 0), "8a8d92"],
+			[Vector3(0.8, 0.03, 0.03), Vector3(0, 1.1, 0), "8a8d92"], [Vector3(0.6, 0.03, 0.03), Vector3(0, 1.3, 0), "8a8d92"],
+			[Vector3(0.3, 0.05, 0.3), Vector3(0, -1.27, 0), "3a3d42"]]},
+	"roof_box": {"size": Vector3(1.6, 0.7, 0.8), "mass": 180.0, "hp": 300.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(1.6, 0.7, 0.8), Vector3.ZERO, "6d7a5a"], [Vector3(1.4, 0.05, 0.02), Vector3(0, 0.15, 0.41), "2a2c30"],
+			[Vector3(1.4, 0.05, 0.02), Vector3(0, -0.05, 0.41), "2a2c30"], [Vector3(0.2, 0.2, 0.2), Vector3(0.5, 0.45, 0), "8a8d92"]]},
 	"extinguisher": {"size": Vector3(-0.1, 0.55, 0), "mass": 9.0, "hp": 12.0, "surface": "metal", "throw": true, "puffs": true,
 		"parts": [[Vector3(-0.1, 0.48, 0), Vector3(0, -0.035, 0), "c41f1f"], [Vector3(0.06, 0.08, 0.14), Vector3(0, 0.25, 0.03), "202226"]]},
 }
@@ -296,7 +321,49 @@ func furnish_block(k: int) -> void:
 		if _next_id >= limit:
 			break
 		_furnish_rooms(city.buildings[bi], rng, limit)
+	for bi in range(blk.buildings_from, blk.buildings_to):
+		if _next_id >= limit:
+			break
+		_furnish_roof(city.buildings[bi], rng)
 	_furnish_outdoors(blk, rng, (k + 1) * BLOCK_IDS - 1)
+
+
+## v0.7.0: plant on the roofs: air conditioning, vents, aerials, a water
+## tank on the tall ones. Kept off the stair hut and a metre in from the edge.
+func _furnish_roof(b: Dictionary, rng: RandomNumberGenerator) -> void:
+	if int(b.storeys) < 2 or b.type == "house":
+		return
+	var M := BlockGenerator.M
+	var basis: Basis = b.basis
+	var y: float = b.storeys * BlockGenerator.STOREY
+	var tank := int(b.storeys) >= 4
+	for i in int(b.w):
+		for j in int(b.d):
+			if b.get("roof_access", false) and i == b.w - 1 and j == b.d - 1:
+				continue    # the stair hut
+			if rng.randf() < 0.4:
+				continue
+			var cx := (i + 0.5) * M + rng.randf_range(-0.6, 0.6)
+			var cz := (j + 0.5) * M + rng.randf_range(-0.6, 0.6)
+			var yaw := float(rng.randi_range(0, 3)) * PI * 0.5
+			var roll := rng.randf()
+			if tank and roll < 0.25:
+				tank = false
+				add_prop("water_tank", _local(b, (i + 0.5) * M, y, (j + 0.5) * M, basis, 0.0))
+			elif roll < 0.55:
+				add_prop("ac_unit", _local(b, cx, y, cz, basis, yaw))
+				if rng.randf() < 0.4:
+					add_prop("ac_unit", _local(b, cx, y, cz + (1.1 if cz < M * 1.5 else -1.1), basis, yaw))
+			elif roll < 0.75:
+				add_prop("roof_vent", _local(b, cx, y, cz, basis, 0.0))
+				if rng.randf() < 0.5:
+					add_prop("roof_vent", _local(b, cx + 0.9, y, cz + 0.4, basis, 0.0))
+			elif roll < 0.85:
+				add_prop("roof_box", _local(b, cx, y, cz, basis, yaw))
+			elif roll < 0.93:
+				add_prop("sat_dish", _local(b, cx, y, cz, basis, rng.randf() * TAU))
+			else:
+				add_prop("aerial", _local(b, cx, y, cz, basis, 0.0))
 
 
 func _furnish_rooms(b: Dictionary, rng: RandomNumberGenerator, limit: int) -> void:
