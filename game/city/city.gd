@@ -287,6 +287,9 @@ func _build(s: int) -> void:
 	state.cars = cars
 	state.dispatch = dispatch
 	state.seed_value = s
+	state.weather = weather
+	state.sync = sync
+	state.name_of = func(id): return _names.get(id, "")
 	add_child(state)
 	if Net.is_host():
 		_furnish_near(true)

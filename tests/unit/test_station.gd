@@ -149,3 +149,51 @@ func test_undercover_and_stings() -> void:
 		t.check(th.state == Suspect.S.SURRENDER, "locked down: hands up in the car (%s)" % Suspect.S.keys()[th.state])
 	s.queue_free()
 	await get_tree().process_frame
+
+
+## Wave 4, Phase 4.4: Continue brings the career back: pay, kit bought,
+## the stories, the clock and weather, and what each officer carried.
+func test_continue_keeps_the_career() -> void:
+	BlockState.save_path = City.SAVE_PATH
+	BlockState.delete_save()
+	var s := await _city()
+	var d := s.dispatch
+	var o: Officer = s.sync.my_pawn()
+	d.pay = 30000
+	s.armoury._buy(2)
+	s.armoury._buy(Armoury.HOLLOW)
+	s.armoury._buy(Armoury.PLAIN)
+	o.set_kit(Armoury.make_kit(2, Armoury.Ammo.HOLLOW))
+	o.set_plain(true)
+	var pay := d.pay
+	var owned := Armoury.owned
+	d.missions.minute = 22 * 60.0 + 30.0
+	s.weather.set_weather(CityWeather.W.STORM)
+	s.weather.wet = 0.8
+	var chain: String = d.stories.progress.keys()[0]
+	d.stories.progress[chain].step = 1
+	d.stories.progress[chain].escapes = 2
+	t.check(s.state.save(), "the host saves")
+	var seed_was: int = s.state.seed_value
+	s.queue_free()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	t.check(Armoury.owned == 1, "the city's gone: back to the service pistol")
+	City.resume = true
+	var c: City = (load("res://game/city/city.tscn") as PackedScene).instantiate()
+	add_child(c)
+	c.dispatch.enabled = false
+	c.dispatch.missions.enabled = false
+	c.dispatch.stories.enabled = false
+	for i in 30:
+		await get_tree().physics_frame
+	var o2: Officer = c.sync.my_pawn()
+	t.check(c.state.seed_value == seed_was, "the same city")
+	t.check(c.dispatch.pay == pay and Armoury.owned == owned, "pay £%d and the kit bought are back" % c.dispatch.pay)
+	t.check(absf(c.dispatch.missions.minute - (22 * 60.0 + 30.0)) < 2.0, "the clock carries on from 22:30 (%.0f)" % c.dispatch.missions.minute)
+	t.check(c.weather.kind == CityWeather.W.STORM and c.weather.wet > 0.7, "still stormy, roads still wet")
+	t.check(c.dispatch.stories.progress[chain].step == 1 and c.dispatch.stories.progress[chain].escapes == 2, "the story picks up where it was")
+	t.check(o2 != null and (o2.kit & 7) == 2 and Armoury.ammo_of(o2.kit) == Armoury.Ammo.HOLLOW and o2.plain, "the officer has the same kit on")
+	c.queue_free()
+	await get_tree().process_frame
+	BlockState.delete_save()
