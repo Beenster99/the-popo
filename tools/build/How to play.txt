@@ -88,6 +88,10 @@ piercing rounds, body armour, pouches, a garage, an interceptor, a prisoner
 van, an unmarked car and a firing range. Each of you picks your own pistol,
 rounds and loadout: ammo backpack, breach charges or C4 (press 2, aim and fire
 to stick one on; 1 back to the pistol), or a tactical torch.
+THE GUN BENCH: the armoury shows your pistol in 3D on a bench with every
+upgrade the station owns fitted. Point at a pistol or an upgrade in the list
+to see it there. Drag with the mouse to turn it, wheel to zoom; on a pad the
+right stick turns it and the triggers zoom.
 THE RANGE (once bought): out the back of the station. Stand on the blue
 circle and press F for a 30 second run: shoot the red targets, not the blue.
 UNDERCOVER (once plain clothes are bought, from the armoury): crooks take you
