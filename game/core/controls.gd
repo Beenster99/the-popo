@@ -22,6 +22,7 @@ const KEYS := {
 	"torch": [KEY_T],
 	"punch": [KEY_V],
 	"kick": [KEY_B],
+	"shout": [KEY_Y],             # "Police! Get down!"
 	"interact": [KEY_F],
 	"drag": [KEY_G],              # hold: drag a downed teammate
 	"horn": [KEY_H],
@@ -59,7 +60,7 @@ const PAD_BUTTONS := {
 	"ping": [JOY_BUTTON_TOUCHPAD],          # (touchpad)
 	"cam_rotate_left": [JOY_BUTTON_DPAD_LEFT],
 	"cam_rotate_right": [JOY_BUTTON_DPAD_RIGHT],
-	"cam_zoom_in": [JOY_BUTTON_DPAD_UP],
+	"shout": [JOY_BUTTON_DPAD_UP],
 	"cam_zoom_out": [JOY_BUTTON_MISC1],
 	"back_to_launcher": [JOY_BUTTON_START],
 }
@@ -83,7 +84,7 @@ const REBINDABLE := [
 	["stance", "Tap crouch / stand, hold prone, hold while running roll"],
 	["crouch", "Crouch"], ["prone", "Lie prone"], ["dive", "Roll (slide when sprinting)"],
 	["cover", "Take cover (with a direction: run to the next cover)"], ["reload", "Reload"],
-	["holster", "Holster / draw"], ["torch", "Torch on / off"], ["punch", "Punch"], ["kick", "Kick"], ["interact", "Use / revive (hold)"], ["drag", "Drag a downed teammate (hold)"],
+	["holster", "Holster / draw"], ["torch", "Torch on / off"], ["punch", "Punch"], ["kick", "Kick"], ["shout", "Shout: Police! Get down!"], ["interact", "Use / revive (hold)"], ["drag", "Drag a downed teammate (hold)"],
 	["aim", "Aim / peek from cover"], ["fire", "Fire"], ["ping", "Ping a spot for everyone"], ["horn", "Car horn"], ["handbrake", "Handbrake"],
 	["cam_rotate_left", "Rotate camera left"], ["cam_rotate_right", "Rotate camera right"],
 ]

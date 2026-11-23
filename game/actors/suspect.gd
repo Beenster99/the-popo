@@ -199,6 +199,38 @@ func on_alarm(at: Vector3, radius: float) -> void:
 	_goal = _near(global_position + away.normalized() * _rng.randf_range(18.0, 30.0), 3.0)
 
 
+## Host: an officer shouted "Police! Get down!" from `at`.
+func on_shout(at: Vector3, reach: float) -> void:
+	var d := global_position.distance_to(at)
+	if d > reach or not is_free():
+		return
+	var q := PhysicsRayQueryParameters3D.create(global_position + Vector3(0, 1.5, 0), at + Vector3(0, 1.4, 0), 1, [get_rid()])
+	var heard_clearly := get_world_3d().direct_space_state.intersect_ray(q).is_empty() or d < 6.0
+	if not heard_clearly:
+		return
+	if part != "":
+		return   # victims and witnesses already know who we are
+	if civilian:
+		if state in [S.WANDER, S.PANIC] and d < 10.0:
+			_calm_t = _rng.randf_range(5.0, 8.0)
+			set_state(S.COWER)
+		return
+	if state == S.BRAWL:
+		brawl_with = null   # the fight's over
+	if drunk:
+		pressure += 1.2 if d < 5.0 else 0.3
+	elif not armed and not fighter:
+		pressure += 1.8 if d < 10.0 else 0.8
+	elif not fighter:
+		pressure += 0.6
+	else:
+		pressure += 0.15
+	if pressure >= SURRENDER_AT and (not armed or not fighter):
+		set_state(S.SURRENDER)
+	elif state == S.BRAWL:
+		set_state(S.LOITER)
+
+
 ## Dealt with: no longer part of the call's trouble.
 func is_done() -> bool:
 	return state in [S.DOWN, S.BOOKED]
@@ -427,7 +459,38 @@ func _physics_process(delta: float) -> void:
 			wish = r[0]
 			speed = r[1]
 		S.BRAWL:
-			if _notices(t) and _rng.randf() < delta * 1.5:
+			var gunfight := armed and (brawl_with is Suspect or has_meta("crew"))
+			if gunfight and not _brawl_alive():
+				brawl_with = _next_rival()
+			if gunfight and brawl_with == null:
+				set_state(S.LOITER)   # the other lot are done: now it's the police
+			elif gunfight:
+				# Phase 3.4, gang war: shooting it out with the other crew, too
+				# busy to notice the police until they're close or shooting.
+				if t.o and t.los and (t.d < 12.0 or pressure > 0.5):
+					brawl_with = null
+					_react(t)
+				else:
+					var foe := brawl_with as Suspect
+					var fp := foe.global_position
+					_face(fp)
+					aim_at = fp + Vector3(0, 1.1, 0)
+					var gap := Vector2(fp.x - global_position.x, fp.z - global_position.z).length()
+					if gap > 18.0:
+						wish = _steer(fp, delta)
+						speed = WALK * 1.5
+					elif gap < 6.0:
+						wish = _steer(global_position + (global_position - fp).normalized() * 3.0, delta)
+						speed = WALK
+					_swing_t -= delta
+					if _swing_t <= 0.0:
+						if mag <= 0:
+							mag = EnemyGuns.MAG[weapon]
+							_swing_t = EnemyGuns.RELOAD[weapon]
+						else:
+							_swing_t = _rng.randf_range(0.5, 1.4)
+							_fire_at(aim_at, 0.12)
+			elif _notices(t) and _rng.randf() < delta * 1.5:
 				brawl_with = null
 				_react(t)
 			else:
@@ -509,6 +572,30 @@ func _physics_process(delta: float) -> void:
 
 
 ## Where the fight is: the other brawler, or the thing being smashed.
+func _brawl_alive() -> bool:
+	return brawl_with is Suspect and is_instance_valid(brawl_with) and (brawl_with as Suspect).is_free() \
+		and (brawl_with as Suspect).state != S.SURRENDER
+
+
+## Gang war: someone else from the other crew still standing.
+func _next_rival() -> Suspect:
+	if dispatcher == null or not has_meta("crew"):
+		return null
+	var best: Suspect = null
+	var bd := INF
+	for s in dispatcher.suspects.values():
+		var o := s as Suspect
+		if o == self or o.call_id != call_id or not o.has_meta("crew") or o.get_meta("crew") == get_meta("crew"):
+			continue
+		if not o.is_free():
+			continue
+		var d := o.global_position.distance_to(global_position)
+		if d < bd:
+			bd = d
+			best = o
+	return best
+
+
 func _brawl_point() -> Vector3:
 	if brawl_with is Vector3:
 		return brawl_with
@@ -1238,7 +1325,7 @@ func _process(delta: float) -> void:
 			upper = "hands_up"
 		S.BRAWL:
 			lower = "idle" if hs < 0.2 else "walk"
-			upper = "punch" if fmod(Time.get_ticks_msec() / 1000.0 + net_id * 0.37, 1.3) < 0.55 else "none"
+			upper = "aim_hold" if armed else "punch" if fmod(Time.get_ticks_msec() / 1000.0 + net_id * 0.37, 1.3) < 0.55 else "none"
 		S.CUFFED:
 			lower = "idle" if hs < 0.2 else ("walk" if hs < 2.2 else "run")
 			upper = "cuffed"

@@ -199,3 +199,68 @@ func test_story_chains() -> void:
 		t.check(st.progress.vipers.step == 1 and st.progress.vipers.escapes == 0, "booked: on to the next part (step %d)" % st.progress.vipers.step)
 	s.queue_free()
 	await get_tree().process_frame
+
+
+func test_arrests_pay_and_big_busts() -> void:
+	var s := await _city()
+	var d := s.dispatch
+	var K := Dispatcher.Kind
+	var o: Officer = s.sync.my_pawn()
+	# "Police! Get down!": a shoplifter gives up on the spot.
+	var id := d.start_call(K.SHOPLIFT)
+	t.check(id > 0, "a shoplifter")
+	if id > 0:
+		var sh: Suspect = d.suspects[d.calls[id].suspects[0]]
+		o.global_position = sh.global_position + Vector3(0, 0, 3)
+		await get_tree().physics_frame
+		o.shout()
+		await get_tree().physics_frame
+		t.check(sh.state == Suspect.S.SURRENDER, "shout at a shoplifter: hands up (%s)" % Suspect.S.keys()[sh.state])
+		# Pay: book them and close the job.
+		var before := d.pay
+		d.book(sh)
+		for i in 3:
+			await get_tree().physics_frame
+		print("    pay %d -> %d" % [before, d.pay])
+		t.check(d.pay == before + Dispatcher.PAY_SUSPECT + Dispatcher.PAY_JOB[K.SHOPLIFT], "paid for the arrest and the job (£%d)" % d.pay)
+	# A drunk takes some talking down.
+	var id2 := d.start_call(K.DRUNK)
+	if id2 > 0:
+		var dr: Suspect = d.suspects[d.calls[id2].suspects[0]]
+		o.global_position = dr.global_position + Vector3(0, 0, 2.5)
+		await get_tree().physics_frame
+		o.shout()
+		o.shout_t = 0.0
+		o.shout()
+		await get_tree().physics_frame
+		t.check(dr.state == Suspect.S.SURRENDER, "the drunk is talked down (%s)" % Suspect.S.keys()[dr.state])
+	o.global_position = s._spawn_point(0)
+	# Gang war: two crews shoot it out.
+	var gid := d.start_call(K.GANGWAR)
+	t.check(gid > 0, "gang war: %s" % (d.calls[gid].text if gid > 0 else "-"))
+	if gid > 0:
+		var gang: Array = d.calls[gid].suspects.map(func(x): return d.suspects[x])
+		t.check(gang.size() == 6 and gang.all(func(g): return g.state == Suspect.S.BRAWL and g.armed), "six armed, squared up")
+		o.global_position = (gang[0] as Suspect).global_position + Vector3(150, 0, 0)
+		for i in 60 * 8:
+			await get_tree().physics_frame
+		var hurt := gang.filter(func(g): return g.hp < Suspect.MAX_HP or g.is_done()).size()
+		print("    after 8 s: %d of 6 hit" % hurt)
+		t.check(hurt >= 1, "they're hitting each other (%d hurt)" % hurt)
+	# Bank job: robbers inside with staff, a driver at the kerb.
+	o.global_position = s._spawn_point(0)
+	var bid := d.start_call(K.BANK)
+	t.check(bid > 0, "bank job: %s" % (d.calls[bid].text if bid > 0 else "-"))
+	if bid > 0:
+		var e: Dictionary = d.missions.people[bid]
+		t.check(e.hostages.size() == 2, "staff held")
+		t.check(e.has("getaway"), "a getaway car waiting")
+		if e.has("getaway"):
+			var drv: Suspect = e.getaway.s
+			var robber: Suspect = d.suspects[d.calls[bid].suspects[0]]
+			robber.set_state(Suspect.S.SHOOT)
+			for i in 10:
+				await get_tree().physics_frame
+			t.check(drv.state == Suspect.S.DRIVE, "shooting starts: the driver's away (%s)" % Suspect.S.keys()[drv.state])
+	s.queue_free()
+	await get_tree().process_frame

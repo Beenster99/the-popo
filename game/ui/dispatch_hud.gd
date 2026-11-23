@@ -66,7 +66,7 @@ func _process(delta: float) -> void:
 	var o: Node3D = pawn_getter.call() if pawn_getter.is_valid() else null
 	var lines := PackedStringArray()
 	if dispatcher.missions and dispatcher.city:
-		lines.append(dispatcher.missions.clock_text())
+		lines.append("%s     £%s" % [dispatcher.missions.clock_text(), _money(dispatcher.pay)])
 	for call in dispatcher.active_calls():
 		var d := ""
 		if o:
@@ -116,3 +116,12 @@ func _draw_arrows() -> void:
 			var dist := int(Vector2(p.x - o.global_position.x, p.z - o.global_position.z).length())
 			_arrows.draw_string_outline(font, edge - dir * 34.0 + Vector2(-16, 6), "%dm" % dist, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, 4, Color(0, 0, 0, 0.9))
 			_arrows.draw_string(font, edge - dir * 34.0 + Vector2(-16, 6), "%dm" % dist, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, col)
+
+
+static func _money(n: int) -> String:
+	var s := str(n)
+	var out := ""
+	while s.length() > 3:
+		out = "," + s.substr(s.length() - 3) + out
+		s = s.substr(0, s.length() - 3)
+	return s + out

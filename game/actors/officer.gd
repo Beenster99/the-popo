@@ -128,6 +128,9 @@ var _shown_gun := -1
 var _pellet_rng := RandomNumberGenerator.new()
 var buttons := 0
 var punch_t := 0.0
+## Phase 3.4: "Police! Get down!" (s until the next shout).
+var shout_t := 0.0
+const SHOUT_RANGE := 16.0
 var rig: OfficerRig
 
 # Traversal bookkeeping (part of the synced state so prediction replays it).
@@ -263,6 +266,7 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 	var wish := Vector3(move.x, 0, move.y)
 	state_t += delta
 	punch_t = maxf(0.0, punch_t - delta)
+	shout_t = maxf(0.0, shout_t - delta)
 	_cooldown -= delta
 	recoil = maxf(0.0, recoil - delta * 7.0)
 	blind_t = maxf(0.0, blind_t - delta)
@@ -348,6 +352,8 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 		elif _pressed(PlayerInput.KICK):
 			_set_state(S.KICK)
 			return
+	if _pressed(PlayerInput.SHOUT) and shout_t <= 0.0 and state not in [S.DOWNED, S.VEHICLE]:
+		shout()
 	if _pressed(PlayerInput.PUNCH) and state in [S.MOVE, S.CROUCH, S.AIR] and punch_t <= 0.0:
 		punch_t = 0.55
 		# Sprinting: a shoulder barge, a lunge that knocks things over.
@@ -1694,3 +1700,27 @@ func _update_torch() -> void:
 			var target := aim_point if aim_point != Vector3.ZERO else global_position + chest + Vector3(sin(aim_yaw), -0.15, cos(aim_yaw)) * 5.0
 			if target.distance_to(_torch.global_position) > 0.3:
 				_torch.look_at(target, Vector3.UP)
+
+
+## Phase 3.4: "Police! Get down!" Everyone in earshot hears it: unarmed
+## suspects mostly give up on the spot, the armed ones think about it,
+## brawlers stop brawling, drunks have to be close. Civilians get down.
+func shout() -> void:
+	shout_t = 1.4
+	var l := Label3D.new()
+	l.text = "POLICE! GET DOWN!"
+	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.no_depth_test = true
+	l.fixed_size = true
+	l.pixel_size = 0.0016
+	l.font_size = 30
+	l.outline_size = 8
+	l.modulate = Color(1.0, 0.95, 0.6)
+	l.position = Vector3(0, 2.3, 0)
+	add_child(l)
+	var tw := l.create_tween()
+	tw.tween_property(l, "position:y", 2.7, 1.3)
+	tw.parallel().tween_property(l, "modulate:a", 0.0, 1.3).set_delay(0.6)
+	tw.tween_callback(l.queue_free)
+	if Net.is_host() and is_inside_tree():
+		get_tree().call_group("suspects", "on_shout", global_position, SHOUT_RANGE)

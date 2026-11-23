@@ -19,6 +19,7 @@ extends Node
 
 const GAP := Vector2(70.0, 130.0)     # s between story jobs
 const K := Dispatcher.Kind
+const FINALE_PAY := 1500   # Phase 3.4: a story finished
 
 const CHAINS := [
 	{"id": "vipers", "name": "THE VIPERS", "who": "Dex Moran", "look": 41,
@@ -147,7 +148,8 @@ func _watch() -> void:
 			pr.escapes = 0
 			if pr.step >= ch.steps.size():
 				pr.done = true
-				dispatcher.say("%s: %s" % [ch.name, ch.done])
+				dispatcher.earn(FINALE_PAY)
+				dispatcher.say("%s: %s Bonus for the station: £%d." % [ch.name, ch.done, FINALE_PAY])
 			else:
 				dispatcher.say("%s: that's one step closer." % ch.name)
 		else:

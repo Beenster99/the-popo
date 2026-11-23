@@ -22,7 +22,7 @@ extends Node
 ## turns up. Arrests and suspects shot count the same: no conduct score.
 
 enum Kind { ROBBERY, ARMED, TRAFFIC, GANG, THEFT, PURSUIT, MUGGING, SHOPLIFT, FIGHT, DOMESTIC, DEAL, VANDAL, DRUNK,
-	BURGLARY, RAID, HOSTAGE, SEARCH }
+	BURGLARY, RAID, HOSTAGE, SEARCH, GANGWAR, BANK }
 enum CallState { ACTIVE, CLOSED, LOST, HIDDEN }
 
 const MSG_STATE := 80        # host -> all: calls, suspects, dropped guns (10 a second)
@@ -43,7 +43,16 @@ const BOOK_TIME := 1.2
 const LAP := [Vector3(-6, 0, -6), Vector3(54, 0, -6), Vector3(54, 0, 54), Vector3(-6, 0, 54)]
 const KIND_NAMES := ["Robbery in progress", "Armed suspect", "Traffic stop", "Shots fired", "Car theft", "Pursuit",
 	"Mugging", "Shoplifter", "Fight", "Domestic", "Drug deal", "Vandalism", "Drunk and disorderly",
-	"Burglary", "Raid", "Hostages", "Building search"]
+	"Burglary", "Raid", "Hostages", "Building search", "Gang war", "Bank job"]
+## Phase 3.4: pay. Every job closed pays the station; each suspect brought in
+## (booked or down, the same: no conduct score) pays a bit more. Story
+## characters brought in alive pay a bonus. Spent at the armoury (Phase 3.5).
+const PAY_SUSPECT := 100
+const PAY_STORY_ALIVE := 500
+const PAY_JOB := {Kind.ROBBERY: 200, Kind.ARMED: 250, Kind.TRAFFIC: 150, Kind.GANG: 450, Kind.THEFT: 150,
+	Kind.PURSUIT: 300, Kind.MUGGING: 150, Kind.SHOPLIFT: 100, Kind.FIGHT: 100, Kind.DOMESTIC: 150, Kind.DEAL: 200,
+	Kind.VANDAL: 100, Kind.DRUNK: 80, Kind.BURGLARY: 200, Kind.RAID: 700, Kind.HOSTAGE: 800, Kind.SEARCH: 250,
+	Kind.GANGWAR: 900, Kind.BANK: 1200}
 ## Wave 2: how long a car thief takes to get into the car.
 const BREAK_IN_TIME := 22.0
 
@@ -78,6 +87,9 @@ var traffic: TrafficSystem
 ## Wave 3: templates, the clock and chance encounters.
 var missions: Missions
 var stories: Stories
+## Phase 3.4: the station's earnings (shared by everyone, synced).
+var pay := 0
+signal paid(amount: int, total: int)
 var _thefts := {}            # host: call id -> {dr, suspect, t}
 var guns := {}               # net id -> DroppedGun (everyone)
 var _next_gun_id := 1
@@ -702,7 +714,18 @@ func book(s: Suspect) -> void:
 		return
 	s.set_state(Suspect.S.BOOKED)
 	s.car = null
-	say("CUSTODY: suspect booked in. Good work.")
+	earn(PAY_SUSPECT)
+	if s.has_meta("story_name"):
+		earn(PAY_STORY_ALIVE)
+		say("CUSTODY: %s booked in, alive and talking. Bonus £%d. Good work." % [s.get_meta("story_name"), PAY_STORY_ALIVE])
+	else:
+		say("CUSTODY: suspect booked in. Good work. +£%d" % PAY_SUSPECT)
+
+
+## Host: money for the station.
+func earn(amount: int) -> void:
+	pay += amount
+	paid.emit(amount, pay)
 
 
 # --- host: calls --------------------------------------------------------------------------
@@ -719,7 +742,8 @@ func _check_calls() -> void:
 				continue
 			if s.state == Suspect.S.DOWN and not s.has_meta("counted"):
 				s.set_meta("counted", true)
-				say("DISPATCH: suspect down.")
+				earn(PAY_SUSPECT)
+				say("DISPATCH: suspect down. +£%d" % PAY_SUSPECT)
 			if not s.is_done():
 				all_done = false
 		# Dispatch keeps the marker on the latest sighting.
@@ -738,7 +762,9 @@ func _check_calls() -> void:
 					break
 		if all_done:
 			c.state = CallState.CLOSED
-			say("DISPATCH: %s call closed. Thanks, units." % KIND_NAMES[c.kind].to_lower())
+			var job: int = PAY_JOB.get(c.kind, 150)
+			earn(job)
+			say("DISPATCH: %s call closed. Thanks, units. +£%d" % [KIND_NAMES[c.kind].to_lower(), job])
 			if c.kind == Kind.TRAFFIC:
 				_traffic.clear()
 		elif c.t > CALL_TIMEOUT:
@@ -946,6 +972,7 @@ func _encode_state() -> PackedByteArray:
 	var b := StreamPeerBuffer.new()
 	b.put_double(_clock)
 	b.put_float(missions.minute if missions else 0.0)
+	b.put_u32(pay)
 	var act := calls.values().filter(func(c): return c.state == CallState.ACTIVE)
 	b.put_u8(act.size())
 	for c in act:
@@ -977,6 +1004,10 @@ func _on_state(_from: int, data: PackedByteArray) -> void:
 	b.data_array = data
 	var t := b.get_double()
 	var mn := b.get_float()
+	var new_pay := b.get_u32()
+	if new_pay != pay:
+		paid.emit(new_pay - pay, new_pay)
+		pay = new_pay
 	if missions and absf(mn - missions.minute) > 2.0:
 		missions.minute = mn
 	var n := b.get_u8()

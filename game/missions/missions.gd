@@ -48,6 +48,9 @@ const TEMPLATES := {
 	Dispatcher.Kind.RAID: {"d": [1, 2, 3, 3], "h": [3, 1, 1, 1]},
 	Dispatcher.Kind.HOSTAGE: {"d": [3, 1, 1, 0.5], "h": [1, 1.5, 1, 0.5]},
 	Dispatcher.Kind.SEARCH: {"d": [1, 2, 3, 2], "h": [1, 1, 1, 1]},
+	# Phase 3.4: big busts.
+	Dispatcher.Kind.GANGWAR: {"d": [0.5, 0.7, 1.5, 2], "h": [0.1, 0.3, 1, 1.5]},
+	Dispatcher.Kind.BANK: {"d": [1.2, 0.2, 0.2, 0], "h": [1, 1, 0.3, 0]},
 }
 const FLOOR_NAMES := ["Ground floor", "First floor", "Second floor", "Third floor", "Fourth floor", "Fifth floor"]
 const DISTRICTS := ["downtown", "residential", "industrial", "docks"]
@@ -92,6 +95,7 @@ func _physics_process(delta: float) -> void:
 		return
 	_talk_step()
 	_floors_step()
+	_getaway_step()
 	_hidden_step(delta)
 	if enabled and dispatcher.enabled:
 		_encounter_t -= delta
@@ -263,9 +267,108 @@ func setup_call(c: Dictionary, at := Vector3.INF) -> bool:
 			_note_floor(c, s, b)
 			c.pos = b.door
 			c.text = "Wanted man seen going into the %s on %s. Search it, every floor." % [b.type, CityGenerator.street_at(b.door)]
+		Dispatcher.Kind.GANGWAR:
+			# Two crews shooting it out across the street.
+			var p := at if at != Vector3.INF else d._gang_spot()
+			var away := _side(1.0)
+			var p2 := d.nav.closest(p + away * 15.0) if d.nav and d.nav.ready_to_use else p + away * 15.0
+			var crews := [[], []]
+			for crew in 2:
+				var base: Vector3 = p if crew == 0 else p2
+				for i in 3:
+					var q: Vector3 = d.nav.closest(base + Vector3(cos(i * 2.1 + crew), 0, sin(i * 2.1 + crew)) * 2.2)
+					var s := d.spawn_suspect(q, Suspect.S.LOITER, true, c.id)
+					s.fighter = true
+					s.set_meta("crew", crew)
+					s.role = Suspect.ROLE_PIN if i == 0 else Suspect.ROLE_FLANK
+					if i == 2 and _rng.randf() < 0.5:
+						s.weapon = EnemyGuns.SHOTGUN
+						s.mag = EnemyGuns.MAG[s.weapon]
+					crews[crew].append(s)
+					c.suspects.append(s.net_id)
+			for crew in 2:
+				for i in 3:
+					var s: Suspect = crews[crew][i]
+					s.brawl_with = crews[1 - crew][i]
+					s.set_state(Suspect.S.BRAWL)
+			c.pos = (p + p2) * 0.5
+			c.text = "Gang war %s: two crews shooting it out, six armed at least. Let them thin each other out, or go in hard." % d._side_name(c.pos)
+		Dispatcher.Kind.BANK:
+			var b := _inside_building(["office", "shop"])
+			if b.is_empty():
+				return false
+			var room := _pick_room(b, 0)
+			var hostages: Array = []
+			for i in 2:
+				var h := _bystander(_room_spot(b, room), "hostage", c)
+				h.set_state(Suspect.S.SURRENDER)
+				hostages.append(h)
+			people[c.id].hostages = hostages
+			var n := _rng.randi_range(3, 4)
+			for i in n:
+				var s := d.spawn_suspect(_room_spot(b, room if i < 2 else _pick_room(b, 0)), Suspect.S.LOITER, true, c.id)
+				s.fighter = true
+				s.role = Suspect.ROLE_PIN if i % 2 == 0 else Suspect.ROLE_FLANK
+				if i == 1:
+					s.weapon = EnemyGuns.SHOTGUN
+					s.mag = EnemyGuns.MAG[s.weapon]
+				c.suspects.append(s.net_id)
+				_note_floor(c, s, b)
+			# The getaway driver, waiting at the kerb with the engine running.
+			if d.traffic:
+				var dr := d.traffic.borrow_car(b.door)
+				if not dr.is_empty():
+					var car: CivilianVehicle = dr.car
+					var door := car.door_point(0)
+					door.y = BlockGenerator.BASE_Y
+					if d.nav and d.nav.ready_to_use:
+						var q := d.nav.closest(door)
+						if q.distance_to(door) < 3.0:
+							door = q
+					var drv := d.spawn_suspect(door, Suspect.S.LOITER, _rng.randf() < 0.5, c.id)
+					drv.home = door
+					c.suspects.append(drv.net_id)
+					people[c.id].getaway = {"dr": dr, "s": drv}
+			c.pos = b.door
+			c.text = "Bank job at the %s on %s: %d armed inside with staff held, and a getaway car out front. Box the car in, then go in." % [b.type, CityGenerator.street_at(b.door), n]
 		_:
 			return false
 	return true
+
+
+## Phase 3.4: the bank job's getaway driver waits by the car until the
+## police turn up or the shooting starts, then drives off: a chase.
+func _getaway_step() -> void:
+	for id in people.keys():
+		var e: Dictionary = people[id]
+		if not e.has("getaway"):
+			continue
+		var g: Dictionary = e.getaway
+		var s: Suspect = g.s
+		var c: Dictionary = dispatcher.calls.get(id, {})
+		if c.is_empty() or c.state != Dispatcher.CallState.ACTIVE or not is_instance_valid(s):
+			g.dr.erase("hold")
+			e.erase("getaway")
+			continue
+		if s.state in [Suspect.S.SURRENDER, Suspect.S.CUFFED, Suspect.S.DOWN, Suspect.S.IN_CAR, Suspect.S.BOOKED]:
+			g.dr.erase("hold")
+			e.erase("getaway")
+			continue
+		var car: CivilianVehicle = g.dr.car
+		var go := s.state != Suspect.S.LOITER
+		if not go:
+			s._face(car.global_position)
+			for sid in c.suspects:
+				var r: Suspect = dispatcher.suspects.get(sid)
+				if r and r != s and r.state in [Suspect.S.SHOOT, Suspect.S.COVER, Suspect.S.SEEK_COVER, Suspect.S.FLEE]:
+					go = true
+		if go and g.dr.mode == "parked" and car.global_position.distance_to(s.global_position) < 6.0:
+			dispatcher.traffic.getaway(g.dr, s)
+			dispatcher.say("DISPATCH: the getaway car's off along %s! Stop it." % CityGenerator.street_at(car.global_position))
+			e.erase("getaway")
+		elif go:
+			g.dr.erase("hold")
+			e.erase("getaway")   # couldn't reach it: on foot now
 
 
 # --- inside buildings (Phase 3.2) --------------------------------------------------------
