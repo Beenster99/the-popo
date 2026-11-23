@@ -51,6 +51,10 @@ const TEMPLATES := {
 	# Phase 3.4: big busts.
 	Dispatcher.Kind.GANGWAR: {"d": [0.5, 0.7, 1.5, 2], "h": [0.1, 0.3, 1, 1.5]},
 	Dispatcher.Kind.BANK: {"d": [1.2, 0.2, 0.2, 0], "h": [1, 1, 0.3, 0]},
+	# Phase 4.2: things that just happen (crashes are likelier on wet roads).
+	Dispatcher.Kind.CRASH: {"d": [3, 2, 2, 1], "h": [2, 2, 2, 1], "wet": 2.5},
+	Dispatcher.Kind.FIRE: {"d": [0.8, 2, 2, 1], "h": [0.5, 0.7, 1.5, 1.5]},
+	Dispatcher.Kind.ALARM: {"d": [3, 1, 2, 1], "h": [0.3, 0.3, 1, 3]},
 	# Phase 3.7: stings (only once the station has plain clothes).
 	Dispatcher.Kind.BAITCAR: {"d": [1, 2, 2, 1], "h": [0.5, 0.5, 1.5, 2], "needs": Armoury.PLAIN},
 	Dispatcher.Kind.BUY: {"d": [1, 1, 2, 2], "h": [0.3, 0.5, 1.5, 2], "needs": Armoury.PLAIN},
@@ -130,6 +134,8 @@ func pick_kind(exclude: Array = []) -> Dispatcher.Kind:
 		if TEMPLATES[k].has("needs") and not Armoury.owns(TEMPLATES[k].needs):
 			continue
 		var w: float = float(TEMPLATES[k].d[di]) * float(TEMPLATES[k].h[slot])
+		if TEMPLATES[k].has("wet") and CityWeather.current:
+			w *= 1.0 + float(TEMPLATES[k].wet) * CityWeather.current.wet
 		if w > 0.0:
 			weights[k] = w
 			total += w
@@ -370,6 +376,71 @@ func setup_call(c: Dictionary, at := Vector3.INF) -> bool:
 			people[c.id].buy_t = 0.0
 			c.pos = p
 			c.text = "Sting: a dealer's selling %s. Go in plain clothes, walk up and buy (hold %s next to him), then take him. Uniforms will scare him off." % [d._side_name(p), "F"]
+		Dispatcher.Kind.CRASH:
+			if d.traffic == null:
+				return false
+			var a := d.traffic.borrow_car(street)
+			if a.is_empty():
+				return false
+			var b := d.traffic.borrow_car(street + _side(5.0))
+			var ca: CivilianVehicle = a.car
+			var dent_at := ca.global_position
+			if not b.is_empty():
+				var cb: CivilianVehicle = b.car
+				# Nose to nose, a little skewed, both smashed in.
+				cb.global_transform = Transform3D(ca.global_transform.basis.rotated(Vector3.UP, PI + _rng.randf_range(-0.6, 0.6)),
+					ca.global_position + ca.global_transform.basis.z * 4.6 + Vector3(0, 0.3, 0))
+				d.cars.damage_car(cb, 45.0)
+				dent_at = (ca.global_position + cb.global_position) * 0.5
+			d.cars.damage_car(ca, 45.0)
+			people[c.id] = {"victim": null, "witness": null, "said": {}, "crash": [a, b]}
+			var door := d.nav.closest(dent_at + _side(3.5)) if d.nav and d.nav.ready_to_use else dent_at
+			if _rng.randf() < 0.45:
+				# The drivers are out and squaring up to each other.
+				var p1 := d.spawn_suspect(door, Suspect.S.BRAWL, false, c.id)
+				var p2 := d.spawn_suspect(door + _side(1.2), Suspect.S.BRAWL, false, c.id)
+				p1.brawl_with = p2
+				p2.brawl_with = p1
+				c.suspects.append(p1.net_id)
+				c.suspects.append(p2.net_id)
+				c.text = "Road accident %s. Two cars, and the drivers are fighting in the road." % d._side_name(dent_at)
+			else:
+				_bystander(door, "victim", c)
+				c.text = "Road accident %s. Two cars, one driver hurt. Secure the scene." % d._side_name(dent_at)
+			c.pos = dent_at
+			c.presence = 12.0
+			c.scene_done = "accident scene's clear. Recovery truck's on its way."
+		Dispatcher.Kind.FIRE:
+			var b := _inside_building(["house", "flats", "shop", "warehouse"])
+			if b.is_empty():
+				return false
+			var fire: FireSystem = d.get_parent().get("fire") as FireSystem if d.get_parent() else null
+			if fire == null:
+				return false
+			for i in 3:
+				fire.ignite(_room_spot(b, _pick_room(b, 0)) + Vector3(0, 0.1, 0), 1.6, 90.0)
+			var out: Vector3 = (b.door as Vector3) - (b.v as Vector3) * 5.0
+			for i in 3:
+				var v := _bystander(out + _side(2.5), "witness", c)
+				v.set_state(Suspect.S.COWER)
+			c.pos = b.door
+			c.presence = 20.0
+			c.text = "Fire at the %s on %s, people still coming out. Keep everyone back till the brigade gets there." % [b.type, CityGenerator.street_at(b.door)]
+			c.scene_done = "fire brigade's on scene. Thanks for holding it."
+		Dispatcher.Kind.ALARM:
+			var b := d._shop()
+			if b.is_empty():
+				return false
+			var inside: Vector3 = b.origin + b.u * (b.w * BlockGenerator.M * 0.5) + b.v * (BlockGenerator.M * 0.9) + Vector3(0, 0.05, 0)
+			c.real = _rng.randf() < 0.45
+			if c.real:
+				var s := d.spawn_suspect(inside, Suspect.S.ROB, _rng.randf() < 0.2, c.id)
+				c.suspects.append(s.net_id)
+			c.pos = b.door
+			c.presence = 6.0
+			c.text = "Alarm going off at the %s on %s. Probably nothing; have a look." % [b.type, CityGenerator.street_at(b.door)]
+			c.scene_done = "alarm's reset." if not c.real else "alarm's reset, and that's the one who set it off."
+			Sfx.play(d.get_parent(), "ping", b.door, -2.0, 60.0, 0.0)
 		_:
 			return false
 	return true
@@ -645,6 +716,9 @@ static func _compass(v: Vector3) -> String:
 ## The job's over: victims and witnesses get on with their day (hostages
 ## are freed, and dispatch says how many came out).
 func _release(e: Dictionary) -> void:
+	for dr in e.get("crash", []):
+		if dr is Dictionary and not (dr as Dictionary).is_empty():
+			(dr as Dictionary).erase("hold")   # the wrecks go back to the traffic
 	var hs: Array = e.get("hostages", [])
 	if not hs.is_empty():
 		var alive := 0
