@@ -37,3 +37,46 @@ func test_downtown_has_towers_with_a_shaft() -> void:
 			bad += 1
 			print("    shaft: %d slabs, %d doorways for %d storeys" % [slabs, doors, b.storeys])
 	t.check(bad == 0, "every shaft is open top to bottom with a doorway per floor")
+
+
+func test_lift_carries_an_officer_up() -> void:
+	BlockState.save_path = City.SAVE_PATH
+	BlockState.delete_save()
+	City.next_seed = 4242
+	var s: City = (load("res://game/city/city.tscn") as PackedScene).instantiate()
+	add_child(s)
+	await _frames(30)
+	var lifts := s.lifts
+	t.check(lifts != null and lifts.lifts.size() >= 3, "a lift in every tower (%d)" % (lifts.lifts.size() if lifts else 0))
+	if lifts == null or lifts.lifts.is_empty():
+		s.queue_free()
+		return
+	var L: Dictionary = lifts.lifts[0]
+	var o: Officer = s.sync.my_pawn()
+	# Call it from the ground floor door: the doors open.
+	var cp := Lifts.call_point(L, 0) + Vector3(0, 0.1, 0)
+	t.check(lifts.door_near(cp) == [0, 0], "standing at the ground floor door (%s)" % [lifts.door_near(cp)])
+	t.check(lifts.prompt_for(cp) != "", "the HUD offers the lift: %s" % lifts.prompt_for(cp))
+	lifts.ask(0, 0)
+	await _frames(60)
+	t.check(float(L.open) > 0.9, "the doors open when it's called to where it is")
+	# Step in and ride to the fourth floor.
+	o.global_position = (L.origin as Vector3) + Vector3(0, 0.3, 0)
+	o.velocity = Vector3.ZERO
+	await _frames(10)
+	t.check(lifts.lift_inside(o.global_position) == 0, "the officer is in the car")
+	lifts.ask(0, 4)
+	var top := Lifts.floor_height(4) + (L.origin as Vector3).y
+	for i in 400:
+		await get_tree().physics_frame
+		if Lifts.floor_of(L) == 4 and not Lifts.moving(L) and float(L.open) > 0.9:
+			break
+	print("    car at %.2f, officer at %.2f (floor 4 at %.2f)" % [(L.car as Node3D).global_position.y, o.global_position.y, top])
+	t.check(Lifts.floor_of(L) == 4 and not Lifts.moving(L), "the car stops at the fourth floor")
+	t.check(absf(o.global_position.y - top) < 0.5, "and the officer rode up with it")
+	var d4: Node3D = L.doors[4]
+	var d0: Node3D = L.doors[0]
+	t.check(d4.global_position.distance_to(Lifts._door_base(L, 4)) > 0.8, "the fourth floor doors are open")
+	t.check(d0.global_position.distance_to(Lifts._door_base(L, 0)) < 0.05, "the ground floor doors are shut over the empty shaft")
+	s.queue_free()
+	await _frames(2)

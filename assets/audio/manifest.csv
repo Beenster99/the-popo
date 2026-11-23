@@ -205,3 +205,11 @@ sfx/radio_voice_6.wav,Made by tools/audio/make_wave5.py,Project's own (no third-
 music/menu.ogg,Made by tools/audio/make_wave5.py,Project's own (no third-party audio),"title theme, D minor (loops)"
 music/patrol.ogg,Made by tools/audio/make_wave5.py,Project's own (no third-party audio),"quiet patrol bed, A minor (loops)"
 music/action.ogg,Made by tools/audio/make_wave5.py,Project's own (no third-party audio),"gunfights and chases, E minor (loops)"
+sfx/lift_ding_1.wav,Made by tools/audio/make_v070.py,Project's own (no third-party audio),lift arriving: two-note chime
+sfx/grapple_fire_1.wav,Made by tools/audio/make_v070.py,Project's own (no third-party audio),"grapple launcher: pneumatic thump, line whipping out"
+sfx/grapple_fire_2.wav,Made by tools/audio/make_v070.py,Project's own (no third-party audio),"grapple launcher: pneumatic thump, line whipping out"
+sfx/grapple_hit_1.wav,Made by tools/audio/make_v070.py,Project's own (no third-party audio),grapple hook biting a roof edge: metal clank
+sfx/grapple_hit_2.wav,Made by tools/audio/make_v070.py,Project's own (no third-party audio),grapple hook biting a roof edge: metal clank
+sfx/grapple_hit_3.wav,Made by tools/audio/make_v070.py,Project's own (no third-party audio),grapple hook biting a roof edge: metal clank
+sfx/rope_slide_1.wav,Made by tools/audio/make_v070.py,Project's own (no third-party audio),sliding down a rope through a descender
+sfx/rope_slide_2.wav,Made by tools/audio/make_v070.py,Project's own (no third-party audio),sliding down a rope through a descender

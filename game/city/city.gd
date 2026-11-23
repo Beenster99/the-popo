@@ -51,6 +51,8 @@ var peds: PedSystem
 ## Wave 4: the light follows the clock; rain and storms.
 var weather: CityWeather
 var repairs: RepairCrews
+## v0.7.0: the lifts in the downtown towers.
+var lifts: Lifts
 var sun: DirectionalLight3D
 ## Wave 3, Phase 3.5: what the station has bought, and the vehicles waiting
 ## in its yard until it does.
@@ -274,6 +276,10 @@ func _build(s: int) -> void:
 	repairs.traffic = traffic
 	repairs.gen = gen
 	add_child(repairs)
+	lifts = Lifts.new()
+	lifts.name = "Lifts"
+	add_child(lifts)
+	lifts.build(gen)
 	# Something big coming down: people and drivers near it scatter.
 	world.piece_broken.connect(func(id):
 		if Net.is_host() and _alarm_t <= 0.0 and world.pieces.has(id):
