@@ -76,6 +76,29 @@ func _run() -> void:
 			cam.current = true
 			await _frames(80)
 			await _save()
+		"nade_smoke", "nade_gas", "nade_flash", "nade_frag":
+			# Grenades: a cloud of smoke or CS gas in the street, a flashbang
+			# going off, a frag blast.
+			City.next_seed = 4242
+			var s := await _scene("res://game/city/city.tscn")
+			await _frames(10)
+			s.find_children("*", "NetOverlay", false, false)[0].queue_free()
+			(s.dispatch as Dispatcher).enabled = false
+			s.dispatch.missions.minute = 14 * 60.0 if shot != "nade_flash" else 22 * 60.0
+			var j := CityGenerator.junction(2, 4)
+			var o: Officer = s.sync.my_pawn()
+			o.global_position = j + Vector3(-6, 0.1, -4)
+			var cam := Camera3D.new()
+			s.add_child(cam)
+			cam.far = 1000.0
+			cam.look_at_from_position(j + Vector3(-14, 3.5, -10), j + Vector3(3, 1.0, 4))
+			cam.current = true
+			var kind: int = ["nade_smoke", "nade_gas", "nade_flash", "nade_frag"].find(shot)
+			var at := j + Vector3(2, 0.4, 3)
+			Grenades.throw(o, kind, at, Vector3.ZERO)
+			var wait := int(60 * Grenades.FUSE[kind]) + (300 if kind < 2 else 3)
+			await _frames(wait)
+			await _save()
 		"repair_site":
 			# Wave 4: a council crew at a hole blown in a building.
 			City.next_seed = 4242

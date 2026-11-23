@@ -164,6 +164,14 @@ const WEAPON_NAME := "Service pistol"
 var kit := 0
 ## Phase 3.6: breach charges or C4 left (refilled from a patrol car's boot).
 var charges := 0
+## Throwables in the pouch (Grenades: 2 bits each for smoke, CS gas,
+## flashbangs), and the throw under way: throw_t counts down the wind-up and
+## the grenade leaves the hand at THROW_RELEASE.
+var nades := 0
+var throw_t := 0.0
+var throw_kind := 0
+const THROW_TIME := 0.55
+const THROW_RELEASE := 0.25
 ## Phase 3.7: in plain clothes (synced). Suspects take you for anyone on the
 ## street until you get your gun out, turn up in a marked car, shout, or
 ## hang about too close for too long.
@@ -214,6 +222,9 @@ func _init() -> void:
 
 func _ready() -> void:
 	home = global_position
+	if Net.is_host():
+		nades = Grenades.full_pouch()
+	_grenades_ready.call_deferred()
 	_shape = CollisionShape3D.new()
 	var cap := CapsuleShape3D.new()
 	cap.radius = 0.3
@@ -475,10 +486,39 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 	if on_floor and state in [S.MOVE, S.CROUCH, S.COVER]:
 		_step_up(target * delta, global_position - before)
 	_set_capsule()
+	_throw_step(delta)
 	_fire_step()
 
 
+func _grenades_ready() -> void:
+	if is_inside_tree():
+		Grenades.ensure(self)
+
+
+## Throwing a grenade: press throw, the arm comes over, and it leaves the
+## hand toward the crosshair (the host lets it go; everyone sees it fly).
+func _throw_step(delta: float) -> void:
+	if throw_t > 0.0:
+		var before := throw_t
+		throw_t = maxf(0.0, throw_t - delta)
+		if before > THROW_RELEASE and throw_t <= THROW_RELEASE and Net.is_host():
+			Grenades.officer_throw(self, throw_kind, aim_point)
+		return
+	if not _pressed(PlayerInput.THROW) or state not in [S.MOVE, S.CROUCH, S.COVER, S.AIR, S.PRONE]:
+		return
+	if reload_t > 0.0 or holster_t > 0.0 or punch_t > 0.0:
+		return
+	var k := Grenades.pick(nades, (buttons >> PlayerInput.NADE_SHIFT) & 3)
+	if k < 0:
+		return
+	nades = Grenades.with_count(nades, k, Grenades.count(nades, k) - 1)
+	throw_kind = k
+	throw_t = THROW_TIME
+
+
 func _fire_step() -> void:
+	if throw_t > 0.0:
+		return
 	# Phase 3.6: with the charges selected (2), fire places one where you aim.
 	if buttons & PlayerInput.ALT_TOOL and charges > 0 and gun == EnemyGuns.NONE:
 		if _pressed(PlayerInput.FIRE) and is_aiming() and _cooldown <= 0.0 and reload_t <= 0.0:
@@ -781,6 +821,7 @@ func _boot_and_treat(delta: float) -> void:
 			_boot_t = 0.0
 			reserve = reserve_max()
 			charges = Armoury.charges_max(kit)
+			nades = Grenades.full_pouch()
 			pouch = POUCH_MAX
 			injuries = 0
 			hp = minf(hp + 25.0, MAX_HP)
@@ -1086,6 +1127,8 @@ func respawn() -> void:
 	ammo = mag_size()
 	reserve = reserve_max()
 	charges = Armoury.charges_max(kit)
+	nades = Grenades.full_pouch()
+	throw_t = 0.0
 	reload_t = 0.0
 	revive_t = 0.0
 	gun = EnemyGuns.NONE
@@ -1664,6 +1707,9 @@ func encode_state(b: StreamPeerBuffer) -> void:
 	b.put_u8(gun_ammo)
 	b.put_u8(kit)
 	b.put_u8(charges | (128 if plain else 0))
+	b.put_u8(nades)
+	b.put_half(throw_t)
+	b.put_u8(throw_kind)
 
 
 func decode_state(b: StreamPeerBuffer) -> Dictionary:
@@ -1679,6 +1725,7 @@ func decode_state(b: StreamPeerBuffer) -> Dictionary:
 		"hp": b.get_u8(), "rv": b.get_half(), "bg": b.get_u8() == 1, "sg": b.get_half(),
 		"car": b.get_8(), "seat": b.get_u8() - 1, "inj": b.get_u8(), "tr": b.get_half(), "bt": b.get_half(), "cf": b.get_half(),
 		"gn": b.get_u8(), "ga": b.get_u8(), "kit": b.get_u8(), "chg": b.get_u8(),
+		"nd": b.get_u8(), "tt": b.get_half(), "tk": b.get_u8(),
 	}
 
 
@@ -1710,6 +1757,9 @@ func apply_state(s: Dictionary) -> void:
 	kit = s.kit
 	charges = s.chg & 127
 	plain = (s.chg & 128) != 0
+	nades = s.nd
+	throw_t = s.tt
+	throw_kind = s.tk
 	reload_t = s.rl
 	holster_t = absf(s.ht)
 	drawing = s.ht < 0.0

@@ -119,6 +119,17 @@ var _retreated := false
 ## Clients: holding something over their head (for the pose).
 var holding := false
 
+## Grenades (2026-11-23). Fighters may carry a frag or two (-1: not
+## worked out yet); _nade is a frag being wound up to throw. Flashbangs
+## stun (_stun_t), CS gas builds up (_gas) until they stumble out of it or
+## give up.
+var frags := -1
+var _nade := false
+var _frag_cd := 0.0
+var _stun_t := 0.0
+var _gas := 0.0
+var _gas_from := Vector3.INF
+
 ## Wave 2, Phase 2.3: people out on the street (civilian). They walk a loop
 ## of pavement (route), and when shots, blasts or falling buildings go off
 ## near them they run from it (PANIC), then crouch with their hands over
@@ -242,6 +253,9 @@ func set_state(s: S) -> void:
 		return
 	state = s
 	state_t = 0.0
+	if s != S.THROW and _nade:
+		_nade = false
+		holding = _held != null
 	_path = PackedVector3Array()
 	_goal = Vector3.INF
 	if s in [S.SURRENDER, S.CUFFED, S.IN_CAR, S.DOWN, S.BOOKED]:
@@ -351,6 +365,9 @@ func _physics_process(delta: float) -> void:
 	state_t += delta
 	_shoot_t -= delta
 	_suppressed_t -= delta
+	_frag_cd -= delta
+	_stun_t -= delta
+	_gas = maxf(0.0, _gas - 0.12 * delta)
 	pressure = maxf(0.0, pressure - 0.2 * delta)
 	if state == S.IN_CAR:
 		if car == null or not is_instance_valid(car):
@@ -441,7 +458,11 @@ func _physics_process(delta: float) -> void:
 				elif t.d < 10.0 and _rng.randf() < 0.25:
 					_bolt(t)
 		S.STAGGER:
-			if state_t > 1.0 and civilian:
+			if _stun_t > 0.0:
+				# Blinded and deaf: stumbling about, hands at their face.
+				wish = Vector3(sin(state_t * 2.3 + net_id), 0, cos(state_t * 1.7)) * 0.3
+				speed = WALK * 0.4
+			elif state_t > 1.0 and civilian:
 				set_state(S.COWER)
 				_calm_t = 8.0
 			elif state_t > 1.0:
@@ -689,7 +710,7 @@ func _threat() -> Dictionary:
 		var a := global_position + Vector3(0, 1.5, 0)
 		var b := best.global_position + Vector3(0, 1.4, 0)
 		var q := PhysicsRayQueryParameters3D.create(a, b, 1, [get_rid()])
-		los = get_world_3d().direct_space_state.intersect_ray(q).is_empty()
+		los = get_world_3d().direct_space_state.intersect_ray(q).is_empty() and not Grenades.blocks_sight(a, b)
 	return {"o": best, "d": bd, "los": los}
 
 
@@ -715,6 +736,8 @@ func _feel_pressure(delta: float) -> void:
 		if not get_world_3d().direct_space_state.intersect_ray(q).is_empty():
 			continue
 		pressure += delta * (0.25 if fighter else (0.5 if armed else 1.0)) * (1.5 if d < 6.0 else 1.0)
+	if state == S.STAGGER and _stun_t > 0.0:
+		return   # stunned: they'll decide when they can see again
 	if pressure >= SURRENDER_AT:
 		if fighter and hp > MAX_HP * 0.35 and _rng.randf() < 0.75:
 			# Not giving up yet: get out of the line of fire.
@@ -857,6 +880,8 @@ func _fire_at(target: Vector3, spread_k: float) -> void:
 	if dispatcher == null or not dispatcher.has_method("suspect_shot"):
 		return
 	var muzzle := muzzle_position()
+	if _gas > 0.2:
+		spread_k += 0.25   # eyes streaming: can't aim
 	var spread := target.distance_to(muzzle) * spread_k
 	target += Vector3(_rng.randf_range(-1, 1), _rng.randf_range(-0.6, 0.6), _rng.randf_range(-1, 1)) * spread
 	var dir := (target - muzzle).normalized()
@@ -1149,6 +1174,8 @@ func _next_move(t: Dictionary) -> void:
 		_unseen_t = 0.0
 		if _take_cover({"o": null, "d": INF, "los": false}, "advance"):
 			return
+	if _try_frag(t):
+		return
 	if role == ROLE_FLANK and _cycles >= 2 and not _flanked:
 		_flanked = true
 		if _take_cover(t, "flank"):
@@ -1227,6 +1254,7 @@ func _throwable_near() -> RigidBody3D:
 
 
 func _start_throw(rb: RigidBody3D) -> void:
+	_nade = false
 	set_state(S.THROW)
 	_grab = rb
 	_held = null
@@ -1235,6 +1263,8 @@ func _start_throw(rb: RigidBody3D) -> void:
 
 func _throw_step(t: Dictionary, delta: float) -> Array:
 	var tp := _threat_pos(t)
+	if _nade:
+		return _frag_step(t, tp, delta)
 	if _held == null:
 		if _grab == null or not is_instance_valid(_grab) or _grab.has_meta("held") or state_t > 5.0:
 			_after_throw(t)
@@ -1434,3 +1464,116 @@ func apply_net(d: Dictionary) -> void:
 	seat = d.seat
 	escort_peer = d.escort
 	_show_gun()
+
+
+# --- host: grenades ------------------------------------------------------------------------
+
+## Out of cover with a frag: lob it at officers dug in behind cover or out of
+## sight, or bunched up, now and then.
+func _try_frag(t: Dictionary) -> bool:
+	if frags < 0:
+		frags = 0
+		if fighter and armed:
+			var r := _rng.randf()
+			frags = 2 if r < 0.12 else (1 if r < 0.5 else 0)
+	if frags <= 0 or _frag_cd > 0.0:
+		return false
+	var tp := _threat_pos(t)
+	if tp == Vector3.INF:
+		return false
+	var d := global_position.distance_to(tp)
+	if d < 6.0 or d > 24.0:
+		return false
+	var dug_in: bool = t.o != null and ((t.o as Officer).state in [Officer.S.COVER, Officer.S.CROUCH, Officer.S.PRONE] or not t.los)
+	var bunched := 0
+	for n in get_tree().get_nodes_in_group("officers"):
+		if (n as Node3D).global_position.distance_to(tp) < 4.0:
+			bunched += 1
+	if _rng.randf() > (0.45 if dug_in or bunched >= 2 or _unseen_t > 2.0 else 0.12):
+		_frag_cd = 3.0
+		return false
+	frags -= 1
+	_frag_cd = 9.0
+	_nade = true
+	_grab = null
+	_held = null
+	set_state(S.THROW)
+	holding = true
+	_throw_t = 0.75
+	return true
+
+
+## Pin out, arm back, and over it goes at where the police are.
+func _frag_step(t: Dictionary, tp: Vector3, delta: float) -> Array:
+	if tp != Vector3.INF:
+		_face(tp)
+	_throw_t -= delta
+	if _throw_t > 0.0:
+		return [Vector3.ZERO, 0.0]
+	holding = false
+	_nade = false
+	if tp != Vector3.INF:
+		var fwd := Vector3(sin(rotation.y), 0, cos(rotation.y))
+		var from := global_position + Vector3(0, 1.9, 0) + fwd * 0.3
+		var miss := Vector3(_rng.randf_range(-1.5, 1.5), 0, _rng.randf_range(-1.5, 1.5))
+		var lead := (t.o as Officer).velocity * 0.4 if t.o else Vector3.ZERO
+		Grenades.throw(self, Grenades.Kind.FRAG, from, Thrown.launch_velocity(from, tp + lead + miss + Vector3(0, 0.2, 0), 13.0))
+	_after_throw(t)
+	return [Vector3.ZERO, 0.0]
+
+
+## Host: a dose of CS gas (amount: about seconds in the thick of it).
+## from: the middle of the cloud.
+func gassed(amount: float, from: Vector3) -> void:
+	if state in [S.DOWN, S.BOOKED, S.DRIVE, S.IN_CAR, S.CUFFED]:
+		return
+	_gas += amount
+	_gas_from = from
+	if state == S.SURRENDER:
+		return
+	if civilian:
+		if state != S.PANIC:
+			on_alarm(from, 30.0)
+		return
+	pressure += amount * (0.6 if fighter else 1.4)
+	# Long enough in it and anyone gives up, hands up, eyes streaming.
+	if _gas > (3.0 if fighter else 1.2) or (pressure >= SURRENDER_AT and not fighter):
+		set_state(S.SURRENDER)
+		return
+	if state == S.STAGGER:
+		return
+	if not fighter:
+		# Doubled over, choking: they barely get anywhere.
+		_drop_held(Vector3.ZERO)
+		_stun_t = maxf(_stun_t, 1.6)
+		set_state(S.STAGGER)
+		return
+	# Fighters get out of it: stumble away from the middle.
+	if state in [S.FLEE, S.THROW]:
+		return
+	var away := global_position - from
+	away.y = 0.0
+	if away.length() < 0.2:
+		away = Vector3(_rng.randf_range(-1, 1), 0, _rng.randf_range(-1, 1))
+	set_state(S.FLEE)
+	_stuck_t = 0.0
+	_stuck_p = global_position
+	_goal = _near(global_position + away.normalized() * (Grenades.GAS_RADIUS + 6.0), 3.0)
+
+
+## Host: a flashbang went off in front of them (k: 0..1, how hard).
+func flashed(k: float) -> void:
+	if not is_free() and state != S.SURRENDER:
+		return
+	if state == S.SURRENDER:
+		return
+	if civilian:
+		_calm_t = 10.0
+		set_state(S.COWER)
+		return
+	_drop_held(Vector3.ZERO)
+	_nade = false
+	_stun_t = 2.0 + 4.5 * k
+	pressure += 1.0 + 1.4 * k
+	velocity = Vector3.ZERO
+	set_state(S.STAGGER)
