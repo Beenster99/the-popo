@@ -77,6 +77,7 @@ var _look_counter := 0
 var traffic: TrafficSystem
 ## Wave 3: templates, the clock and chance encounters.
 var missions: Missions
+var stories: Stories
 var _thefts := {}            # host: call id -> {dr, suspect, t}
 var guns := {}               # net id -> DroppedGun (everyone)
 var _next_gun_id := 1
@@ -100,6 +101,10 @@ func _ready() -> void:
 	missions.name = "Missions"
 	missions.dispatcher = self
 	add_child(missions)
+	stories = Stories.new()
+	stories.name = "Stories"
+	stories.dispatcher = self
+	add_child(stories)
 
 
 func _exit_tree() -> void:

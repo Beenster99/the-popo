@@ -12,6 +12,7 @@ func _city() -> City:
 	add_child(s)
 	s.dispatch.enabled = false
 	s.dispatch.missions.enabled = false
+	s.dispatch.stories.enabled = false
 	for i in 60 * 12:
 		await get_tree().physics_frame   # walking routes near the station
 	return s
@@ -159,5 +160,42 @@ func test_indoor_jobs() -> void:
 			await get_tree().physics_frame
 		t.check(said.any(func(x): return String(x).contains("hostages out safe")), "hostages out safe")
 		t.check((hostages[0] as Suspect).state == Suspect.S.WANDER, "and they walk away")
+	s.queue_free()
+	await get_tree().process_frame
+
+
+func test_story_chains() -> void:
+	var s := await _city()
+	var d := s.dispatch
+	var st := d.stories
+	var said: Array = []
+	d.radio.connect(func(x): said.append(x))
+	t.check(Stories.CHAINS.size() >= 3, "%d story chains" % Stories.CHAINS.size())
+	# The Vipers, part one: Dex Moran is dealing on the corner.
+	var id := st.start_chain(0)
+	t.check(id > 0, "the Vipers' first job: %s" % (d.calls[id].text if id > 0 else "-"))
+	if id <= 0:
+		s.queue_free()
+		return
+	var c: Dictionary = d.calls[id]
+	var dex: Suspect = d.suspects[c.character]
+	t.check(c.story == "vipers" and dex.get_meta("story_name") == "Dex Moran" and dex.look == 41, "Dex Moran, with his own face")
+	# He gets away: the job comes round again and he's ready for us.
+	c.state = Dispatcher.CallState.LOST
+	for i in 3:
+		await get_tree().physics_frame
+	t.check(st.progress.vipers.escapes == 1 and st.progress.vipers.step == 0, "he got away: the story waits for him")
+	var id2 := st.start_chain(0)
+	t.check(id2 > 0, "and he turns up again")
+	if id2 > 0:
+		var dex2: Suspect = d.suspects[d.calls[id2].character]
+		t.check(dex2.look == 41 and dex2.armed and dex2.fighter, "same face, armed this time")
+		t.check(said.any(func(x): return String(x).begins_with("DEX MORAN:")), "and he lets us know he remembers")
+		# Caught: the story moves on.
+		dex2.set_state(Suspect.S.BOOKED)
+		d.calls[id2].state = Dispatcher.CallState.CLOSED
+		for i in 3:
+			await get_tree().physics_frame
+		t.check(st.progress.vipers.step == 1 and st.progress.vipers.escapes == 0, "booked: on to the next part (step %d)" % st.progress.vipers.step)
 	s.queue_free()
 	await get_tree().process_frame

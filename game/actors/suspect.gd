@@ -1300,6 +1300,10 @@ static func decode(b: StreamPeerBuffer) -> Dictionary:
 
 ## Clients: take the host's word for everything but the smoothed position.
 func apply_net(d: Dictionary) -> void:
+	if d.look != look:
+		look = d.look
+		if rig:
+			SuspectLook.apply(rig.model, look)
 	if d.state != state:
 		set_state(d.state)
 	weapon = d.weapon
