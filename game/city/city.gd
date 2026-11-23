@@ -51,7 +51,7 @@ var peds: PedSystem
 ## Wave 4: the light follows the clock; rain and storms.
 var weather: CityWeather
 var repairs: RepairCrews
-## v0.9.0: the lifts in the downtown towers.
+## v0.10.0: the lifts in the downtown towers.
 var lifts: Lifts
 var sun: DirectionalLight3D
 ## Wave 3, Phase 3.5: what the station has bought, and the vehicles waiting

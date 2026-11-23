@@ -38,7 +38,7 @@ const STYLES := {
 	"park": {"count": [0, 0], "w": [0, 0], "d": [0, 0], "storeys": [0, 0], "gap": 1.0, "types": []},
 	"carpark": {"count": [0, 0], "w": [0, 0], "d": [0, 0], "storeys": [0, 0], "gap": 1.0, "types": []},
 }
-## v0.9.0: tall downtown buildings with a lift beside the stairs.
+## v0.10.0: tall downtown buildings with a lift beside the stairs.
 const MAX_TOWERS := 2
 const TOWER_CHANCE := 0.7
 const TOWER_STOREYS := Vector2i(7, 10)
@@ -95,7 +95,7 @@ static func plan(g: BlockGenerator, rng: RandomNumberGenerator) -> void:
 			b.storeys = 1
 		if b.type == "house":
 			b.storeys = mini(b.storeys, 2)
-		# v0.9.0: downtown towers, up to ten storeys, with a lift.
+		# v0.10.0: downtown towers, up to ten storeys, with a lift.
 		b.lift = false
 		if g.style == "downtown" and towers < MAX_TOWERS and b.w >= 4 and b.d >= 3 \
 				and b.type in ["office", "flats"] and rng.randf() < TOWER_CHANCE:
@@ -103,7 +103,7 @@ static func plan(g: BlockGenerator, rng: RandomNumberGenerator) -> void:
 			b.type = "tower"
 			b.storeys = rng.randi_range(TOWER_STOREYS.x, TOWER_STOREYS.y)
 			b.lift = true
-		# v0.9.0: stairs up to a hut on the roof, so roofs can be reached
+		# v0.10.0: stairs up to a hut on the roof, so roofs can be reached
 		# from inside as well as by grapple.
 		b.roof_access = b.storeys >= 2 and b.type not in ["house", "station"]
 		b.tint = colours[rng.randi_range(0, colours.size() - 1)]
@@ -192,7 +192,7 @@ static func building(g: BlockGenerator, bi: int, rng: RandomNumberGenerator) -> 
 		_roof_hut(g, b, bi, ry, rng)
 
 
-## v0.9.0: the hut over the stairs on the roof, with a door out onto it.
+## v0.10.0: the hut over the stairs on the roof, with a door out onto it.
 ## About a third are locked: kick it in, or come up the stairs.
 static func _roof_hut(g: BlockGenerator, b: Dictionary, bi: int, ry: float, rng: RandomNumberGenerator) -> void:
 	var w: int = b.w
@@ -215,7 +215,7 @@ static func _roof_hut(g: BlockGenerator, b: Dictionary, bi: int, ry: float, rng:
 	b.roof_door = g._w(b, (w - 0.5) * M, ry, (d - 1) * M - 1.0)
 
 
-## v0.9.0: the lift shaft walls on one storey: the module left of the
+## v0.10.0: the lift shaft walls on one storey: the module left of the
 ## stairs at the back, with a doorway at the front for the lift doors.
 static func _shaft(g: BlockGenerator, b: Dictionary, bi: int, y: float) -> void:
 	var w: int = b.w

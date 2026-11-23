@@ -1961,7 +1961,7 @@ func _order_prisoners() -> void:
 	shout_t = maxf(shout_t, 0.8)
 
 
-# --- v0.9.0: grapple hook and abseil rope ---------------------------------------------
+# --- v0.10.0: grapple hook and abseil rope ---------------------------------------------
 # GRAPPLE: the hook flies to a roof edge, the line hauls you up the wall and
 # you climb over the parapet. ROPE: hanging off a roof edge on the line,
 # climbing or sliding. SWING: kicking off the wall and crashing in through

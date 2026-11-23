@@ -87,7 +87,7 @@ func _process(delta: float) -> void:
 			lines.append("%s: start a range run" % use)
 			if Input.is_action_just_pressed("interact") and not PlayerInput.blocked:
 				rng.ask_start()
-	# v0.9.0: the tower lifts.
+	# v0.10.0: the tower lifts.
 	if o and Lifts.current and not LiftPanel.is_open() and not PauseMenu.is_open() and not (o is Officer and (o as Officer).in_car()):
 		var lp := Lifts.current.prompt_for(o.global_position)
 		if lp != "":

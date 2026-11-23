@@ -1,6 +1,6 @@
 class_name GrappleRope
 extends Node3D
-## v0.9.0: the grapple line and hook you can see, and their sounds, for one
+## v0.10.0: the grapple line and hook you can see, and their sounds, for one
 ## officer. Reads the officer's state each frame (the same on every machine).
 
 var officer: Officer

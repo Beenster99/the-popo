@@ -546,7 +546,7 @@ func _area_offset() -> Vector3:
 	return city.blocks[area_block].offset
 
 
-## The area's lot size (x, z) in metres (city lots vary since v0.9.0).
+## The area's lot size (x, z) in metres (city lots vary since v0.10.0).
 func _area_size() -> Vector2:
 	if city == null or area_block < 0:
 		return Vector2.ONE * BlockGenerator.N * BlockGenerator.M

@@ -1,6 +1,6 @@
 class_name Rooftops
 extends RefCounted
-## v0.9.0: what the grapple hook and the abseil rope need to know about the
+## v0.10.0: what the grapple hook and the abseil rope need to know about the
 ## city's buildings: which one a point is on or against, its roof height,
 ## and the nearest outside wall (a point on it and which way it faces).
 ## The city sets the list when it's built (one city at a time).

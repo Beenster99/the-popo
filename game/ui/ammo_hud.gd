@@ -165,7 +165,7 @@ func _prompt(o: Officer) -> String:
 			Controls.describe(Controls.pc_event("sprint")), Controls.describe(Controls.pc_event("jump")), use]
 	if o.state not in [Officer.S.MOVE, Officer.S.CROUCH]:
 		return ""
-	# v0.9.0: the grapple and the rope.
+	# v0.10.0: the grapple and the rope.
 	var aim_held := (o.buttons & PlayerInput.AIM) != 0
 	if aim_held and not o.grapple_plan(PlayerInput.aim_point).is_empty():
 		return "%s fire the grapple: up onto the roof" % use

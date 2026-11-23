@@ -1,6 +1,6 @@
 class_name LiftPanel
 extends CanvasLayer
-## v0.9.0: the buttons inside a lift. Click one, press its number (0 for
+## v0.10.0: the buttons inside a lift. Click one, press its number (0 for
 ## G), or pick one with the pad and press A. Esc / B closes it.
 
 static var _open: LiftPanel
