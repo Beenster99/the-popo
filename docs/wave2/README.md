@@ -109,3 +109,10 @@ lights; people walk and scatter; a car knocks someone down; a car theft
 turns into a pursuit and the driver bails) and
 `tests/unit/test_vehicles.gd` (every vehicle settles, drives, turns and stays
 upright; the artic pulls its trailer round a corner).
+
+## Pictures
+
+![The city from the air](img/city_aerial.png)
+![Downtown](img/city_downtown.png)
+![Inside an office](img/city_inside.png)
+![A street with traffic lights, traffic and the skyline](img/street_skyline.png)

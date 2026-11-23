@@ -78,7 +78,7 @@ func _run() -> void:
 					var j := CityGenerator.junction(2, 3)
 					if shot == "city_traffic":
 						cam.look_at_from_position(j + Vector3(-16, 5.5, -13), j + Vector3(2, 0.5, 4))
-						await _frames(420)
+						await _frames(40)
 					else:
 						var j0 := CityGenerator.junction(0, 3)
 						cam.look_at_from_position(j0 + Vector3(-2, 3.0, 2.6), j0 + Vector3(300, 8, 2.6))
