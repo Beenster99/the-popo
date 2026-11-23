@@ -1,0 +1,57 @@
+{
+ "walk": {
+  "take": "Neutral_FW",
+  "frames": [
+   571,
+   651
+  ],
+  "length_s": 1.333,
+  "speed_mps": 0.873,
+  "turn_rad_s": 0.1,
+  "mirror": false
+ },
+ "walk_ready": {
+  "take": "Swat_FW",
+  "frames": [
+   728,
+   794
+  ],
+  "length_s": 1.1,
+  "speed_mps": 1.093,
+  "turn_rad_s": 0.125,
+  "mirror": false
+ },
+ "walk_back": {
+  "take": "Swat_BW",
+  "frames": [
+   756,
+   821
+  ],
+  "length_s": 1.083,
+  "speed_mps": 0.536,
+  "turn_rad_s": 0.066,
+  "mirror": false
+ },
+ "walk_left": {
+  "take": "Swat_SW",
+  "frames": [
+   3669,
+   3730
+  ],
+  "length_s": 1.017,
+  "speed_mps": 0.58,
+  "turn_rad_s": 0.117,
+  "mirror": false
+ },
+ "walk_right": {
+  "take": "Swat_SW",
+  "frames": [
+   3669,
+   3730
+  ],
+  "length_s": 1.017,
+  "speed_mps": 0.58,
+  "turn_rad_s": 0.117,
+  "mirror": true
+ }
+}

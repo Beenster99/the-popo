@@ -1,0 +1,9 @@
+officer_walks.glb: walk cycles retargeted from the 100STYLE dataset
+  "The 100STYLE Dataset - Ian Mason", https://ianxmason.github.io/100style/
+  Licence: Creative Commons Attribution 4.0 International (CC BY 4.0).
+  Takes used: Neutral_FW (walk), Swat_FW (walk_ready), Swat_BW (walk_back),
+  Swat_SW (walk_left, and mirrored for walk_right).
+  Built by tools/blender/mocap/build_walks.py (cycle picks in walks.json).
+
+officer_mocap.glb: captured from video on beenster's PC (toyxyz RGB MoCap,
+  GVHMR / ExMR), hand-keyed polish in Blender.
