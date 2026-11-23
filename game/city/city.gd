@@ -276,6 +276,8 @@ func _build(s: int) -> void:
 	repairs.traffic = traffic
 	repairs.gen = gen
 	add_child(repairs)
+	Rooftops.buildings = gen.buildings
+	Rooftops.world = world
 	lifts = Lifts.new()
 	lifts.name = "Lifts"
 	add_child(lifts)

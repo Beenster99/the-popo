@@ -136,8 +136,17 @@ func _prompt(o: Officer) -> String:
 		var w := o.respawn_wait()
 		var first := ("%s respawn in %d" % [r, ceili(w)]) if w > 0.0 else ("%s respawn back at the start" % r)
 		return "DOWN   %s   or a teammate holds %s on you   (you get up here in %d s)" % [first, use, ceili(up)]
+	if o.state == Officer.S.ROPE:
+		return "ON THE ROPE   W climb   S slide   %s drop fast   %s swing in through a window   %s let go" % [
+			Controls.describe(Controls.pc_event("sprint")), Controls.describe(Controls.pc_event("jump")), use]
 	if o.state not in [Officer.S.MOVE, Officer.S.CROUCH]:
 		return ""
+	# v0.7.0: the grapple and the rope.
+	var aim_held := (o.buttons & PlayerInput.AIM) != 0
+	if aim_held and not o.grapple_plan(PlayerInput.aim_point).is_empty():
+		return "%s fire the grapple: up onto the roof" % use
+	if not aim_held and not o.abseil_plan().is_empty():
+		return "%s abseil down the wall" % use
 	if o.cuff_target():
 		return "Hold %s: cuff the suspect" % use
 	var fg := o.gun_on_floor()

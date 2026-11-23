@@ -61,6 +61,8 @@ const ITEMS := [
 	# Phase 3.7: undercover.
 	{"cat": Cat.UNDERCOVER, "name": "Plain clothes", "price": 1000, "about": "Street clothes from the locker. Crooks take you for anyone until you draw, shout, turn up in a marked car or hang about too close."},
 	{"cat": Cat.UNDERCOVER, "name": "Unmarked car", "price": 2000, "needs": 16, "about": "A plain grey saloon. Nobody looks twice at it."},
+	# v0.7.0: rooftops.
+	{"cat": Cat.GEAR, "name": "Grapple hook", "price": 1500, "about": "Everyone carries a grapple launcher and rope. Aim at a roof edge and press the use key to be hauled up onto the roof. At a roof edge, press the use key to abseil down; W/S to climb or slide, Shift to drop fast, Space to swing in through a window."},
 ]
 enum Gear { NONE, BACKPACK, BREACH, C4, TORCH }
 const GEAR_NAMES := ["Nothing", "Ammo backpack", "Breach charges", "C4", "Tactical torch"]
@@ -79,6 +81,7 @@ const GARAGE := 16
 const RANGE := 17
 const PLAIN := 22
 const UNMARKED := 23
+const GRAPPLE := 24
 
 const MSG_BUY := 100      # client -> host: buy item (u8)
 const MSG_KIT := 101      # client -> host: my kit (u8)
