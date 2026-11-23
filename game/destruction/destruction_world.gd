@@ -64,6 +64,10 @@ var _buffers := {}       # client: net id -> Array of [time, pos, quat]
 var _debris: Array = []  # local cosmetic chunks [body, spawn time]
 var _next_id := 1
 var _stability_dirty := false
+## Wave 2: pieces belong to a group (a city block). Support only runs within
+## a block, so after a break only that block's support is re-checked.
+var _groups := {}        # group -> Array of piece ids
+var _dirty_groups := {}  # group -> true
 
 # Stats
 var synced_awake := 0
@@ -91,7 +95,7 @@ func _exit_tree() -> void:
 ## tint recolours exterior wall faces (alpha 0 keeps the kit colour).
 ## held_by: the piece this one hangs in (glass and doors in their wall); it
 ## stands while that piece stands.
-func add_piece(kind: String, xform: Transform3D, bears := true, tint := Color(0, 0, 0, 0), held_by := -1) -> int:
+func add_piece(kind: String, xform: Transform3D, bears := true, tint := Color(0, 0, 0, 0), held_by := -1, group := 0) -> int:
 	var id := _next_id
 	_next_id += 1
 	var kit := KitLibrary.get_piece(kind)
@@ -116,8 +120,11 @@ func add_piece(kind: String, xform: Transform3D, bears := true, tint := Color(0,
 		"id": id, "kind": kind, "node": body, "xform": xform, "aabb": world_aabb,
 		"hp": HP.get(kind, 100.0), "bears": bears, "state": "intact",
 		"anchored": world_aabb.position.y < ANCHOR_Y and held_by < 0, "below": [],
-		"tint": tint, "held_by": held_by,
+		"tint": tint, "held_by": held_by, "group": group,
 	}
+	if not _groups.has(group):
+		_groups[group] = []
+	_groups[group].append(id)
 	return id
 
 
@@ -136,10 +143,12 @@ static func surface_for(kind: String) -> String:
 func finalize() -> void:
 	# Bucket pieces by the height of their top (5 cm steps), so each piece
 	# only checks the few that could be right under it.
+	# Wave 2: and by group, so a city of blocks does not compare every
+	# floor with every other floor at the same height across town.
 	var by_top := {}
 	for b in pieces.values():
 		b.below = []
-		var k := int(roundf(b.aabb.end.y * 20.0))
+		var k := Vector2i(int(roundf(b.aabb.end.y * 20.0)), b.group)
 		if not by_top.has(k):
 			by_top[k] = []
 		by_top[k].append(b)
@@ -150,7 +159,7 @@ func finalize() -> void:
 		var kb := int(roundf(a_bottom * 20.0))
 		var ax := Rect2(a.aabb.position.x, a.aabb.position.z, a.aabb.size.x, a.aabb.size.z)
 		for k in [kb - 1, kb, kb + 1]:
-			for b in by_top.get(k, []):
+			for b in by_top.get(Vector2i(k, a.group), []):
 				# Non-bearing pieces (shopfronts, facades) hold up walls above
 				# them but never carry a slab.
 				if a == b or (a.kind in SLABS and not b.bears) or b.held_by >= 0:
@@ -165,17 +174,27 @@ func finalize() -> void:
 ## Stable pieces: anchored to the ground, or held up by stable pieces below.
 ## Walls and columns need one support. A slab needs support on two opposite
 ## sides (both ends of its span along X, or both along Z).
-func compute_stable() -> Dictionary:
+func compute_stable(groups := {}) -> Dictionary:
 	var stable := {}
-	var order: Array = pieces.values().filter(func(p): return p.state == "intact")
+	var order: Array
+	if groups.is_empty():
+		order = pieces.values().filter(func(p): return p.state == "intact")
+	else:
+		for g in groups:
+			for id in _groups.get(g, []):
+				if pieces[id].state == "intact":
+					order.append(pieces[id])
 	order.sort_custom(func(a, b): return a.aabb.position.y < b.aabb.position.y)
+	# Glass and doors stand while the piece they hang in stands: worked out
+	# after the rest, since a door's bottom is level with its wall's and the
+	# sort may put either first.
+	var held_pieces: Array = []
 	for p in order:
 		if p.anchored:
 			stable[p.id] = true
 			continue
 		if p.held_by >= 0:
-			if stable.has(p.held_by):
-				stable[p.id] = true
+			held_pieces.append(p)
 			continue
 		var held: Array = p.below.filter(func(i): return stable.has(i))
 		if held.is_empty():
@@ -198,6 +217,9 @@ func compute_stable() -> Dictionary:
 			if (minx and maxx) or (minz and maxz):
 				stable[p.id] = true
 		else:
+			stable[p.id] = true
+	for p in held_pieces:
+		if stable.has(p.held_by):
 			stable[p.id] = true
 	return stable
 
@@ -319,13 +341,16 @@ func _apply_break(b: StreamPeerBuffer) -> void:
 			p.node.queue_free()
 			_spawn_chunks(p, p.xform, Vector3.ZERO, Vector3.ZERO, origin, strength, rng)
 			_stability_dirty = true
+			_dirty_groups[p.group] = true
 		BREAK_RELEASE:
 			if p.state != "intact":
 				return
 			p.state = "released"
+			_released[p.id] = true
 			p.node.queue_free()
 			_spawn_released(p)
 			_stability_dirty = true
+			_dirty_groups[p.group] = true
 		BREAK_BODY_SHATTER:
 			var xf := _get_xform(b)
 			var lv := _get_v3(b)
@@ -343,10 +368,14 @@ func _apply_break(b: StreamPeerBuffer) -> void:
 func _physics_process(delta: float) -> void:
 	if Net.is_host() and _stability_dirty:
 		_stability_dirty = false
-		var stable := compute_stable()
-		for p in pieces.values():
-			if p.state == "intact" and not stable.has(p.id):
-				_host_break(p.id, BREAK_RELEASE, p.aabb.get_center(), 0.0)
+		var groups := _dirty_groups
+		_dirty_groups = {}
+		var stable := compute_stable(groups)
+		for g in groups:
+			for id in _groups.get(g, []):
+				var p: Dictionary = pieces[id]
+				if p.state == "intact" and not stable.has(p.id):
+					_host_break(p.id, BREAK_RELEASE, p.aabb.get_center(), 0.0)
 	if Net.is_host():
 		_check_released_impacts(delta)
 	else:
@@ -450,14 +479,18 @@ func _spawn_released(p: Dictionary) -> void:
 	bodies[nid] = rb
 	# Pieces that stood on this one but are still held up elsewhere would
 	# clamp its edge like a vice; let it tear free from under them instead.
-	for other in pieces.values():
+	# (Only its own block's pieces: support never crosses between blocks.)
+	var mates: Array = _groups.get(p.group, [])
+	for oid in mates:
+		var other: Dictionary = pieces[oid]
 		if other.state == "intact" and other.below.has(p.id) and is_instance_valid(other.node):
 			rb.add_collision_exception_with(other.node)
 	# The pieces it was touching when it let go (the next slab along, the
 	# wall it hung off). Scraping past them as it tips is not an impact.
 	var torn_from: Array = []
 	var near: AABB = p.aabb.grow(0.1)
-	for other in pieces.values():
+	for oid in mates:
+		var other: Dictionary = pieces[oid]
 		if other.id != p.id and other.state == "intact" and near.intersects(other.aabb):
 			torn_from.append(other.id)
 	rb.set_meta("torn_from", torn_from)
@@ -498,8 +531,11 @@ const SHATTER_GRACE_STEPS := 6
 const TEAR_SCRAPE_SPEED := 4.0
 
 func _check_released_impacts(_delta: float) -> void:
-	for p in pieces.values():
-		if p.state != "released":
+	# Wave 2: only the pieces let go (a city has tens of thousands of pieces).
+	for id in _released.keys():
+		var p: Dictionary = pieces.get(id, {})
+		if p.is_empty() or p.state != "released":
+			_released.erase(id)
 			continue
 		var rb: RigidBody3D = bodies.get(p.id * 64 + RELEASED_BIT)
 		if rb == null or not is_instance_valid(rb):
@@ -538,6 +574,7 @@ func _watch_sleep(rb: RigidBody3D, nid: int) -> void:
 const MAX_BODIES_PER_SNAPSHOT := 110
 const POS_SCALE := 64.0
 var _priority := {}
+var _released := {}     # host: piece ids falling free (state "released")
 var awake_total := 0
 
 func _write_snapshot(b: StreamPeerBuffer) -> void:
@@ -641,6 +678,7 @@ func read_state(b: StreamPeerBuffer) -> void:
 			p.node.queue_free()
 		piece_broken.emit(id)
 		_stability_dirty = true
+		_dirty_groups[p.group] = true
 	for i in b.get_u32():
 		var nid := b.get_u32()
 		var xf := _get_xform(b)
@@ -669,6 +707,7 @@ func _restore_body(p: Dictionary, k: int, xf: Transform3D) -> void:
 		rb.collision_layer = FALLING_LAYER
 		rb.set_meta("released_piece", p.id)
 		p.state = "released"
+		_released[p.id] = true
 		if Net.is_host():
 			rb.contact_monitor = true
 			rb.max_contacts_reported = 6

@@ -10,6 +10,8 @@ const BULLET_DAMAGE := 25.0
 
 static func resolve(world: DestructionWorld, cars: CarSync, origin: Vector3, dir: Vector3, alt: bool, shooter: Officer) -> Vector3:
 	var hit := Melee.bullet_ray(shooter.get_world_3d().direct_space_state, origin, dir, shooter)
+	if Net.is_host():
+		shooter.get_tree().call_group("alarm_listeners", "on_alarm", origin, 45.0)
 	if alt:
 		var at: Vector3 = hit.position if hit else origin + dir * 8.0
 		Blast.go(shooter.get_tree(), world, cars, at, 3.5, 200.0, 9.0)

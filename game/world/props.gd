@@ -57,6 +57,30 @@ const KINDS := {
 			[Vector3(-0.31, 0.05, 0), Vector3(0, -0.22, 0), "e0c23a"]]},
 	"gas": {"size": Vector3(-0.15, 0.72, 0), "mass": 14.0, "hp": 20.0, "surface": "metal", "throw": true, "explosive": true,
 		"parts": [[Vector3(-0.15, 0.62, 0), Vector3(0, -0.05, 0), "d86a1e"], [Vector3(-0.07, 0.1, 0), Vector3(0, 0.31, 0), "8a8d92"]]},
+	# Wave 2 (Phase 2.2): furniture for flats, offices, shops, warehouses
+	# and the station, and shipping containers on the docks.
+	"bed": {"size": Vector3(1.4, 0.55, 2.0), "mass": 45.0, "hp": 80.0, "surface": "wood", "throw": false, "flammable": true,
+		"parts": [[Vector3(1.4, 0.25, 2.0), Vector3(0, -0.15, 0), "5f3f26"], [Vector3(1.34, 0.18, 1.94), Vector3(0, 0.06, 0), "d9d4c8"],
+			[Vector3(0.5, 0.12, 0.35), Vector3(-0.35, 0.2, -0.75), "eeeeee"], [Vector3(0.5, 0.12, 0.35), Vector3(0.35, 0.2, -0.75), "eeeeee"],
+			[Vector3(1.4, 0.7, 0.08), Vector3(0, 0.1, -0.98), "5f3f26"]]},
+	"sofa": {"size": Vector3(1.9, 0.8, 0.85), "mass": 40.0, "hp": 70.0, "surface": "wood", "throw": false, "flammable": true,
+		"parts": [[Vector3(1.9, 0.4, 0.85), Vector3(0, -0.2, 0), "5a6b7d"], [Vector3(1.9, 0.45, 0.2), Vector3(0, 0.17, -0.32), "4c5b6b"],
+			[Vector3(0.2, 0.3, 0.85), Vector3(-0.85, 0.05, 0), "4c5b6b"], [Vector3(0.2, 0.3, 0.85), Vector3(0.85, 0.05, 0), "4c5b6b"]]},
+	"desk": {"size": Vector3(1.4, 0.75, 0.7), "mass": 28.0, "hp": 60.0, "surface": "wood", "throw": false, "flammable": true,
+		"parts": [[Vector3(1.4, 0.05, 0.7), Vector3(0, 0.35, 0), "c9b48a"], [Vector3(0.05, 0.7, 0.66), Vector3(-0.66, -0.03, 0), "6b6f72"],
+			[Vector3(0.05, 0.7, 0.66), Vector3(0.66, -0.03, 0), "6b6f72"], [Vector3(0.5, 0.32, 0.04), Vector3(0.1, 0.55, -0.15), "202226"],
+			[Vector3(0.45, 0.02, 0.15), Vector3(0.1, 0.39, 0.1), "303236"]]},
+	"counter": {"size": Vector3(2.0, 1.0, 0.6), "mass": 60.0, "hp": 90.0, "surface": "wood", "throw": false, "flammable": true,
+		"parts": [[Vector3(2.0, 0.95, 0.6), Vector3(0, -0.025, 0), "7b5232"], [Vector3(2.04, 0.05, 0.64), Vector3(0, 0.475, 0), "d8cba8"]]},
+	"cabinet": {"size": Vector3(0.5, 1.3, 0.6), "mass": 35.0, "hp": 90.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(0.5, 1.3, 0.6), Vector3.ZERO, "8a8d92"], [Vector3(0.3, 0.03, 0.02), Vector3(0, 0.4, 0.31), "303236"],
+			[Vector3(0.3, 0.03, 0.02), Vector3(0, 0.0, 0.31), "303236"], [Vector3(0.3, 0.03, 0.02), Vector3(0, -0.4, 0.31), "303236"]]},
+	"pallet": {"size": Vector3(1.2, 0.15, 1.0), "mass": 18.0, "hp": 30.0, "surface": "wood", "throw": false, "flammable": true,
+		"parts": [[Vector3(1.2, 0.03, 1.0), Vector3(0, 0.06, 0), "b08a5a"], [Vector3(1.2, 0.09, 0.12), Vector3(0, -0.02, -0.4), "8a6a44"],
+			[Vector3(1.2, 0.09, 0.12), Vector3(0, -0.02, 0), "8a6a44"], [Vector3(1.2, 0.09, 0.12), Vector3(0, -0.02, 0.4), "8a6a44"]]},
+	"container": {"size": Vector3(2.44, 2.6, 6.06), "mass": 3800.0, "hp": 3000.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(2.44, 2.6, 6.06), Vector3.ZERO, "b3402a"], [Vector3(2.48, 0.12, 6.1), Vector3(0, 1.25, 0), "8a2f20"],
+			[Vector3(2.48, 0.12, 6.1), Vector3(0, -1.25, 0), "8a2f20"], [Vector3(2.3, 2.4, 0.06), Vector3(0, 0, 3.03), "7a2a1c"]]},
 	"extinguisher": {"size": Vector3(-0.1, 0.55, 0), "mass": 9.0, "hp": 12.0, "surface": "metal", "throw": true, "puffs": true,
 		"parts": [[Vector3(-0.1, 0.48, 0), Vector3(0, -0.035, 0), "c41f1f"], [Vector3(0.06, 0.08, 0.14), Vector3(0, 0.25, 0.03), "202226"]]},
 }
@@ -93,6 +117,12 @@ func _exit_tree() -> void:
 ## The props as they are now (Phase 1.7): what has broken, and where every
 ## standing one is. Sent to a friend who joins late, and what the host saves.
 func write_state(b: StreamPeerBuffer) -> void:
+	if city:
+		# Wave 2: which city blocks are furnished, so the reader makes the
+		# same props first.
+		b.put_u16(furnished.size())
+		for k in furnished:
+			b.put_u16(k)
 	b.put_u16(props.size())
 	for p in props.values():
 		b.put_u16(p.id)
@@ -104,6 +134,9 @@ func write_state(b: StreamPeerBuffer) -> void:
 ## Puts the props where a written state says, quietly: the breaking happened
 ## a while ago, so no sound and no splinters.
 func read_state(b: StreamPeerBuffer) -> void:
+	if city:
+		for i in b.get_u16():
+			furnish_block(b.get_u16())
 	for i in b.get_u16():
 		var id := b.get_u16()
 		var gone := b.get_u8() == 1
@@ -177,6 +210,203 @@ func furnish(gen: BlockGenerator) -> void:
 		var p: Vector3 = spots[k % 2]
 		if not _inside_any(gen, p):
 			add_prop("bench", Transform3D(Basis(), p))
+
+
+# --- Wave 2: the city, a block at a time -----------------------------------------------
+
+## Prop ids per city block (ids are u16 on the wire): block k uses
+## k * BLOCK_IDS + 1 up to (k + 1) * BLOCK_IDS - 1.
+const BLOCK_IDS := 1800
+## Container colours on the docks.
+const CONTAINER_COLOURS := ["b3402a", "2f5d8a", "3f6b3a", "c9a23a", "6f7378", "8a4a2c"]
+var city: CityGenerator
+var furnished := {}       # block index -> true
+
+
+## Furnishes one city block (every machine, from the city seed). The host
+## decides when (an officer coming near), so ids line up everywhere.
+func furnish_block(k: int) -> void:
+	if city == null or furnished.has(k) or k < 0 or k >= city.blocks.size():
+		return
+	furnished[k] = true
+	var blk: Dictionary = city.blocks[k]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(city.seed_value * 31 + 5 + k * 977)
+	_next_id = k * BLOCK_IDS + 1
+	var limit: int = (k + 1) * BLOCK_IDS - 60
+	for bi in range(blk.buildings_from, blk.buildings_to):
+		if _next_id >= limit:
+			break
+		_furnish_rooms(city.buildings[bi], rng, limit)
+	_furnish_outdoors(blk, rng, (k + 1) * BLOCK_IDS - 1)
+
+
+func _furnish_rooms(b: Dictionary, rng: RandomNumberGenerator, limit: int) -> void:
+	var M := BlockGenerator.M
+	var basis: Basis = b.basis
+	var door_local: Vector3 = (b.door as Vector3) - (b.origin as Vector3)
+	var door_x: float = door_local.dot(b.u)
+	add_prop("extinguisher", _local(b, minf(door_x + 1.3, b.w * M - 0.5), 0.0, 0.45, basis, 0.0))
+	var stair := Rect2((b.w - 1) * M, (b.d - 1) * M, M, M).grow(0.3)
+	for r in b.get("rooms", []):
+		if _next_id >= limit:
+			return
+		var y: float = r.floor * BlockGenerator.STOREY
+		var rect: Rect2 = r.rect
+		# One spot per module of the room.
+		for i in int(rect.size.x / M):
+			for j in int(rect.size.y / M):
+				var cx: float = rect.position.x + (i + 0.5) * M
+				var cz: float = rect.position.y + (j + 0.5) * M
+				if stair.has_point(Vector2(cx, cz)):
+					continue
+				if r.floor == 0 and cz < M and absf(cx - door_x) < M * 0.6:
+					continue    # keep the way in clear
+				if rng.randf() < 0.3:
+					continue
+				_furnish_module(b, rng, String(r.kind), cx, y, cz, basis)
+
+
+func _furnish_module(b: Dictionary, rng: RandomNumberGenerator, kind: String, cx: float, y: float, cz: float, basis: Basis) -> void:
+	var roll := rng.randf()
+	match kind:
+		"living":
+			if roll < 0.4:
+				add_prop("sofa", _local(b, cx, y, cz + 1.2, basis, PI))
+				if rng.randf() < 0.5:
+					add_prop("table", _local(b, cx, y, cz - 0.2, basis, 0.0))
+			else:
+				_furnish_cell(b, rng, cx, y, cz, basis, false)
+		"bedroom":
+			add_prop("bed", _local(b, cx, y, cz + 0.6, basis, PI if roll < 0.5 else 0.0))
+			if rng.randf() < 0.5:
+				add_prop("cabinet", _local(b, cx + 1.5, y, cz - 1.4, basis, 0.0))
+		"kitchen":
+			add_prop("counter", _local(b, cx, y, cz + 1.6, basis, PI))
+			for n in rng.randi_range(0, 3):
+				add_prop("bottle", _local(b, cx - 0.6 + n * 0.3, y + 1.01, cz + 1.6, basis, 0.0))
+			if rng.randf() < 0.5:
+				add_prop("gas", _local(b, cx + 1.4, y, cz + 1.5, basis, 0.0))
+		"bathroom":
+			add_prop("cabinet", _local(b, cx, y, cz + 1.6, basis, PI))
+		"shopfloor":
+			add_prop("shelf", _local(b, cx, y, cz + 0.4, basis, PI))
+			for n in rng.randi_range(1, 3):
+				add_prop("bottle", _local(b, cx - 0.5 + n * 0.25, y + 1.81, cz + 0.4, basis, 0.0))
+			if roll < 0.25:
+				add_prop("counter", _local(b, cx, y, cz - 1.0, basis, 0.0))
+		"stock", "hall":
+			if roll < 0.5:
+				add_prop("pallet", _local(b, cx, y, cz, basis, rng.randf_range(-0.2, 0.2)))
+				for n in rng.randi_range(1, 4):
+					add_prop("crate", _local(b, cx - 0.3 + (n % 2) * 0.6, y + 0.15 + (n / 2) * 0.6, cz, basis, 0.0))
+			elif roll < 0.7:
+				add_prop("shelf", _local(b, cx, y, cz + 1.4, basis, PI))
+			elif roll < 0.85:
+				add_prop("barrel", _local(b, cx, y, cz, basis, 0.0))
+			else:
+				add_prop("gas", _local(b, cx + 0.8, y, cz + 0.8, basis, 0.0))
+		"office":
+			add_prop("desk", _local(b, cx, y, cz, basis, PI if roll < 0.5 else 0.0))
+			add_prop("chair", _local(b, cx, y, cz + (0.7 if roll >= 0.5 else -0.7), basis, PI if roll >= 0.5 else 0.0))
+			if rng.randf() < 0.3:
+				add_prop("cabinet", _local(b, cx + 1.6, y, cz + 1.5, basis, PI))
+		"meeting":
+			add_prop("table", _local(b, cx, y, cz, basis, 0.0))
+			for n in 4:
+				var a := n * TAU / 4.0 + 0.4
+				add_prop("chair", _local(b, cx + cos(a) * 0.95, y, cz + sin(a) * 0.95, basis, -a - PI * 0.5))
+		"lobby":
+			if roll < 0.4:
+				add_prop("counter", _local(b, cx, y, cz, basis, 0.0))
+			else:
+				add_prop("chair", _local(b, cx, y, cz, basis, rng.randf() * TAU))
+		"cell":
+			add_prop("bench", _local(b, cx, y, cz + 1.4, basis, PI))
+		_:
+			_furnish_cell(b, rng, cx, y, cz, basis, false)
+
+
+## Out on the lot: yards and alleys, the pavement, parks, the docks.
+func _furnish_outdoors(blk: Dictionary, rng: RandomNumberGenerator, limit: int) -> void:
+	var r: Rect2 = blk.rect
+	var o: Vector3 = blk.offset
+	var y := BlockGenerator.BASE_Y
+	var inside := func(p: Vector3) -> bool:
+		for bi in range(blk.buildings_from, blk.buildings_to):
+			if (city.buildings[bi].bounds as AABB).grow(1.0).has_point(p + Vector3(0, 0.5, 0)):
+				return true
+		return false
+	var e := r.size.x
+	# Bins and benches along the kerb.
+	for k in 6:
+		if _next_id >= limit:
+			return
+		var along := rng.randf_range(6.0, e - 6.0)
+		var spots := [Vector3(along, 0, 1.6), Vector3(along, 0, e - 1.6), Vector3(1.6, 0, along), Vector3(e - 1.6, 0, along)]
+		var p: Vector3 = o + spots[k % 4] + Vector3(0, y, 0)
+		if not inside.call(p):
+			add_prop("bin" if k % 2 == 0 else "bench", Transform3D(Basis(Vector3.UP, 0.0 if k % 4 < 2 else PI / 2), p))
+	match blk.style:
+		"park":
+			for k in 8:
+				var p := o + Vector3(rng.randf_range(8.0, e - 8.0), y - 0.05, rng.randf_range(8.0, e - 8.0))
+				add_prop("bench", Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p))
+		"docks", "industrial":
+			# Container stacks in the yards (good, hard cover), pallets and
+			# barrels.
+			var tries := 30
+			var placed := 0
+			while tries > 0 and placed < (8 if blk.style == "docks" else 3) and _next_id < limit - 4:
+				tries -= 1
+				var p := o + Vector3(rng.randf_range(6.0, e - 6.0), y, rng.randf_range(6.0, e - 6.0))
+				var yaw := 0.0 if rng.randf() < 0.5 else PI / 2
+				var foot := AABB(p - Vector3(3.5, 0, 3.5), Vector3(7, 3, 7))
+				var clash := false
+				for bi in range(blk.buildings_from, blk.buildings_to):
+					if (city.buildings[bi].bounds as AABB).grow(1.5).intersects(foot):
+						clash = true
+				if clash:
+					continue
+				var id := add_prop("container", Transform3D(Basis(Vector3.UP, yaw), p))
+				_paint_container(id, rng)
+				if rng.randf() < 0.5:
+					var id2 := add_prop("container", Transform3D(Basis(Vector3.UP, yaw), p + Vector3(0, 2.62, 0)))
+					_paint_container(id2, rng)
+				placed += 1
+			for k in 6:
+				var p := o + Vector3(rng.randf_range(6.0, e - 6.0), y, rng.randf_range(6.0, e - 6.0))
+				if inside.call(p):
+					continue
+				add_prop("barrel" if rng.randf() < 0.4 else "pallet", Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p))
+		_:
+			for k in 6:
+				if _next_id >= limit:
+					return
+				var p := o + Vector3(rng.randf_range(6.0, e - 6.0), y, rng.randf_range(6.0, e - 6.0))
+				if inside.call(p):
+					continue
+				var roll := rng.randf()
+				if roll < 0.35:
+					for n in rng.randi_range(1, 3):
+						add_prop("crate", Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p + Vector3(n * 0.7, 0, 0)))
+				elif roll < 0.5:
+					add_prop("barrel", Transform3D(Basis(), p))
+				elif roll < 0.6:
+					add_prop("gas", Transform3D(Basis(), p))
+				else:
+					add_prop("bin", Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p))
+
+
+func _paint_container(id: int, rng: RandomNumberGenerator) -> void:
+	var rb := body(id)
+	if rb == null:
+		return
+	var col := Color(CONTAINER_COLOURS[rng.randi_range(0, CONTAINER_COLOURS.size() - 1)])
+	var meshes := rb.find_children("*", "MeshInstance3D", false, false)
+	for i in meshes.size():
+		var mi := meshes[i] as MeshInstance3D
+		mi.material_override = Cel.material(col.darkened(0.0 if i == 0 else 0.25), true, 0.02)
 
 
 func _furnish_cell(b: Dictionary, rng: RandomNumberGenerator, cx: float, y: float, cz: float, basis: Basis, shop_front: bool) -> void:
@@ -266,6 +496,10 @@ func add_prop(kind: String, xf: Transform3D) -> int:
 		rb.freeze = true
 	add_child(rb)
 	props[id] = {"id": id, "kind": kind, "body": rb, "hp": float(d.hp), "broken": false, "burning": false}
+	# Wave 2: only awake props are looked at each frame (a city has thousands).
+	rb.sleeping_state_changed.connect(func():
+		if is_instance_valid(rb) and not rb.sleeping:
+			_awake[id] = true)
 	return id
 
 
@@ -447,18 +681,24 @@ func _fragments(kind: String, xf: Transform3D, lv: Vector3, dir: Vector3) -> voi
 
 # --- host: knocks and sync --------------------------------------------------------------
 
+var _awake := {}    # host: prop id -> true while its body is awake
+
+
 func _physics_process(delta: float) -> void:
 	_clock += delta
 	if not Net.is_host():
 		_follow(delta)
 		return
 	# Hard knocks hurt: a chair thrown at a wall, a bottle dropped.
-	for p in props.values():
-		if p.broken:
+	for id in _awake.keys():
+		var p: Dictionary = props.get(id, {})
+		if p.is_empty() or p.broken or not is_instance_valid(p.body):
+			_awake.erase(id)
 			continue
 		var rb: RigidBody3D = p.body
 		if rb.sleeping or rb.freeze:
 			_prev_v.erase(p.id)
+			_awake.erase(id)
 			continue
 		var v := rb.linear_velocity
 		var pv: Vector3 = _prev_v.get(p.id, v)

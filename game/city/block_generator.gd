@@ -31,11 +31,23 @@ var buildings: Array = []
 var seed_value := 0
 var _rng := RandomNumberGenerator.new()
 
+## Wave 2: where this block's lot starts in the city (its north-west pavement
+## corner), its district style, and whether it lays its own ground and road
+## ring (a lone block does; in the city the CityGenerator lays one road grid).
+## Styles: "block" (the Wave 1 block), "downtown", "residential",
+## "industrial", "docks", "station", "park", "carpark".
+var offset := Vector3.ZERO
+var style := "block"
+var own_ground := true
 
-static func generate(seed_value: int) -> BlockGenerator:
+
+static func generate(seed_value: int, opts := {}) -> BlockGenerator:
 	var g := BlockGenerator.new()
 	g.seed_value = seed_value
 	g._rng.seed = seed_value
+	g.offset = opts.get("offset", Vector3.ZERO)
+	g.style = opts.get("style", "block")
+	g.own_ground = opts.get("ground", true)
 	g._build()
 	return g
 
@@ -56,16 +68,33 @@ static func extent() -> float:
 
 
 func _add(kind: String, xform: Transform3D, bears := true, tint := Color(0, 0, 0, 0), held_by := -1, building := -1) -> int:
+	xform.origin += offset
 	pieces.append({"kind": kind, "xform": xform, "bears": bears, "tint": tint, "held_by": held_by, "building": building})
 	return pieces.size() - 1
 
 
 func _build() -> void:
-	_ground()
-	_plan_buildings()
+	if own_ground:
+		_ground()
+	if style == "block":
+		_plan_buildings()
+	else:
+		CityStyles.plan(self, _rng)
 	for i in buildings.size():
-		_building(i)
-	_street_furniture()
+		if style == "block":
+			_building(i)
+		else:
+			CityStyles.building(self, i, _rng)
+	if style == "block":
+		_street_furniture()
+	else:
+		CityStyles.furniture(self, _rng)
+	# Into city coordinates.
+	for b in buildings:
+		b.origin += offset
+		b.start += offset
+		b.door += offset
+		b.bounds.position += offset
 
 
 # --- Ground -------------------------------------------------------------------

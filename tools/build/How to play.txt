@@ -12,6 +12,29 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
+THE WHOLE CITY (0.3.0)
+The game is now a whole city: six by six blocks, about 370 m across, with
+downtown offices and shops, houses and flats, an industrial district, two
+parks, a car park and the docks on the water. You start at the police
+station's front door; the patrol cars are parked out front and the custody
+bay is round the side. The F3 overlay shows which district and street you are
+on, and the radio names streets.
+Every building can be entered (some doors are locked: kick them in), with
+stairs on every floor and furnished rooms.
+Traffic drives on the right and stops at the traffic lights. Put your siren
+on and drivers pull over. Shoot near them and they floor it, or jump out
+and run. People walk the pavements and scatter from gunfire. Cars hurt
+anyone they hit, you included.
+F at any car, van, lorry or motorbike gets you in (commandeering): the
+driver is pulled out. Lorries pull trailers that swing out on corners and
+can come off in a big crash.
+New calls: CAR THEFT (someone breaking into a parked car; get there before
+they drive off) and PURSUIT (a stolen car racing through town: ram it, box
+it in or shoot it up, and the driver bails and runs).
+Gunshots now crack, boom and roll round the streets; each district sounds
+different, and sirens drop in pitch as they pass.
+G (host) makes a new city, J (host) calls in a job now.
+
 THE VIEW (v0.2.11: third person only)
 The camera sits behind your officer's shoulder. The mouse looks around, the
 dot in the middle of the screen is where shots go (hold right mouse to aim,
@@ -118,9 +141,7 @@ your aim, bleeding drains health. Hold F to treat yourself or a teammate
 (uses one first aid from your pouch of 3; one wound per use). The car boot
 fixes everything and refills the pouch.
 Civilian box car (test scenes): WASD drive, Space handbrake, H horn.
-City block (the game for now): two police cars on the roads, 1 pistol, 2 demolition charge, G (host) builds a new
-block for everyone. Two buildings have open doors, rooms and stairs; kick
-the shut doors of the others in.
+In the city: 1 pistol, 2 demolition charge.
 Training yard (1.2): everything above in one place; hold F at the ammo box
 for spare rounds. K (host) puts you down
 to try reviving, G (host) resets the yard.

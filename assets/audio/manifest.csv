@@ -175,3 +175,15 @@ sfx/bone_snap_1.wav,Sonniss GDC bundle / Membrans - Bone Crackings Sound Pack 01
 sfx/bone_snap_2.wav,Sonniss GDC bundle / Membrans - Bone Crackings Sound Pack 01 / Bone Cracking 34.flac (https://archive.org/details/gameaudiogdc-part1through7),"Sonniss GDC Game Audio Bundle licence (royalty-free, games allowed, no attribution)",bone cracking
 sfx/bone_snap_3.wav,"Sonniss GDC bundle / Mattia Cellotto - Crunch Mode / Leeks,Break,Bone,Crack,Body,Arm13.flac (https://archive.org/details/gameaudiogdc-part1through7)","Sonniss GDC Game Audio Bundle licence (royalty-free, games allowed, no attribution)",bone breaking
 sfx/bone_snap_4.wav,Sonniss GDC bundle / Coll Anderson - Gore / EFX SD GORE Snap 05 C.M.flac (https://archive.org/details/gameaudiogdc-part1through7),"Sonniss GDC Game Audio Bundle licence (royalty-free, games allowed, no attribution)",gore snap
+sfx/gun_sub_1.wav,Made by tools/audio/make_wave2.py,Project's own (no third-party audio),sub-bass boom under a close shot
+sfx/gun_crack_near_1.wav,Made by tools/audio/make_wave2.py,Project's own (no third-party audio),supersonic snap and muzzle blast at the front of a close shot
+sfx/gun_sub_2.wav,Made by tools/audio/make_wave2.py,Project's own (no third-party audio),sub-bass boom under a close shot
+sfx/gun_crack_near_2.wav,Made by tools/audio/make_wave2.py,Project's own (no third-party audio),supersonic snap and muzzle blast at the front of a close shot
+sfx/gun_sub_3.wav,Made by tools/audio/make_wave2.py,Project's own (no third-party audio),sub-bass boom under a close shot
+sfx/gun_crack_near_3.wav,Made by tools/audio/make_wave2.py,Project's own (no third-party audio),supersonic snap and muzzle blast at the front of a close shot
+sfx/gun_tail_city_1.wav,Made by tools/audio/make_wave2.py from gun_far_1..4 (Sonniss GDC bundle),Project's own (no third-party audio),a shot echoing down the streets (reworked from the project's gun_far recordings)
+sfx/gun_tail_city_2.wav,Made by tools/audio/make_wave2.py from gun_far_1..4 (Sonniss GDC bundle),Project's own (no third-party audio),a shot echoing down the streets (reworked from the project's gun_far recordings)
+sfx/gun_tail_city_3.wav,Made by tools/audio/make_wave2.py from gun_far_1..4 (Sonniss GDC bundle),Project's own (no third-party audio),a shot echoing down the streets (reworked from the project's gun_far recordings)
+sfx/amb_docks_1.wav,Made by tools/audio/make_wave2.py,Project's own (no third-party audio),"docks: water on the quay, creaks, a far ship's horn (loops)"
+sfx/amb_industrial_1.wav,Made by tools/audio/make_wave2.py,Project's own (no third-party audio),"industrial: hum, fan, metal clanks (loops)"
+sfx/amb_park_1.wav,Made by tools/audio/make_wave2.py,Project's own (no third-party audio),"park: wind in the trees, birds (loops)"

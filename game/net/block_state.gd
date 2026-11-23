@@ -13,7 +13,9 @@ extends Node
 
 const MSG_ASK := 95      # client -> host: send me the block as it is
 const MSG_STATE := 96    # host -> client: here it is
-const SAVE_PATH := "user://saves/block.save"
+## Wave 2: the city saves to its own file (the Wave 1 block test scene to
+## block.save); the scene sets this before anything reads it.
+static var save_path := "user://saves/city.save"
 const MAGIC := 0x504F504F   # "POPO"
 const VERSION := 3
 const SAVE_EVERY := 20.0
@@ -116,8 +118,8 @@ func save() -> bool:
 	b.put_u8(KitLibrary.detail)
 	b.put_64(int(Time.get_unix_time_from_system()))
 	write(b)
-	DirAccess.make_dir_recursive_absolute(SAVE_PATH.get_base_dir())
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	DirAccess.make_dir_recursive_absolute(save_path.get_base_dir())
+	var f := FileAccess.open(save_path, FileAccess.WRITE)
 	if f == null:
 		push_warning("Could not save the block: %s" % FileAccess.get_open_error())
 		return false
@@ -145,9 +147,9 @@ static func has_save() -> bool:
 
 
 static func _open() -> StreamPeerBuffer:
-	if not FileAccess.file_exists(SAVE_PATH):
+	if not FileAccess.file_exists(save_path):
 		return null
-	var data := FileAccess.get_file_as_bytes(SAVE_PATH)
+	var data := FileAccess.get_file_as_bytes(save_path)
 	if data.size() < 16:
 		return null
 	var b := StreamPeerBuffer.new()
@@ -172,5 +174,5 @@ func load_save() -> bool:
 
 
 static func delete_save() -> void:
-	if FileAccess.file_exists(SAVE_PATH):
-		DirAccess.remove_absolute(SAVE_PATH)
+	if FileAccess.file_exists(save_path):
+		DirAccess.remove_absolute(save_path)

@@ -3,8 +3,8 @@ extends RefCounted
 ## Where the game starts, and the Wave 0 / Wave 1 test scenes (reachable from
 ## Settings > Debug > Test scenes, not from the menus).
 
-## The game: the city block with its police cars.
-const GAME := "res://prototypes/p08_block/block.tscn"
+## The game: the whole city (Wave 2).
+const GAME := "res://game/city/city.tscn"
 
 const TESTS := [
 	["0.1 Pipeline check (Blender asset with collision)", "res://prototypes/p01_pipeline/pipeline.tscn"],
@@ -16,6 +16,7 @@ const TESTS := [
 	["0.6 Movement and animation course", "res://prototypes/p06_movement/movement.tscn"],
 	["1.6 Listening room (every gun, every material)", "res://prototypes/p07_sound/sound.tscn"],
 	["1.1 City block (generated, breakable)", "res://prototypes/p08_block/block.tscn"],
+	["2.1 The city", "res://game/city/city.tscn"],
 	["1.2 Training yard (movement, cover, melee, revive)", "res://prototypes/p09_yard/yard.tscn"],
 	["1.3 Patrol (police car, seats, lights and siren, injuries)", "res://prototypes/p10_patrol/patrol.tscn"],
 ]

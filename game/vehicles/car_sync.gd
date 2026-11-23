@@ -52,6 +52,7 @@ var _tick := 0
 var car_hp := {}             # car index -> hp (host)
 var fire_state := {}         # car index -> Fire
 var _burn_t := {}            # host: car index -> s until it goes up
+var _quiet := {}             # host: car index -> snapshots it has been asleep
 
 
 func _ready() -> void:
@@ -190,7 +191,17 @@ func _physics_process(delta: float) -> void:
 			var b := StreamPeerBuffer.new()
 			b.put_double(_clock)
 			b.put_u8(cars.size())
-			for c in cars:
+			for i in cars.size():
+				# Wave 2: parked cars asleep are sent a few times, then left
+				# out (a city has dozens of them).
+				var c: Car = cars[i]
+				var quiet: int = _quiet.get(i, 0)
+				quiet = quiet + 1 if c.sleeping else 0
+				_quiet[i] = quiet
+				if quiet > 6 and _tick % 90 != 0:
+					b.put_u8(0)
+					continue
+				b.put_u8(1)
 				c.encode_state(b)
 			Net.broadcast(MSG_CAR_SNAP, b.data_array, Net.ORDERED, 3)
 	elif mode == Mode.DRIVER and mine >= 0 and mine < cars.size() and _tick % 2 == 0:
@@ -272,6 +283,8 @@ func _on_snap(_from: int, data: PackedByteArray) -> void:
 	var t := b.get_double()
 	var n := b.get_u8()
 	for i in n:
+		if b.get_u8() == 0:
+			continue
 		var s := _decode(i, b)
 		if i < cars.size() and not simulates_locally(i):
 			_push(i, t, s)

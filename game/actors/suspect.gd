@@ -24,7 +24,7 @@ extends CharacterBody3D
 ## dropped on surrender or when they go down; officers can pick them up.
 ## Same skeleton and clips as the officers, dressed as civilians.
 
-enum S { LOITER, ROB, FLEE, HIDE, SHOOT, STAGGER, SURRENDER, CUFFED, IN_CAR, DOWN, BOOKED, DRIVE, COVER, SEEK_COVER, THROW }
+enum S { LOITER, ROB, FLEE, HIDE, SHOOT, STAGGER, SURRENDER, CUFFED, IN_CAR, DOWN, BOOKED, DRIVE, COVER, SEEK_COVER, THROW, WANDER, PANIC, COWER }
 ## What a fighter is doing in cover (synced, for the pose).
 enum C { HIDE, PEEK, BLIND, RELOAD }
 
@@ -119,9 +119,22 @@ var _retreated := false
 ## Clients: holding something over their head (for the pose).
 var holding := false
 
+## Wave 2, Phase 2.3: people out on the street (civilian). They walk a loop
+## of pavement (route), and when shots, blasts or falling buildings go off
+## near them they run from it (PANIC), then crouch with their hands over
+## their heads (COWER) until it has been quiet a while. An officer aiming at
+## one makes them put their hands up like anyone else.
+var civilian := false
+var route: Array = []
+var _route_i := 0
+var _panic_from := Vector3.INF
+var _calm_t := 0.0
+var _pace := 1.0
+
 
 func _init() -> void:
 	add_to_group("suspects")
+	add_to_group("alarm_listeners")
 
 
 func _ready() -> void:
@@ -147,7 +160,30 @@ func is_host_side() -> bool:
 
 
 func is_free() -> bool:
-	return state in [S.LOITER, S.ROB, S.FLEE, S.HIDE, S.SHOOT, S.STAGGER, S.COVER, S.SEEK_COVER, S.THROW]
+	return state in [S.LOITER, S.ROB, S.FLEE, S.HIDE, S.SHOOT, S.STAGGER, S.COVER, S.SEEK_COVER, S.THROW, S.WANDER, S.PANIC, S.COWER]
+
+
+## Host: something loud and dangerous at `at` (a shot, a blast, a building
+## coming down). Civilians in reach run from it or cower.
+func on_alarm(at: Vector3, radius: float) -> void:
+	if not civilian or state not in [S.WANDER, S.PANIC, S.COWER]:
+		return
+	var d := global_position.distance_to(at)
+	if d > radius:
+		return
+	_calm_t = _rng.randf_range(7.0, 12.0)
+	_panic_from = at
+	if state == S.COWER and d > 6.0:
+		return   # already down, stay down
+	if d < 7.0 and _rng.randf() < 0.45:
+		set_state(S.COWER)
+		return
+	set_state(S.PANIC)
+	var away := global_position - at
+	away.y = 0.0
+	if away.length() < 0.1:
+		away = Vector3(_rng.randf_range(-1, 1), 0, _rng.randf_range(-1, 1))
+	_goal = _near(global_position + away.normalized() * _rng.randf_range(18.0, 30.0), 3.0)
 
 
 ## Dealt with: no longer part of the call's trouble.
@@ -255,7 +291,7 @@ func put_in_car(c: PoliceCar, s: int) -> void:
 func _place_in_seat() -> void:
 	if car == null or not is_instance_valid(car):
 		return
-	global_position = car.global_transform * (PoliceCar.SEATS[seat] as Vector3)
+	global_position = car.global_transform * (car.seats[seat] as Vector3)
 	var f := car.global_transform.basis.z
 	rotation.y = atan2(f.x, f.z)
 	velocity = car.linear_velocity
@@ -346,7 +382,10 @@ func _physics_process(delta: float) -> void:
 				elif t.d < 10.0 and _rng.randf() < 0.25:
 					_bolt(t)
 		S.STAGGER:
-			if state_t > 1.0:
+			if state_t > 1.0 and civilian:
+				set_state(S.COWER)
+				_calm_t = 8.0
+			elif state_t > 1.0:
 				if pressure >= (2.0 if fighter else 1.0) or (not armed and not fighter):
 					set_state(S.SURRENDER)
 				else:
@@ -363,10 +402,33 @@ func _physics_process(delta: float) -> void:
 			var r := _throw_step(t, delta)
 			wish = r[0]
 			speed = r[1]
+		S.WANDER:
+			if route.is_empty():
+				pass
+			else:
+				var g: Vector3 = route[_route_i % route.size()]
+				if Vector2(g.x - global_position.x, g.z - global_position.z).length() < 1.2:
+					_route_i = (_route_i + 1) % route.size()
+					g = route[_route_i]
+				wish = _steer(g, delta)
+				speed = WALK * _pace
+		S.PANIC:
+			wish = _steer(_goal, delta)
+			speed = RUN * 0.95
+			if (wish == Vector3.ZERO and _arrived()) or _flee_stuck(delta) or state_t > 9.0:
+				set_state(S.COWER)
+		S.COWER:
+			_calm_t -= delta
+			if _calm_t <= 0.0:
+				_back_to_route()
 		S.SURRENDER:
 			# Nobody watching for a while: some get up and run again.
 			_alone_t = _alone_t + delta if (t.o == null or t.d > 18.0) else 0.0
-			if _alone_t > 12.0:
+			if civilian and _alone_t > 6.0:
+				_alone_t = 0.0
+				pressure = 0.0
+				_back_to_route()
+			elif _alone_t > 12.0:
 				_alone_t = 0.0
 				if _rng.randf() < 0.4:
 					pressure = 0.0
@@ -400,6 +462,17 @@ func _physics_process(delta: float) -> void:
 		_face(aim_at)
 	move_and_slide()
 	_step_up(target)
+
+
+## A civilian picks up their walk again from the nearest point of it.
+func _back_to_route() -> void:
+	set_state(S.WANDER)
+	var best := INF
+	for i in route.size():
+		var d := (route[i] as Vector3).distance_to(global_position)
+		if d < best:
+			best = d
+			_route_i = i
 
 
 ## The nearest officer on their feet: {o, d, los}.
@@ -1081,6 +1154,9 @@ func _process(delta: float) -> void:
 		S.SURRENDER:
 			lower = "kneel"
 			upper = "hands_up"
+		S.COWER:
+			lower = "crouch_idle"
+			upper = "hands_up"
 		S.CUFFED:
 			lower = "idle" if hs < 0.2 else ("walk" if hs < 2.2 else "run")
 			upper = "cuffed"
@@ -1102,7 +1178,7 @@ func encode(b: StreamPeerBuffer) -> void:
 	b.put_u16(net_id)
 	b.put_u8(look)
 	b.put_u8(state)
-	b.put_u8(cphase | (weapon << 2) | (16 if holding else 0) | (32 if fighter else 0))
+	b.put_u8(cphase | (weapon << 2) | (16 if holding else 0) | (32 if fighter else 0) | (64 if civilian else 0))
 	b.put_float(global_position.x)
 	b.put_float(global_position.y)
 	b.put_float(global_position.z)
@@ -1127,6 +1203,7 @@ static func decode(b: StreamPeerBuffer) -> Dictionary:
 	d.weapon = (fl >> 2) & 3
 	d.holding = (fl & 16) != 0
 	d.fighter = (fl & 32) != 0
+	d.civilian = (fl & 64) != 0
 	d.armed = d.weapon != EnemyGuns.NONE
 	d.pos = Vector3(b.get_float(), b.get_float(), b.get_float())
 	d.yaw = b.get_half()
@@ -1147,6 +1224,7 @@ func apply_net(d: Dictionary) -> void:
 	cphase = d.cphase
 	holding = d.holding
 	fighter = d.fighter
+	civilian = d.get("civilian", false)
 	aim_at = d.aim
 	hp = d.hp
 	seat = d.seat

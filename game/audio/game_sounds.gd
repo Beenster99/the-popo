@@ -84,6 +84,9 @@ func _ready() -> void:
 	_amb_player("air", "amb_air", Sfx.BUS_AMBIENCE_OUT, -18.0)
 	_amb_player("far", "amb_far_traffic", Sfx.BUS_AMBIENCE_OUT, -16.0)
 	_amb_player("room", "room_tone", Sfx.BUS_AMBIENCE, -60.0)
+	# Wave 2: each district has its own sound under the street.
+	for k in DISTRICT_BEDS:
+		_amb_player(k, DISTRICT_BEDS[k][0], Sfx.BUS_AMBIENCE_OUT, -80.0)
 	if world:
 		world.piece_broken.connect(_on_piece_broken)
 		world.fx.connect(_on_world_fx)
@@ -100,8 +103,18 @@ func _amb_player(key: String, stem: String, bus: String, db: float) -> void:
 	_amb[key] = p
 
 
+## Wave 2: the district beds, [stem, loudness at full (dB)], and how loud
+## the busy street is in each district (dB).
+const DISTRICT_BEDS := {"docks": ["amb_docks", -9.0], "industrial": ["amb_industrial", -12.0], "park": ["amb_park", -10.0]}
+const STREET_DB := {"downtown": -9.0, "residential": -14.0, "industrial": -15.0, "docks": -19.0, "park": -17.0, "station": -11.0, "outskirts": -18.0}
+var city: CityGenerator
+var _bed := {}            # district bed -> 0..1, eased
+
+
 ## Indoors for the ears and the reverb: one zone per building.
 func add_building_zones(gen: BlockGenerator) -> void:
+	if gen is CityGenerator:
+		city = gen
 	for b in gen.buildings:
 		var box: AABB = b.bounds
 		var z := SoundZone.new()
@@ -186,6 +199,10 @@ func _place_ears() -> void:
 		if f.length() > 0.01:
 			basis = Basis.looking_at(f.normalized(), Vector3.UP)
 	listener.global_transform = Transform3D(basis, at)
+	var dt := get_process_delta_time()
+	if _ear_last != Vector3.INF and dt > 0.0:
+		_ear_v = _ear_v.lerp((at - _ear_last) / dt, 0.3)
+	_ear_last = at
 	if not listener.is_current():
 		listener.make_current()
 
@@ -201,6 +218,26 @@ func _background(delta: float) -> void:
 		AudioServer.set_bus_volume_db(i, lerpf(0.0, -9.0, _indoor_k))
 	if _amb.has("room"):
 		(_amb.room as AudioStreamPlayer).volume_db = lerpf(-60.0, -20.0, _indoor_k)
+	if city:
+		var here := _district_here()
+		for k in DISTRICT_BEDS:
+			_bed[k] = move_toward(_bed.get(k, 0.0), 1.0 if here == k else 0.0, delta * 0.25)
+			var w: float = _bed[k]
+			(_amb[k] as AudioStreamPlayer).volume_db = DISTRICT_BEDS[k][1] + linear_to_db(maxf(w, 0.0001))
+		var want: float = STREET_DB.get(here, -11.0)
+		var st := _amb.street as AudioStreamPlayer
+		st.volume_db = move_toward(st.volume_db, want, delta * 3.0)
+
+
+func _district_here() -> String:
+	var p := listener.global_position
+	var c := CityGenerator.block_at(p)
+	if c.x < 0:
+		return "docks" if p.z > CityGenerator.city_extent() - 20.0 else "outskirts"
+	var b: Dictionary = city.blocks[city.block_index(c.x, c.y)]
+	if b.style == "park":
+		return "park"
+	return b.district
 
 
 ## A close shot: the background and engines drop away for a moment.
@@ -460,7 +497,7 @@ func _car(c: Car, delta: float) -> void:
 		eng.stream = Sfx.loop_stream("car_engine")
 		eng.bus = Sfx.BUS_VEHICLES
 		eng.unit_size = 5.0
-		eng.max_distance = 70.0
+		eng.max_distance = 110.0 if _engine_tone(c).y > 3.0 else 70.0
 		eng.volume_db = -80.0
 		c.add_child(eng)
 		var skid := AudioStreamPlayer3D.new()
@@ -493,11 +530,13 @@ func _car(c: Car, delta: float) -> void:
 	if a.on:
 		var accel := (Vector2(v.x, v.z).length() - Vector2(prev_v.x, prev_v.z).length()) / delta
 		a.load = lerpf(a.load, clampf(accel / 6.0 + absf(c.throttle), 0.0, 1.0), 1.0 - exp(-6.0 * delta))
-		var k := clampf(speed / Car.TOP_SPEED, 0.0, 1.0)
+		var k := clampf(speed / c.top_speed, 0.0, 1.0)
 		# Up through three "gears": the pitch climbs and drops back.
 		var gear_k := fmod(k * 3.0, 1.0) if k < 0.99 else 1.0
-		eng.pitch_scale = 0.75 + k * 0.5 + gear_k * 0.45 + a.load * 0.08
-		eng.volume_db = -14.0 + a.load * 6.0 + k * 4.0
+		var tone := _engine_tone(c)
+		var dop := _doppler(p, v)
+		eng.pitch_scale = (0.75 + k * 0.5 + gear_k * 0.45 + a.load * 0.08) * tone.x * dop
+		eng.volume_db = -14.0 + a.load * 6.0 + k * 4.0 + tone.y
 		var right := c.global_transform.basis.x
 		var slip := absf(v.dot(right))
 		var on_ground := p.y < 3.0
@@ -506,6 +545,9 @@ func _car(c: Car, delta: float) -> void:
 			squeal = maxf(squeal, 0.7)
 		skid.volume_db = lerpf(-60.0, -6.0, squeal) if squeal > 0.02 else -80.0
 		skid.pitch_scale = 0.9 + squeal * 0.2
+	# Wave 2: sirens rise as they come at you and fall away as they pass.
+	if c is PoliceCar and (c as PoliceCar)._siren_player and (c as PoliceCar)._siren_player.playing:
+		(c as PoliceCar)._siren_player.pitch_scale = _doppler(p, v)
 	# A hard knock: metal crunching, louder the harder.
 	if dv > 6.0 and speed + prev_v.length() > 4.0:
 		var db := clampf(-10.0 + (dv - 6.0) * 1.2, -10.0, 6.0)
@@ -516,8 +558,43 @@ func _car(c: Car, delta: float) -> void:
 func _driven(c: Car) -> bool:
 	if c is PoliceCar:
 		var occ: Dictionary = (c as PoliceCar).occupants()
-		return occ.has(0)
+		if occ.has(0):
+			return true
+		# Wave 2: traffic, with someone at the wheel (stopped at the lights too).
+		var d := c.get_node_or_null("Driver") as Node3D
+		return d != null and d.visible
 	return absf(c.throttle) > 0.01
+
+
+## Engine pitch (x) and loudness (y, dB) by vehicle: lorries low and loud,
+## bikes high and buzzy.
+static func _engine_tone(c: Car) -> Vector2:
+	if c is CivilianVehicle:
+		match (c as CivilianVehicle).kind:
+			"hgv_tractor", "trash_truck": return Vector2(0.52, 5.0)
+			"van_box", "minibus": return Vector2(0.7, 2.0)
+			"van_panel": return Vector2(0.85, 1.0)
+			"hatchback": return Vector2(1.08, -1.0)
+			"motorbike": return Vector2(1.5, 2.0)
+	return Vector2(1.0, 0.0)
+
+
+## The Doppler shift for a sound at p moving at v, heard by our ears
+## (exaggerated a touch so a passing siren really drops).
+var _ear_last := Vector3.INF
+var _ear_v := Vector3.ZERO
+
+
+func _doppler(p: Vector3, v: Vector3) -> float:
+	var ear := listener.global_position
+	var u := ear - p
+	var d := u.length()
+	if d < 0.5:
+		return 1.0
+	u /= d
+	var vs := v.dot(u) * 1.25            # source coming toward us
+	var vl := -_ear_v.dot(u) * 1.25      # us going toward it
+	return clampf((Sfx.SPEED_OF_SOUND + vl) / maxf(Sfx.SPEED_OF_SOUND - vs, 100.0), 0.7, 1.4)
 
 
 # --- destruction ----------------------------------------------------------------------
@@ -552,18 +629,48 @@ func _on_world_fx(kind: int, at: Vector3, _n: Vector3) -> void:
 
 
 ## Loose chunks and objects landing hard play their material's impact.
+const HEAR_IMPACTS := 75.0
+var _near: Array = []
+var _near_t := 0.0
+
+
+## Where we listen from: our officer, or the camera.
+func _ear() -> Vector3:
+	var o: Node3D = pawn_getter.call() if pawn_getter.is_valid() else null
+	if o:
+		return o.global_position
+	var cam := get_viewport().get_camera_3d()
+	return cam.global_position if cam else Vector3.ZERO
+
+
 func _physics_impacts(delta: float) -> void:
 	if world == null or delta <= 0.0:
 		return
 	var seen := {}
-	var list: Array = world.bodies.values()
-	for d in world._debris:
-		list.append(d[0])
-	for n in get_tree().get_nodes_in_group("props"):
-		list.append(n)
-	for b in list:
+	# Wave 2: a city has thousands of loose things. Twice a second, list the
+	# ones within earshot; each frame only those that are awake are checked.
+	_near_t -= delta
+	if _near_t <= 0.0:
+		_near_t = 0.5
+		_near.clear()
+		var ear := _ear()
+		var all: Array = world.bodies.values()
+		for d in world._debris:
+			all.append(d[0])
+		all.append_array(get_tree().get_nodes_in_group("props"))
+		for b in all:
+			if not is_instance_valid(b):
+				continue
+			var n := b as Node3D
+			if n and n.is_inside_tree() and n.global_position.distance_squared_to(ear) < HEAR_IMPACTS * HEAR_IMPACTS:
+				_near.append(n)
+	for b in _near:
+		if not is_instance_valid(b):
+			continue
 		var rb := b as Node3D
-		if rb == null or not is_instance_valid(rb) or not rb.is_inside_tree():
+		if rb == null or not rb.is_inside_tree():
+			continue
+		if rb is RigidBody3D and (rb as RigidBody3D).sleeping:
 			continue
 		var id := rb.get_instance_id()
 		seen[id] = true
@@ -579,7 +686,7 @@ func _physics_impacts(delta: float) -> void:
 		var drop := last_sp - sp
 		if last_sp > 2.5 and drop > 2.0:
 			_impact_sound(rb, p, drop)
-	if _bodies.size() > seen.size() + 64:
+	if _bodies.size() > seen.size() + 256:
 		for id in _bodies.keys():
 			if not seen.has(id):
 				_bodies.erase(id)

@@ -9,6 +9,7 @@ extends RefCounted
 static func go(tree: SceneTree, world: DestructionWorld, cars: CarSync, at: Vector3, radius := 3.5, damage := 200.0, strength := 9.0) -> void:
 	if not Net.is_host():
 		return
+	tree.call_group("alarm_listeners", "on_alarm", at, 60.0)
 	if world:
 		world.explode(at, radius, damage, strength)
 	var reach := radius + 1.0

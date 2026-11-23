@@ -34,11 +34,12 @@ func _ready() -> void:
 	_home = VBoxContainer.new()
 	_home.add_theme_constant_override("separation", 14)
 	col.add_child(_home)
+	BlockState.save_path = City.SAVE_PATH
 	var saved := BlockState.peek()
 	if not saved.is_empty():
 		var when := Time.get_datetime_string_from_unix_time(int(saved.saved) + _utc_offset(), true)
-		_home.add_child(UiTheme.big_button("Continue   (block %d, saved %s)" % [saved.seed, when.substr(5, 11)], func(): _play(Scenes.GAME, true)))
-	_home.add_child(UiTheme.big_button("Single Player" if saved.is_empty() else "New Block", func(): _play(Scenes.GAME)))
+		_home.add_child(UiTheme.big_button("Continue   (city %d, saved %s)" % [saved.seed, when.substr(5, 11)], func(): _play(Scenes.GAME, true)))
+	_home.add_child(UiTheme.big_button("Single Player" if saved.is_empty() else "New City", func(): _play(Scenes.GAME)))
 	_home.add_child(UiTheme.big_button("Online", func(): get_tree().change_scene_to_file("res://prototypes/launcher/launcher.tscn")))
 	_home.add_child(UiTheme.big_button("Settings", _open_settings))
 	_home.add_child(UiTheme.big_button("Quit", func(): get_tree().quit()))
@@ -65,7 +66,7 @@ func _open_settings() -> void:
 
 
 func _play(path: String, resume := false) -> void:
-	Block.resume = resume
+	City.resume = resume
 	get_tree().change_scene_to_file(path)
 
 
