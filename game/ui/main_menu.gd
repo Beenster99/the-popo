@@ -43,6 +43,7 @@ func _ready() -> void:
 	_home.add_child(UiTheme.big_button("First Shift   (how to play)", func(): City.tutorial = true; _play(Scenes.GAME)))
 	_home.add_child(UiTheme.big_button("Online", func(): get_tree().change_scene_to_file("res://prototypes/launcher/launcher.tscn")))
 	_home.add_child(UiTheme.big_button("Settings", _open_settings))
+	_home.add_child(UiTheme.big_button("Benchmark   (frame rate test, about a minute)", func(): Perf.start_benchmark()))
 	_home.add_child(UiTheme.big_button("Quit", func(): get_tree().quit()))
 
 	var foot := UiTheme.title("v%s   ·   test build for friends   ·   a game controller works too" %
@@ -65,7 +66,7 @@ func _ready() -> void:
 
 func _open_settings() -> void:
 	var s := SettingsScreen.new()
-	s.closed.connect(func(): (_home.get_child(_home.get_child_count() - 2) as Button).grab_focus())
+	s.closed.connect(func(): (_home.get_child(_home.get_child_count() - 3) as Button).grab_focus())
 	add_child(s)
 
 

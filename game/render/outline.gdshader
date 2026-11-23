@@ -35,6 +35,11 @@ void vertex() {
 	// the mesh in the perspective view: far buildings and people went black.
 	clip.z -= 0.0002 * clip.w;
 	POSITION = clip;
+	// v0.8.1: past the fade the hull is thrown out of view instead of being
+	// drawn and discarded pixel by pixel (a big cost at 4K).
+	if ((persp && far_k <= 0.0) || strength < 0.01) {
+		POSITION = vec4(0.0, 0.0, -10.0, 1.0);
+	}
 }
 
 void fragment() {

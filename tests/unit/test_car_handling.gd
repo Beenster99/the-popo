@@ -61,3 +61,25 @@ func test_horn_sounds_while_held_and_syncs() -> void:
 	c.horn = false
 	await _frames(2)
 	t.check(not c._horn_player.playing, "horn stops when released")
+
+
+## v0.8.1 (beenster: "they have a tendency to roll"): flat out, then full
+## lock for two seconds, with and without the handbrake. The car leans but
+## stays on its wheels.
+func test_full_lock_at_speed_does_not_roll_over() -> void:
+	for hb in [false, true]:
+		var c := _car()
+		await _frames(30)
+		c.throttle = 1.0
+		await _frames(240)
+		var kmh := c.speed_kmh()
+		c.steer = 1.0
+		c.handbrake = hb
+		var worst := 1.0
+		for i in 120:
+			await get_tree().physics_frame
+			worst = minf(worst, c.global_transform.basis.y.y)
+		print("    %s at %.0f km/h: most lean %.0f deg" % ["handbrake" if hb else "full lock", kmh, rad_to_deg(acos(clampf(worst, -1.0, 1.0)))])
+		t.check(worst > 0.7, "stays on its wheels (%s): up.y %.2f" % ["handbrake" if hb else "full lock", worst])
+		c.queue_free()
+		await _frames(2)

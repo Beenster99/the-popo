@@ -24,11 +24,21 @@ const GRIP := 9.0           # lateral stiffness per unit load
 const MU := 1.25            # tyre friction coefficient
 ## Wave 4: how much grip the roads give right now (CityWeather: wet roads 0.7).
 static var grip_k := 1.0
-const HANDBRAKE_REAR_GRIP := 0.1
+## v0.8.1: the handbrake was far too strong (rear grip near zero, twice the
+## yaw ask and most of the full brake on each rear wheel). Softer now: the
+## tail steps out and the car slows, but it no longer spins on the spot.
+const HANDBRAKE_REAR_GRIP := 0.5
 const YAW_ASSIST := 0.55
-const HANDBRAKE_YAW := 1.9
+const HANDBRAKE_YAW := 1.15
 const REAR_GRIP := 0.75         # rear tyres grip less than the fronts: the tail steps out
-const HANDBRAKE_LOCK := 0.9     # share of BRAKE the handbrake puts on each rear wheel
+const HANDBRAKE_LOCK := 0.3     # share of BRAKE the handbrake puts on each rear wheel
+## v0.8.1: sideways tyre forces push at this share of the way from the road up to the
+## car's centre, as arcade racers do, so hard cornering leans the body
+## instead of tipping it over.
+const ROLL_CENTRE := 0.7
+## Anti-roll: resists body lean (N m per radian, per kg) and lean speed.
+const ANTI_ROLL := 14.0
+const ANTI_ROLL_DAMP := 2.5
 const STEER_MAX := 0.6      # rad at low speed
 const STEER_MIN := 0.12     # rad at top speed
 
@@ -416,6 +426,12 @@ func _physics_process(delta: float) -> void:
 	if freeze:
 		_update_wheel_visuals(delta, false)
 		return
+	# v0.8.1: a car nobody is driving may fall asleep (parked cars were
+	# simulated every tick forever); any input wakes it.
+	var driven := absf(throttle) > 0.01 or absf(steer) > 0.01 or brake > 0.0 or handbrake
+	can_sleep = not driven
+	if driven and sleeping:
+		sleeping = false
 
 
 func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
@@ -487,7 +503,11 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		var f := Vector2(lat_f, lon_f)
 		if f.length() > limit:
 			f = f.normalized() * limit
-		state.apply_force(wright * f.x + wfwd * f.y, rel)
+		# Tyre forces act up near the centre height (ROLL_CENTRE) so they
+		# lean the car rather than flip it.
+		var at := rel - up * rel.dot(up) * ROLL_CENTRE
+		state.apply_force(wright * f.x, at)
+		state.apply_force(wfwd * f.y, rel)
 		w.spin += lon_v * dt / wheel_radius
 	if grounded >= 2:
 		# Assists: a little downforce and yaw damping so it reads well from above.
@@ -497,6 +517,10 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		# steps out (oversteer); the handbrake asks for much more again.
 		var wanted_yaw := _steer_smooth * fwd_speed * yaw_assist * (HANDBRAKE_YAW if handbrake else 1.0)
 		state.apply_torque(up * (wanted_yaw - yaw_rate) * mass * 0.9)
+		# Anti-roll bar: pull the body back level about its long axis.
+		var roll := asin(clampf(right.dot(Vector3.UP), -1.0, 1.0))
+		var roll_rate := state.angular_velocity.dot(fwd)
+		state.apply_torque(-fwd * (roll * ANTI_ROLL + roll_rate * ANTI_ROLL_DAMP) * mass)
 	_detect_impacts(state)
 	_update_wheel_visuals(dt, true, steer_angle)
 
