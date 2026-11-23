@@ -11,7 +11,7 @@ extends CharacterBody3D
 ## from the barrel at the reticle, V punch, B kick, MMB ping (defaults;
 ## players can rebind them, and a controller works too).
 
-enum S { MOVE, CROUCH, PRONE, COVER, AIR, ROLL, SLIDE, VAULT, CLIMB, KICK, DOWNED, VEHICLE }
+enum S { MOVE, CROUCH, PRONE, COVER, AIR, ROLL, SLIDE, VAULT, CLIMB, KICK, DOWNED, VEHICLE, GRAPPLE, ROPE, SWING }
 ## What a melee strike was (see struck).
 enum Strike { PUNCH, KICK, BARGE }
 
@@ -240,6 +240,9 @@ func _ready() -> void:
 	add_child(_visual)
 	rig = OfficerRig.new()
 	_visual.add_child(rig)
+	var line := GrappleRope.new()
+	line.officer = self
+	add_child(line)
 	OfficerClips._ensure_loaded()
 
 
@@ -261,7 +264,7 @@ func strafe_scale(wish: Vector3) -> float:
 func is_aiming() -> bool:
 	if state == S.VEHICLE:
 		return (buttons & PlayerInput.AIM) != 0 and gun_up() and seat > 0
-	return (buttons & PlayerInput.AIM) != 0 and gun_up() and state in [S.MOVE, S.CROUCH, S.PRONE, S.COVER, S.AIR]
+	return (buttons & PlayerInput.AIM) != 0 and gun_up() and state in [S.MOVE, S.CROUCH, S.PRONE, S.COVER, S.AIR, S.ROPE]
 
 
 ## The pistol is out and in the hand (not mid-holster, nearly done drawing).
@@ -303,6 +306,7 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 	aim_yaw = cmd.get("aim_yaw", aim_yaw)
 	aim_point = cmd.get("aim_point", aim_point)
 	var move: Vector2 = cmd.get("move", Vector2.ZERO)
+	_last_move = move
 	var wish := Vector3(move.x, 0, move.y)
 	state_t += delta
 	punch_t = maxf(0.0, punch_t - delta)
@@ -334,6 +338,9 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 			return
 		S.ROLL, S.VAULT, S.CLIMB:
 			_scripted_move(delta)
+			return
+		S.GRAPPLE, S.ROPE, S.SWING:
+			_rope_states(delta)
 			return
 		S.SLIDE:
 			var k := 1.0 - state_t / SLIDE_TIME
@@ -408,6 +415,8 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 			velocity.z = f.z * BARGE_SPEED
 	if is_reviving():
 		wish = Vector3.ZERO
+	if state in [S.MOVE, S.CROUCH] and _pressed(PlayerInput.INTERACT) and not is_reviving() and cuff_target() == null and (_try_grapple() or _try_abseil()):
+		return
 	if state in [S.MOVE, S.CROUCH] and _pressed(PlayerInput.INTERACT) and not is_reviving() and _try_seat_prisoner():
 		pass
 	elif state in [S.MOVE, S.CROUCH] and _pressed(PlayerInput.INTERACT) and not is_reviving() and cuff_target() == null and _try_pick_gun():
@@ -1807,7 +1816,7 @@ func apply_state(s: Dictionary) -> void:
 		for c in get_tree().get_nodes_in_group("vehicles"):
 			if c.net_id == s.car:
 				car = c
-	collision_mask = 0 if state in [S.VAULT, S.CLIMB, S.VEHICLE] else (1 | 4 | 16)
+	collision_mask = 0 if state in [S.VAULT, S.CLIMB, S.VEHICLE, S.GRAPPLE, S.ROPE, S.SWING] else (1 | 4 | 16)
 	collision_layer = 0 if state == S.VEHICLE else 2
 
 
@@ -1967,3 +1976,275 @@ func _order_prisoners() -> void:
 			(s as Suspect).order_follow(self)
 		Voices.say(self, Voices.pick(Voices.Kind.FOLLOW))
 	shout_t = maxf(shout_t, 0.8)
+
+
+# --- v0.10.0: grapple hook and abseil rope ---------------------------------------------
+# GRAPPLE: the hook flies to a roof edge, the line hauls you up the wall and
+# you climb over the parapet. ROPE: hanging off a roof edge on the line,
+# climbing or sliding. SWING: kicking off the wall and crashing in through
+# the window in front of you. All three are worked out from state_t and the
+# synced move fields, so the host, your own machine and everyone watching
+# agree: _move_start where it began, _cover_anchor the hook (roof edge, at
+# roof level), _cover_n the wall's outward normal, _move_rise how far down
+# the rope you are (SWING: the floor height you land on).
+
+const GRAPPLE_RANGE := 40.0
+const GRAPPLE_FLY := 0.35
+const GRAPPLE_REEL := 11.0      # m/s up the line
+const GRAPPLE_OVER := 0.7       # s to climb over the parapet
+const ROPE_OFF := 0.45          # body centre out from the wall
+const ROPE_UP := 1.3            # m/s climbing the rope
+const ROPE_DOWN := 2.6
+const ROPE_FAST := 7.0
+const ROPE_OVER := 0.8          # s to go over the edge onto the rope
+const SWING_TIME := 0.9
+
+
+## Aiming at a building from outside it: fire the grapple at its roof edge.
+func _try_grapple() -> bool:
+	if (buttons & PlayerInput.AIM) == 0:
+		return false
+	var plan := grapple_plan(aim_point)
+	if plan.is_empty():
+		return false
+	_move_start = global_position
+	_cover_anchor = plan.hook
+	_cover_n = plan.normal
+	_move_rise = 0.0
+	_set_state(S.GRAPPLE)
+	collision_mask = 0
+	velocity = Vector3.ZERO
+	rotation.y = atan2(-_cover_n.x, -_cover_n.z)
+	return true
+
+
+## Where a grapple aimed at `at` would hook on ({hook, normal}), or {}.
+func grapple_plan(at: Vector3) -> Dictionary:
+	if not Armoury.owns(Armoury.GRAPPLE) or state not in [S.MOVE, S.CROUCH]:
+		return {}
+	var b := Rooftops.building_at(at, 0.6)
+	if b.is_empty() or Rooftops.inside_footprint(b, global_position, 0.3):
+		return {}
+	var top := Rooftops.roof_y(b)
+	if top - global_position.y < 2.5:
+		return {}
+	var face := Rooftops.nearest_face(b, at)
+	var hook: Vector3 = face.point
+	hook.y = top
+	if Vector2(hook.x - global_position.x, hook.z - global_position.z).length() > GRAPPLE_RANGE:
+		return {}
+	return {"hook": hook, "normal": face.normal}
+
+
+## Standing on a roof by its edge, facing out: clip on and go over.
+func _try_abseil() -> bool:
+	if (buttons & PlayerInput.AIM) != 0:
+		return false
+	var plan := abseil_plan()
+	if plan.is_empty():
+		return false
+	_move_start = global_position
+	_cover_anchor = plan.edge
+	_cover_n = plan.normal
+	_move_rise = 0.0
+	_set_state(S.ROPE)
+	collision_mask = 0
+	velocity = Vector3.ZERO
+	return true
+
+
+## The roof edge you could abseil from here ({edge, normal}), or {}.
+func abseil_plan() -> Dictionary:
+	if not Armoury.owns(Armoury.GRAPPLE) or state not in [S.MOVE, S.CROUCH]:
+		return {}
+	var b := Rooftops.building_at(global_position + Vector3(0, 0.5, 0))
+	if b.is_empty():
+		return {}
+	var top := Rooftops.roof_y(b)
+	if absf(global_position.y - top) > 0.4:
+		return {}
+	var face := Rooftops.nearest_face(b, global_position)
+	if face.dist > 1.6 or _fwd().dot(face.normal) < 0.2:
+		return {}
+	var edge: Vector3 = face.point
+	edge.y = top
+	return {"edge": edge, "normal": face.normal}
+
+
+## Where you hang on the rope, d metres below the roof.
+func rope_point(d: float) -> Vector3:
+	return _cover_anchor + _cover_n * ROPE_OFF + Vector3.DOWN * (1.6 + d)
+
+
+## The roof spot a grapple lands you on.
+func grapple_land() -> Vector3:
+	return _cover_anchor - _cover_n * 1.3 + Vector3(0, 0.05, 0)
+
+
+func _rope_states(delta: float) -> void:
+	velocity = Vector3.ZERO
+	_fall_v = 0.0
+	collision_mask = 0
+	match state:
+		S.GRAPPLE:
+			var below := _cover_anchor + _cover_n * ROPE_OFF + Vector3.DOWN * 1.5
+			var reel := maxf(_move_start.distance_to(below) / GRAPPLE_REEL, 0.2)
+			if state_t < GRAPPLE_FLY:
+				pass    # the hook's still flying
+			elif state_t < GRAPPLE_FLY + reel:
+				var k := (state_t - GRAPPLE_FLY) / reel
+				global_position = _move_start.lerp(below, k * k * (3.0 - 2.0 * k))
+			elif state_t < GRAPPLE_FLY + reel + GRAPPLE_OVER:
+				var k := (state_t - GRAPPLE_FLY - reel) / GRAPPLE_OVER
+				var land := grapple_land()
+				var p := below.lerp(land, k)
+				p.y = lerpf(below.y, land.y, minf(k * 1.6, 1.0)) + sin(k * PI) * 1.2
+				global_position = p
+			else:
+				global_position = grapple_land()
+				_rope_end(S.MOVE)
+			return
+		S.ROPE:
+			if state_t < ROPE_OVER:
+				var k := state_t / ROPE_OVER
+				var p := _move_start.lerp(rope_point(0.0), k)
+				p.y = lerpf(_move_start.y, rope_point(0.0).y, k * k) + sin(k * PI) * 0.8
+				global_position = p
+				rotation.y = lerp_angle(rotation.y, atan2(-_cover_n.x, -_cover_n.z), 10.0 * delta)
+				return
+			if _pressed(PlayerInput.INTERACT):
+				_rope_end(S.AIR)    # let go
+				return
+			if _pressed(PlayerInput.JUMP):
+				_start_swing()
+				return
+			var wish := Vector3(_last_move.x, 0, _last_move.y)
+			var into := wish.dot(-_cover_n)
+			var rate := 0.0
+			if into > 0.3:
+				rate = -ROPE_UP
+			elif into < -0.3 or (buttons & PlayerInput.SPRINT):
+				rate = ROPE_FAST if buttons & PlayerInput.SPRINT else ROPE_DOWN
+			_move_rise = maxf(_move_rise + rate * delta, 0.0)
+			var p := rope_point(_move_rise)
+			var ground := _rope_ground(p)
+			if p.y <= ground + 0.02:
+				global_position = Vector3(p.x, ground + 0.02, p.z)
+				_rope_end(S.MOVE)
+				return
+			global_position = p
+			if is_aiming():
+				rotation.y = lerp_angle(rotation.y, aim_yaw, 10.0 * delta)
+			else:
+				rotation.y = lerp_angle(rotation.y, atan2(-_cover_n.x, -_cover_n.z), 10.0 * delta)
+			_fire_step()
+		S.SWING:
+			var inside := _swing_inside()
+			var k := clampf(state_t / SWING_TIME, 0.0, 1.0)
+			var out := _move_start + _cover_n * 1.4 * sin(minf(k * 2.0, 1.0) * PI * 0.5)
+			if k < 0.5:
+				global_position = _move_start.lerp(out, k * 2.0)
+			else:
+				var kk := (k - 0.5) * 2.0
+				global_position = out.lerp(inside, kk * kk)
+				if Net.is_host() and kk > 0.25 and not _swing_smashed:
+					_swing_smashed = true
+					_smash_window()
+			if state_t >= SWING_TIME:
+				global_position = inside
+				_rope_end(S.CROUCH)
+
+
+var _last_move := Vector2.ZERO
+var _swing_smashed := false
+
+
+## Kick off the wall and swing in through the window at chest height, if
+## there is one; a blank wall just bounces you back onto the rope.
+func _start_swing() -> void:
+	var chest := global_position + Vector3(0, 1.2, 0)
+	var wall := chest - _cover_n * ROPE_OFF
+	if not _window_at(wall):
+		velocity = Vector3.ZERO
+		return
+	var b := Rooftops.building_at(wall - _cover_n * 0.5)
+	if b.is_empty():
+		return
+	var oy := (b.origin as Vector3).y
+	var floor_n := floori((chest.y - oy - 0.3) / BlockGenerator.STOREY)
+	floor_n = clampi(floor_n, 0, int(b.storeys) - 1)
+	_move_rise = oy + floor_n * BlockGenerator.STOREY + 0.05    # SWING: the floor height inside
+	_move_start = global_position
+	_swing_smashed = false
+	_set_state(S.SWING)
+
+
+func _swing_inside() -> Vector3:
+	var p := _move_start - _cover_n * (ROPE_OFF + 1.3)
+	p.y = _move_rise
+	return p
+
+
+## A window wall (glass or the hole where it was) in the wall at p.
+func _window_at(p: Vector3) -> bool:
+	var w := Rooftops.world
+	if w == null:
+		return false
+	for id in w.pieces_near(p, 2.0):
+		var pc: Dictionary = w.pieces.get(id, {})
+		if pc.is_empty() or not String(pc.kind).begins_with("wall_window"):
+			continue
+		var bb: AABB = pc.aabb
+		if bb.grow(0.4).has_point(p):
+			return true
+	return false
+
+
+## Host: the glass in front of you goes as you come through.
+func _smash_window() -> void:
+	var w := Rooftops.world
+	if w == null:
+		return
+	var at := _move_start - _cover_n * ROPE_OFF + Vector3(0, 1.2, 0)
+	for id in w.pieces_near(at, 2.2):
+		var pc: Dictionary = w.pieces.get(id, {})
+		if pc.is_empty() or pc.state != "intact" or not String(pc.kind).begins_with("glass"):
+			continue
+		if (pc.aabb as AABB).grow(0.6).has_point(at):
+			w.damage_piece(id, 9999.0, at + _cover_n, 4.0)
+
+
+func _rope_ground(p: Vector3) -> float:
+	var space := get_world_3d().direct_space_state if is_inside_tree() else null
+	if space == null:
+		return -INF
+	var q := PhysicsRayQueryParameters3D.create(p + Vector3.UP * 0.5, p + Vector3.DOWN * 60.0, 1 | 4)
+	q.exclude = [get_rid()]
+	var hit := space.intersect_ray(q)
+	return (hit.position as Vector3).y if hit else -INF
+
+
+func _rope_end(next: S) -> void:
+	collision_mask = 1 | 4 | 16
+	velocity = Vector3.ZERO
+	_fall_v = 0.0
+	_set_state(next)
+
+
+## The line, for the rope's look: where it's fixed and where it ends (the
+## hook in flight, or you). Empty when there's no line out.
+func rope_line() -> Array:
+	match state:
+		S.GRAPPLE:
+			var hand := global_position + Vector3(0, 1.3, 0)
+			if state_t < GRAPPLE_FLY:
+				return [hand, hand.lerp(_cover_anchor, state_t / GRAPPLE_FLY)]
+			var reel := maxf(_move_start.distance_to(_cover_anchor + _cover_n * ROPE_OFF + Vector3.DOWN * 1.5) / GRAPPLE_REEL, 0.2)
+			if state_t < GRAPPLE_FLY + reel + GRAPPLE_OVER * 0.5:
+				return [_cover_anchor, hand]
+		S.ROPE:
+			return [_cover_anchor + _cover_n * 0.15 + Vector3.UP * 1.0, global_position + Vector3(0, 1.0, 0)]
+		S.SWING:
+			if state_t < SWING_TIME * 0.6:
+				return [_cover_anchor + _cover_n * 0.15 + Vector3.UP * 1.0, global_position + Vector3(0, 1.0, 0)]
+	return []

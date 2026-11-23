@@ -43,7 +43,8 @@ const COUNTS := {"amb_air": 1, "amb_far_traffic": 1, "amb_street": 1, "body_hit"
 	"mag_drop_concrete": 2, "mag_drop_metal": 2, "mag_drop_wood": 2, "mag_in": 1, "mag_out": 1, "ping": 1,
 	"punch": 5, "radio_key": 3, "radio_unkey": 2, "radio_voice": 6, "ricochet": 4, "room_tone": 1, "rubble": 6, "shotgun_pump": 1, "siren_wail": 1, "siren_yelp": 1,
 	"slide_rack": 1, "step_concrete": 6, "step_dirt": 6, "step_wood": 4, "tyre_skid": 1, "whoosh": 3,
-	"nade_pin": 2, "nade_bounce": 4, "flashbang": 2, "frag_crack": 2, "smoke_pop": 1, "smoke_hiss": 1, "cough": 6}
+	"nade_pin": 2, "nade_bounce": 4, "flashbang": 2, "frag_crack": 2, "smoke_pop": 1, "smoke_hiss": 1, "cough": 6,
+	"lift_ding": 1, "grapple_fire": 2, "grapple_hit": 3, "rope_slide": 2}
 const BUS_AMBIENCE := "Ambience"
 const BUS_AMBIENCE_OUT := "AmbienceOut"
 const BUS_VEHICLES := "Vehicles"
