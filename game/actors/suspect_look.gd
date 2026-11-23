@@ -6,14 +6,14 @@ extends RefCounted
 
 const HIDE := ["vest", "badge", "radio", "holster", "pouch", "buckle", "cap_peak", "cap_letters", "cap_button", "spare_mag"]
 const SHIRTS := [Color("b8322c"), Color("6f7378"), Color("3f6b3a"), Color("2a2a30"), Color("d9b33c"), Color("e6e2d8"),
-	Color("7a4a8c"), Color("2f5f8a")]
-const TROUSERS := [Color("3b5677"), Color("232327"), Color("8a7c5e"), Color("55585e"), Color("2c3e5c")]
+	Color("7a4a8c"), Color("2f5f8a"), Color("2a8a86"), Color("d9772a"), Color("c96a8e"), Color("6b6b3a"), Color("8fb4d9"), Color("3a2a22")]
+const TROUSERS := [Color("3b5677"), Color("232327"), Color("8a7c5e"), Color("55585e"), Color("2c3e5c"), Color("b8a47a"), Color("5a3a2a")]
 const SKIN := [Color("e8c3a0"), Color("c99a74"), Color("9a6b4a"), Color("6a4630"), Color("f0d2b8")]
 ## Looks from WORKER up are council workers: hi-vis vest and a hard hat.
 const WORKER := 240
 const HI_VIS := Color("ff8a1a")
 const HARD_HAT := Color("f2c81e")
-const HATS := [Color("1f1f24"), Color("6b1e22"), Color("2b3a55"), Color("4a4a42"), Color("c8c2b4")]
+const HATS := [Color("1f1f24"), Color("6b1e22"), Color("2b3a55"), Color("4a4a42"), Color("c8c2b4"), Color("d9772a"), Color("2a8a86")]
 
 
 static func colours(look: int) -> Dictionary:
