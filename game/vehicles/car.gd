@@ -22,6 +22,8 @@ const ENGINE_BRAKE := 900.0  # N per driven wheel when off the throttle
 const ROLLING := 0.015       # tyre rolling resistance, fraction of wheel load
 const GRIP := 9.0           # lateral stiffness per unit load
 const MU := 1.25            # tyre friction coefficient
+## Wave 4: how much grip the roads give right now (CityWeather: wet roads 0.7).
+static var grip_k := 1.0
 const HANDBRAKE_REAR_GRIP := 0.1
 const YAW_ASSIST := 0.55
 const HANDBRAKE_YAW := 1.9
@@ -456,7 +458,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		var pv := state.get_velocity_at_local_position(rel)
 		var lat_v := pv.dot(wright)
 		var lon_v := pv.dot(wfwd)
-		var grip := GRIP
+		var grip := GRIP * grip_k
 		if not w.front:
 			grip *= REAR_GRIP
 			if handbrake:
@@ -481,7 +483,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		lon_f -= sign(lon_v) * minf(drag, absf(lon_v) * mass * 0.5)
 		lon_f -= lon_v * 25.0  # air and bearing drag
 		# Friction circle.
-		var limit: float = MU * load * (0.5 if handbrake and not w.front else 1.0)
+		var limit: float = MU * grip_k * load * (0.5 if handbrake and not w.front else 1.0)
 		var f := Vector2(lat_f, lon_f)
 		if f.length() > limit:
 			f = f.normalized() * limit

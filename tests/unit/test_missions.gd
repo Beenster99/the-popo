@@ -264,3 +264,33 @@ func test_arrests_pay_and_big_busts() -> void:
 			t.check(drv.state == Suspect.S.DRIVE, "shooting starts: the driver's away (%s)" % Suspect.S.keys()[drv.state])
 	s.queue_free()
 	await get_tree().process_frame
+
+
+func test_things_that_just_happen() -> void:
+	var s := await _city()
+	var d := s.dispatch
+	var K := Dispatcher.Kind
+	var o: Officer = s.sync.my_pawn()
+	var said: Array = []
+	d.radio.connect(func(x): said.append(x))
+	for k in [K.CRASH, K.FIRE, K.ALARM]:
+		var id := d.start_call(k)
+		t.check(id > 0, "%s: %s" % [Dispatcher.KIND_NAMES[k], d.calls[id].text if id > 0 else "-"])
+		if id <= 0:
+			continue
+		var c: Dictionary = d.calls[id]
+		# Deal with anyone in it, then stand on the scene.
+		for sid in c.suspects:
+			(d.suspects[sid] as Suspect).set_state(Suspect.S.BOOKED)
+		for i in 30:
+			await get_tree().physics_frame
+		t.check(c.state == Dispatcher.CallState.ACTIVE, "  not over till someone's been there")
+		o.global_position = d.nav.closest(c.pos) if d.nav else c.pos
+		for i in int((float(c.presence) + 1.5) * 60):
+			await get_tree().physics_frame
+		t.check(c.state == Dispatcher.CallState.CLOSED, "  officers on scene: closed (%.0f s there)" % c.get("on_scene", 0.0))
+		o.global_position = s._spawn_point(0)
+	var fire: FireSystem = s.fire
+	t.check(fire.fires.size() > 0 or said.any(func(x): return String(x).contains("brigade")), "the building burned")
+	s.queue_free()
+	await get_tree().process_frame

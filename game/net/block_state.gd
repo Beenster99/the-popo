@@ -10,6 +10,11 @@ extends Node
 ##
 ## The host also saves the same thing to disk every little while and when
 ## the game ends, so "Continue" brings the same block back as it was left.
+##
+## Wave 4, Phase 4.4: the save also keeps the station's career: pay, what's
+## been bought, how far each story has got, the clock and the weather, and
+## what each officer (by name) was carrying. Only the save has these: a
+## friend joining gets them from the regular broadcasts.
 
 const MSG_ASK := 95      # client -> host: send me the block as it is
 const MSG_STATE := 96    # host -> client: here it is
@@ -17,7 +22,7 @@ const MSG_STATE := 96    # host -> client: here it is
 ## block.save); the scene sets this before anything reads it.
 static var save_path := "user://saves/city.save"
 const MAGIC := 0x504F504F   # "POPO"
-const VERSION := 3
+const VERSION := 4
 const SAVE_EVERY := 20.0
 
 signal caught_up
@@ -27,6 +32,13 @@ var props: PropWorld
 var cars: CarSync
 var dispatch: Dispatcher
 var seed_value := 0
+var weather: CityWeather
+var sync: PawnSync
+## id -> player name, for whose kit is whose.
+var name_of: Callable
+## Kit waiting for an officer who hasn't turned up yet: name -> [kit, plain].
+var kits := {}
+var _career_hash := 0
 ## Host: whether anything has changed since the last save.
 var dirty := false
 var _save_t := SAVE_EVERY
@@ -39,6 +51,10 @@ func _ready() -> void:
 		world.piece_broken.connect(func(_id): dirty = true)
 	if props:
 		props.broke.connect(func(_id, _k, _at): dirty = true)
+	if world:
+		world.piece_restored.connect(func(_id): dirty = true)
+	if sync:
+		sync.pawn_spawned.connect(_give_kit)
 
 
 func _exit_tree() -> void:
@@ -93,7 +109,8 @@ func _physics_process(delta: float) -> void:
 	_save_t -= delta
 	if _save_t <= 0.0:
 		_save_t = SAVE_EVERY
-		if dirty or _cars_changed():
+		var ch := _career_changed()
+		if dirty or _cars_changed() or ch:
 			save()
 
 
@@ -107,6 +124,99 @@ func _cars_changed() -> bool:
 	return changed
 
 
+func _career_changed() -> bool:
+	var b := StreamPeerBuffer.new()
+	write_career(b)
+	var h := hash(b.data_array)
+	var changed := h != _career_hash
+	_career_hash = h
+	return changed
+
+
+# --- Career (Phase 4.4) ----------------------------------------------------------
+
+func write_career(b: StreamPeerBuffer) -> void:
+	var m: Missions = dispatch.missions if dispatch else null
+	var st: Stories = dispatch.stories if dispatch else null
+	b.put_u32(dispatch.pay if dispatch else 0)
+	b.put_u32(Armoury.owned)
+	b.put_float(m.minute if m else Missions.START_MINUTE)
+	b.put_u8(weather.kind if weather else 0)
+	b.put_float(weather.wet if weather else 0.0)
+	var chains: Array = st.progress.keys() if st else []
+	b.put_u8(chains.size())
+	for id in chains:
+		var pr: Dictionary = st.progress[id]
+		b.put_utf8_string(str(id))
+		b.put_u8(pr.step)
+		b.put_u8(pr.escapes)
+		b.put_u8((1 if pr.done else 0) | (2 if pr.dead else 0))
+	# Kit by officer name; anyone who isn't here keeps what they had.
+	var all := kits.duplicate()
+	if sync:
+		for id in sync.pawns:
+			var o := sync.pawns[id] as Officer
+			var nm: String = name_of.call(id) if name_of.is_valid() else ""
+			if o and nm != "":
+				all[nm] = [o.kit, o.plain]
+	b.put_u8(all.size())
+	for nm in all:
+		b.put_utf8_string(nm)
+		b.put_u8(all[nm][0])
+		b.put_u8(1 if all[nm][1] else 0)
+
+
+func read_career(b: StreamPeerBuffer) -> void:
+	var pay := b.get_u32()
+	var owned := b.get_u32()
+	var minute := b.get_float()
+	var wk := b.get_u8()
+	var wet := b.get_float()
+	if dispatch:
+		dispatch.pay = pay
+		if dispatch.missions:
+			dispatch.missions.minute = fposmod(minute, Missions.DAY_MINUTES)
+	if owned != Armoury.owned:
+		Armoury.owned = owned | 1
+		if Armoury.current:
+			Armoury.current._broadcast()
+			Armoury.current.changed.emit()
+	if weather:
+		weather.kind = wk & 3
+		weather._target_rain = float([0.0, 0.0, 0.6, 1.0][weather.kind])
+		weather.rain = weather._target_rain
+		weather.wet = wet
+	var st: Stories = dispatch.stories if dispatch else null
+	for i in b.get_u8():
+		var id := b.get_utf8_string()
+		var step := b.get_u8()
+		var esc := b.get_u8()
+		var flags := b.get_u8()
+		if st and st.progress.has(id):
+			st.progress[id] = {"step": step, "escapes": esc, "done": (flags & 1) != 0, "dead": (flags & 2) != 0}
+	kits = {}
+	for i in b.get_u8():
+		var nm := b.get_utf8_string()
+		var k := b.get_u8()
+		kits[nm] = [k, b.get_u8() == 1]
+	if sync:
+		for id in sync.pawns:
+			_give_kit(id, sync.pawns[id])
+
+
+## Host: an officer turns up; if they carried something last time, they
+## carry it again.
+func _give_kit(id: int, p: Node) -> void:
+	if not Net.is_host() or not (p is Officer) or not name_of.is_valid():
+		return
+	var nm: String = name_of.call(id)
+	if not kits.has(nm):
+		return
+	var o := p as Officer
+	o.set_kit(int(kits[nm][0]))
+	o.set_plain(bool(kits[nm][1]))
+
+
 # --- Saving ----------------------------------------------------------------------
 
 func save() -> bool:
@@ -118,6 +228,7 @@ func save() -> bool:
 	b.put_u8(KitLibrary.detail)
 	b.put_64(int(Time.get_unix_time_from_system()))
 	write(b)
+	write_career(b)
 	DirAccess.make_dir_recursive_absolute(save_path.get_base_dir())
 	var f := FileAccess.open(save_path, FileAccess.WRITE)
 	if f == null:
@@ -169,6 +280,9 @@ func load_save() -> bool:
 		return false
 	b.get_64()
 	read(b, true)
+	if b.get_available_bytes() > 0:
+		read_career(b)
+	_career_changed()
 	dirty = false
 	return true
 

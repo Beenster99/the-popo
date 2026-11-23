@@ -45,6 +45,10 @@ var traffic: TrafficSystem
 var env: Environment
 var skyline: CitySkyline
 var peds: PedSystem
+## Wave 4: the light follows the clock; rain and storms.
+var weather: CityWeather
+var repairs: RepairCrews
+var sun: DirectionalLight3D
 ## Wave 3, Phase 3.5: what the station has bought, and the vehicles waiting
 ## in its yard until it does.
 var armoury: Armoury
@@ -59,7 +63,7 @@ var _furnish_t := 0.0
 func _ready() -> void:
 	BlockState.save_path = SAVE_PATH
 	env = ProtoWorld.environment(self).environment
-	var sun := ProtoWorld.sun(self)
+	sun = ProtoWorld.sun(self)
 	sun.directional_shadow_max_distance = 140.0
 	cam = IsoCamera.new()
 	cam.zoom = 16.0
@@ -138,7 +142,7 @@ func _ready() -> void:
 		var where := "-"
 		if o and gen:
 			where = "%s, %s" % [gen.district_at(o.global_position), CityGenerator.street_at(o.global_position)]
-		return "city seed %d   %d pieces (built in %d ms)   walk routes %d/%d   %s\n%s\n1 pistol  2 charge [%s]   G new city (host)   J call in a job (host)   %s" % [
+		return "city seed %d   %d pieces (built in %d ms)   walk routes %d/%d   %s\n%s\n1 pistol  2 charge [%s]   G new city   J call in a job   K weather   N +3 hours (host)   %s" % [
 			seed_value, world.pieces.size(), build_ms, nav.baked_count() if nav else 0, gen.blocks.size() if gen else 0, st, where,
 			"charge" if PlayerInput.alt_tool else "pistol",
 			Controls.help(["stance", "cover", "aim", "fire", "reload", "kick", "interact"])]
@@ -193,6 +197,15 @@ func _build(s: int) -> void:
 	skyline.name = "Skyline"
 	add_child(skyline)
 	skyline.build(gen, world, env)
+	weather = CityWeather.new()
+	weather.name = "Weather"
+	weather.dispatcher = dispatch
+	weather.world = world
+	weather.env = env
+	weather.sun = sun
+	weather.ground = ground
+	weather.skyline = skyline
+	add_child(weather)
 	cars = CarSync.new()
 	cars.destruction = world
 	cars.use_seats = true
@@ -236,6 +249,13 @@ func _build(s: int) -> void:
 	peds.dispatch = dispatch
 	peds.nav = nav
 	add_child(peds)
+	repairs = RepairCrews.new()
+	repairs.name = "Repairs"
+	repairs.world = world
+	repairs.dispatch = dispatch
+	repairs.traffic = traffic
+	repairs.gen = gen
+	add_child(repairs)
 	# Something big coming down: people and drivers near it scatter.
 	world.piece_broken.connect(func(id):
 		if Net.is_host() and _alarm_t <= 0.0 and world.pieces.has(id):
@@ -267,6 +287,9 @@ func _build(s: int) -> void:
 	state.cars = cars
 	state.dispatch = dispatch
 	state.seed_value = s
+	state.weather = weather
+	state.sync = sync
+	state.name_of = func(id): return _names.get(id, "")
 	add_child(state)
 	if Net.is_host():
 		_furnish_near(true)
@@ -360,6 +383,11 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if not (event.is_pressed() and not event.is_echo()):
 		return
 	var key := (event as InputEventKey).physical_keycode
+	# Wave 4 (host): K changes the weather, N moves the clock on three hours.
+	if key == KEY_K and Net.is_host() and weather:
+		weather.set_weather((weather.kind + 1) % 4)
+	if key == KEY_N and Net.is_host() and dispatch and dispatch.missions:
+		dispatch.missions.minute = fposmod(dispatch.missions.minute + 180.0, Missions.DAY_MINUTES)
 	if key == KEY_J and Net.is_host() and dispatch:
 		dispatch.start_call(dispatch._pick_kind())
 	if key == KEY_G and Net.is_host():
