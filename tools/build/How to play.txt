@@ -12,6 +12,23 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
+THE CITY LIVES (0.5.0)
+Day and night: the light follows the clock. The sun comes up about six and
+goes down about eight; at night the street lamps come on. The weather
+changes now and then: clear, cloudy, rain, or a storm with thunder and
+lightning. Rain makes the roads dark and shiny, and slippery: cars lose grip
+until the roads dry out again.
+Things just happen: car crashes (more in the rain), fires in buildings, and
+burglar alarms going off. Get there, stay a while, and it's dealt with.
+Repair crews: a while after something gets knocked down, a council crew
+turns up (van at the kerb, hi-vis, cones). They cart the rubble away, road
+first, then build it back up a piece at a time. Slow while you watch, quicker
+when nobody's about. Scare them or hurt them and the work stops.
+Saving: Continue now brings back the station's pay, everything bought at the
+armoury, how far each story has got, the time of day, the weather, and the
+kit each of you was carrying (by player name).
+Host keys: K changes the weather, N moves the clock on three hours.
+
 POLICE WORK (0.4.0)
 Jobs now depend on where you are and the time of day (the clock is top left:
 a day lasts 48 minutes). Muggings, shoplifters, fights, domestics, drug deals,

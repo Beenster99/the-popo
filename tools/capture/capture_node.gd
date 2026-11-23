@@ -76,6 +76,43 @@ func _run() -> void:
 			cam.current = true
 			await _frames(80)
 			await _save()
+		"repair_site":
+			# Wave 4: a council crew at a hole blown in a building.
+			City.next_seed = 4242
+			var s := await _scene("res://game/city/city.tscn")
+			await _frames(10)
+			s.find_children("*", "NetOverlay", false, false)[0].queue_free()
+			(s.dispatch as Dispatcher).enabled = false
+			s.dispatch.missions.minute = 15 * 60.0
+			var b0: Dictionary = {}
+			for b in s.gen.buildings:
+				if b.type != "station":
+					b0 = b
+					break
+			var at: Vector3 = (b0.origin as Vector3) + Vector3(1.0, 1.0, 0.0)
+			s.world.explode(at, 3.5, 400.0, 6.0)
+			await _frames(200)
+			var r: RepairCrews = s.repairs
+			for id in r._broken:
+				r._broken[id] = RepairCrews.WAIT
+			r._tick = 0.0
+			await _frames(5)
+			var site: Dictionary = r.sites.values()[0]
+			for i in 6:
+				site.t = 0.0
+				await _frames(2)
+			await _frames(90)
+			var cam := Camera3D.new()
+			s.add_child(cam)
+			cam.far = 1000.0
+			var c: Vector3 = site.at
+			var out := Vector3(c.x - at.x, 0, c.z - at.z)
+			out = out.normalized() if out.length() > 0.5 else Vector3(0, 0, -1)
+			var side := Vector3(-out.z, 0, out.x)
+			cam.look_at_from_position(c + out * 11.0 + side * 6.0 + Vector3(0, 4.5, 0), (c + at) * 0.5 + Vector3(0, 1.0, 0))
+			cam.current = true
+			await _frames(30)
+			await _save()
 		"station_armoury", "station_yard":
 			# Wave 3: the armoury screen, and the station grown (garage, range).
 			City.next_seed = 4242
