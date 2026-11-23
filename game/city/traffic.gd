@@ -33,9 +33,10 @@ const CRUISE := 11.5           # m/s, about 40 km/h
 const TURN_SPEED := 5.0
 const STOP_BACK := 7.8         # m from the junction centre to the stop line
 const LANE := CityGenerator.LANE
-const KINDS := [["sedan", 30], ["hatchback", 26], ["van_panel", 10], ["van_box", 7], ["minibus", 5],
-	["motorbike", 8], ["trash_truck", 3]]
-const PARKED_KINDS := [["sedan", 40], ["hatchback", 34], ["van_panel", 12], ["van_box", 5], ["minibus", 4], ["motorbike", 5]]
+const KINDS := [["sedan", 27], ["hatchback", 26], ["van_panel", 8], ["van_box", 5], ["minibus", 5],
+	["motorbike", 8], ["trash_truck", 3], ["taxi", 6], ["work_van", 3], ["courier", 3], ["ice_cream", 1]]
+const PARKED_KINDS := [["sedan", 36], ["hatchback", 34], ["van_panel", 10], ["van_box", 4], ["minibus", 4], ["motorbike", 5],
+	["taxi", 3], ["work_van", 3], ["courier", 2], ["ice_cream", 1]]
 enum L { GO, AMBER_L, RED }
 
 var gen: CityGenerator

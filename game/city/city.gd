@@ -24,6 +24,9 @@ const FURNISH_RANGE := 70.0
 
 static var next_seed := 0
 static var resume := false
+## Wave 5: start the first-shift tutorial (single player; never saved).
+static var tutorial := false
+var first_shift: FirstShift
 
 var cam: IsoCamera
 var sync: PawnSync
@@ -119,9 +122,16 @@ func _ready() -> void:
 			s = randi_range(1, 999999)
 		next_seed = 0
 		_build(s)
-		if not (resume and state.load_save()):
+		if tutorial:
+			state.no_save = true
+			dispatch.enabled = false
+			first_shift = FirstShift.new()
+			first_shift.city = self
+			add_child(first_shift)
+		elif not (resume and state.load_save()):
 			state.dirty = true
 		resume = false
+		tutorial = false
 	else:
 		Net.send(1, MSG_SEED_ASK, PackedByteArray())
 	var reticle := Reticle.new()
@@ -130,6 +140,14 @@ func _ready() -> void:
 	var hud := AmmoHud.new()
 	hud.pawn_getter = func(): return sync.my_pawn()
 	add_child(hud)
+	var radio := PoliceRadio.new()
+	radio.name = "Radio"
+	radio.dispatcher = dispatch
+	add_child(radio)
+	var music := MusicDirector.new()
+	music.name = "Music"
+	music.pawn_getter = func(): return sync.my_pawn()
+	add_child(music)
 	var dhud := DispatchHud.new()
 	dhud.dispatcher = dispatch
 	dhud.armoury = armoury

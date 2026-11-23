@@ -44,6 +44,14 @@ const TYPES := {
 		"radius": 0.32, "mass": 260.0, "engine": 3600.0, "top": 44.0,
 		"seats": "bike", "colours": ["c9302c", "222226", "2f6f9a", "e2c23a", "e8e6e0"]},
 }
+## Wave 5 (Phase 5.1): liveries on the same bodies. model: the body it's
+## built on; extras: what's bolted on (see _add_extras).
+const VARIANTS := {
+	"taxi": {"model": "sedan", "colours": ["1c1c1e", "e2b51e"], "extras": "taxi"},
+	"work_van": {"model": "van_panel", "colours": ["e8e6e0", "f08a24", "e8e6e0"], "extras": "ladders"},
+	"ice_cream": {"model": "van_box", "colours": ["f4b6c8", "f2efe6"], "extras": "ice_cream"},
+	"courier": {"model": "van_box", "colours": ["c9302c", "e2c23a", "2f6f9a"], "extras": "stripe"},
+}
 
 ## Seat layouts: seats (car space, feet), doors (where you stand to get in),
 ## and the window each seat leans out of.
@@ -63,6 +71,7 @@ const LAYOUTS := {
 const CAB_SEAT_Z := {"van_box": 1.25, "trash_truck": 3.0, "hgv_tractor": 2.0}
 
 var kind := "sedan"
+var extras := ""
 var paint := Color.WHITE
 ## The trash truck's bin lifter (raised while it empties a bin).
 var _lifter: Node3D
@@ -75,11 +84,18 @@ static func make(kind_name: String, colour_seed := 0) -> CivilianVehicle:
 	return v
 
 
+## The body a kind is built on (a taxi is a sedan underneath).
+static func base_of(kind_name: String) -> String:
+	return String(VARIANTS[kind_name].model) if VARIANTS.has(kind_name) else kind_name
+
+
 func setup(kind_name: String, colour_seed := 0) -> void:
 	kind = kind_name
-	var t: Dictionary = TYPES[kind]
+	var base := base_of(kind)
+	var t: Dictionary = TYPES[base]
+	extras = String(VARIANTS[kind].extras) if VARIANTS.has(kind) else ""
 	is_police = false
-	model_scene = load("res://assets/models/vehicles/%s.glb" % kind)
+	model_scene = load("res://assets/models/vehicles/%s.glb" % base)
 	size = t.size
 	cabin_box = t.cabin
 	wheel_mounts = (t.wheels as Array).duplicate()
@@ -91,22 +107,22 @@ func setup(kind_name: String, colour_seed := 0) -> void:
 	engine = t.engine
 	top_speed = t.top
 	brake_force = BRAKE * k
-	if kind in ["trash_truck", "hgv_tractor", "van_box"]:
+	if base in ["trash_truck", "hgv_tractor", "van_box"]:
 		steer_max = 0.5
 		yaw_assist = 0.45
 	var lay: Dictionary = LAYOUTS[t.seats]
 	seats = (lay.seats as Array).duplicate()
 	doors = (lay.doors as Array).duplicate()
 	seat_windows = lay.windows
-	if CAB_SEAT_Z.has(kind):
-		var z: float = CAB_SEAT_Z[kind]
+	if CAB_SEAT_Z.has(base):
+		var z: float = CAB_SEAT_Z[base]
 		for i in seats.size():
 			seats[i] = Vector3(seats[i].x, seats[i].y, z)
 			doors[i] = Vector3(doors[i].x, 0, z)
 	boot = Vector3(0, 0, -size.z * 0.5 - 0.6)
 	var r := RandomNumberGenerator.new()
 	r.seed = colour_seed * 7919 + kind.hash()
-	var cols: Array = t.colours
+	var cols: Array = VARIANTS[kind].colours if VARIANTS.has(kind) else t.colours
 	paint = Color(cols[r.randi_range(0, cols.size() - 1)])
 	color = paint
 	center_of_mass = Vector3(0, -0.3, 0.1)
@@ -128,10 +144,70 @@ func _build_body() -> void:
 	if model == null:
 		return
 	_lifter = model.find_child("bin_lifter", true, false) as Node3D
+	_add_extras(model)
 	for n in ["cargo_box", "compactor", "hopper", "cab_shell"]:
 		var mi := _mesh(model, n)
 		if mi:
 			add_deformable(mi)
+
+
+## Bits bolted onto a body for a livery.
+func _add_extras(model: Node3D) -> void:
+	if extras == "":
+		return
+	var top := size.y * 0.5 + (cabin_box[0] as Vector3).y + (cabin_box[1] as Vector3).y - (cabin_box[0] as Vector3).y * 0.5 if not cabin_box.is_empty() else size.y
+	match extras:
+		"taxi":
+			var roof_sign := _box(Vector3(0.7, 0.2, 0.28), Vector3(0, top + 0.1, (cabin_box[1] as Vector3).z), Color("f6d23a"))
+			model.add_child(roof_sign)
+			var l := Label3D.new()
+			l.text = "TAXI"
+			l.font_size = 40
+			l.pixel_size = 0.004
+			l.modulate = Color("1c1c1e")
+			l.position = Vector3(0, 0, 0.145)
+			roof_sign.add_child(l)
+			var back := l.duplicate() as Label3D
+			back.position = Vector3(0, 0, -0.145)
+			back.rotation.y = PI
+			roof_sign.add_child(back)
+			if paint.r > 0.5:
+				return
+			# A chequer band on the black cabs.
+			for i in 10:
+				var c := Color("f6d23a") if i % 2 == 0 else Color("1c1c1e")
+				model.add_child(_box(Vector3(0.02, 0.1, 0.25), Vector3(-size.x * 0.5 - 0.005, 0.05, -1.1 + i * 0.25), c))
+				model.add_child(_box(Vector3(0.02, 0.1, 0.25), Vector3(size.x * 0.5 + 0.005, 0.05, -1.1 + i * 0.25), c))
+		"ladders":
+			var z := (cabin_box[1] as Vector3).z
+			var rail := (cabin_box[0] as Vector3).z * 0.85
+			for x in [-0.35, 0.35]:
+				model.add_child(_box(Vector3(0.06, 0.06, rail), Vector3(x, top + 0.12, z), Color("b8bcc2")))
+			for i in 7:
+				model.add_child(_box(Vector3(0.7, 0.04, 0.04), Vector3(0, top + 0.12, z - rail * 0.5 + i * rail / 6.0), Color("b8bcc2")))
+			model.add_child(_box(Vector3(0.18, 0.12, 0.18), Vector3(0, top + 0.06, z + rail * 0.5 + 0.1), Color("ff9a1a")))
+		"ice_cream":
+			var z := (cabin_box[1] as Vector3).z
+			var cone := _box(Vector3(0.4, 0.7, 0.4), Vector3(0, top + 0.35, z + 0.6), Color("d9a45a"))
+			model.add_child(cone)
+			model.add_child(_box(Vector3(0.55, 0.4, 0.55), Vector3(0, top + 0.85, z + 0.6), Color("f8e8f0")))
+			for side in [-1.0, 1.0]:
+				model.add_child(_box(Vector3(0.02, 0.3, 2.4), Vector3(side * ((cabin_box[0] as Vector3).x * 0.5 + 0.01), (cabin_box[1] as Vector3).y + 0.5, z), Color("7ac8e0")))
+				model.add_child(_box(Vector3(0.02, 0.6, 1.0), Vector3(side * ((cabin_box[0] as Vector3).x * 0.5 + 0.012), (cabin_box[1] as Vector3).y, z + 0.3), Color("3a3a3e")))
+		"stripe":
+			var z := (cabin_box[1] as Vector3).z
+			for side in [-1.0, 1.0]:
+				model.add_child(_box(Vector3(0.02, 0.35, (cabin_box[0] as Vector3).z * 0.9), Vector3(side * ((cabin_box[0] as Vector3).x * 0.5 + 0.01), (cabin_box[1] as Vector3).y, z), Color("f2efe6")))
+
+
+static func _box(sz: Vector3, at: Vector3, col: Color) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = sz
+	mi.mesh = bm
+	mi.material_override = Cel.material(col, true, 0.012)
+	mi.position = at
+	return mi
 
 
 func _ready() -> void:

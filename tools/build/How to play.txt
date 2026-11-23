@@ -12,6 +12,21 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
+CONTENT AND POLISH (0.6.0)
+New to the game? Pick FIRST SHIFT on the main menu: a step-by-step walk
+through the job, from the station door to booking your first prisoner (it
+never touches your saved city).
+The radio on your shoulder now clicks, crackles and squelches with every
+call, and other units chatter between jobs. There's music: a title theme,
+a quiet bed on patrol, and it kicks in when the shooting starts or your
+siren's on. Music and radio have their own volume sliders in Settings >
+Sound.
+More of the city: phone boxes, post boxes, vending machines, planters, bike
+racks, wheelie bins and hydrants on the streets (different by district),
+TVs, fridges, washing machines, armchairs, plants and bookcases indoors,
+tyres and cones in the yards. On the roads: taxis, work vans with ladders,
+couriers and the odd ice cream van. People wear a wider range of colours.
+
 THE CITY LIVES (0.5.0)
 Day and night: the light follows the clock. The sun comes up about six and
 goes down about eight; at night the street lamps come on. The weather

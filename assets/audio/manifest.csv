@@ -191,3 +191,17 @@ sfx/amb_rain_1.wav,Made by tools/audio/make_wave4.py,Project's own (no third-par
 sfx/thunder_1.wav,Made by tools/audio/make_wave4.py,Project's own (no third-party audio),thunder: a close crack rolling into a long rumble
 sfx/thunder_2.wav,Made by tools/audio/make_wave4.py,Project's own (no third-party audio),thunder: a close crack rolling into a long rumble
 sfx/thunder_3.wav,Made by tools/audio/make_wave4.py,Project's own (no third-party audio),thunder: a close crack rolling into a long rumble
+sfx/radio_key_1.wav,Made by tools/audio/make_wave5.py,Project's own (no third-party audio),radio keying up: click and squelch
+sfx/radio_key_2.wav,Made by tools/audio/make_wave5.py,Project's own (no third-party audio),radio keying up: click and squelch
+sfx/radio_key_3.wav,Made by tools/audio/make_wave5.py,Project's own (no third-party audio),radio keying up: click and squelch
+sfx/radio_unkey_1.wav,Made by tools/audio/make_wave5.py,Project's own (no third-party audio),radio squelch tail as the talker lets go
+sfx/radio_unkey_2.wav,Made by tools/audio/make_wave5.py,Project's own (no third-party audio),radio squelch tail as the talker lets go
+sfx/radio_voice_1.wav,Made by tools/audio/make_wave5.py,Project's own (no third-party audio),"far-off talker on the radio, garbled"
+sfx/radio_voice_2.wav,Made by tools/audio/make_wave5.py,Project's own (no third-party audio),"far-off talker on the radio, garbled"
+sfx/radio_voice_3.wav,Made by tools/audio/make_wave5.py,Project's own (no third-party audio),"far-off talker on the radio, garbled"
+sfx/radio_voice_4.wav,Made by tools/audio/make_wave5.py,Project's own (no third-party audio),"far-off talker on the radio, garbled"
+sfx/radio_voice_5.wav,Made by tools/audio/make_wave5.py,Project's own (no third-party audio),"far-off talker on the radio, garbled"
+sfx/radio_voice_6.wav,Made by tools/audio/make_wave5.py,Project's own (no third-party audio),"far-off talker on the radio, garbled"
+music/menu.ogg,Made by tools/audio/make_wave5.py,Project's own (no third-party audio),"title theme, D minor (loops)"
+music/patrol.ogg,Made by tools/audio/make_wave5.py,Project's own (no third-party audio),"quiet patrol bed, A minor (loops)"
+music/action.ogg,Made by tools/audio/make_wave5.py,Project's own (no third-party audio),"gunfights and chases, E minor (loops)"

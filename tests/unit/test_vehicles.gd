@@ -15,7 +15,7 @@ func test_every_vehicle_drives() -> void:
 	ProtoWorld.ground(self, 600.0)
 	var x := -120.0
 	var all: Array = []
-	for kind in CivilianVehicle.TYPES:
+	for kind in CivilianVehicle.TYPES.keys() + CivilianVehicle.VARIANTS.keys():
 		all.append(_vehicle(kind, Vector3(x, 2.2, 0)))
 		x += 18.0
 	for i in 90:

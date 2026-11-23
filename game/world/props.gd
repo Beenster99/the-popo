@@ -81,6 +81,64 @@ const KINDS := {
 	"container": {"size": Vector3(2.44, 2.6, 6.06), "mass": 3800.0, "hp": 3000.0, "surface": "metal", "throw": false, "flammable": false,
 		"parts": [[Vector3(2.44, 2.6, 6.06), Vector3.ZERO, "b3402a"], [Vector3(2.48, 0.12, 6.1), Vector3(0, 1.25, 0), "8a2f20"],
 			[Vector3(2.48, 0.12, 6.1), Vector3(0, -1.25, 0), "8a2f20"], [Vector3(2.3, 2.4, 0.06), Vector3(0, 0, 3.03), "7a2a1c"]]},
+	# Wave 5 (Phase 5.1): more of the city. Street furniture...
+	"post_box": {"size": Vector3(-0.28, 1.5, 0), "mass": 160.0, "hp": 400.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(-0.28, 1.36, 0), Vector3(0, -0.07, 0), "c41f1f"], [Vector3(-0.31, 0.14, 0), Vector3(0, 0.68, 0), "a51818"],
+			[Vector3(0.3, 0.04, 0.06), Vector3(0, 0.35, 0.26), "1a1a1a"], [Vector3(-0.3, 0.06, 0), Vector3(0, -0.72, 0), "2a2a2a"]]},
+	"phone_box": {"size": Vector3(1.0, 2.5, 1.0), "mass": 600.0, "hp": 500.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(1.0, 2.3, 1.0), Vector3(0, -0.1, 0), "c41f1f"], [Vector3(1.06, 0.2, 1.06), Vector3(0, 1.15, 0), "a51818"],
+			[Vector3(0.7, 1.4, 0.02), Vector3(0, 0.15, 0.5), "b9d6e2"], [Vector3(0.02, 1.4, 0.7), Vector3(0.5, 0.15, 0), "b9d6e2"],
+			[Vector3(0.02, 1.4, 0.7), Vector3(-0.5, 0.15, 0), "b9d6e2"], [Vector3(0.8, 0.12, 0.02), Vector3(0, 1.0, 0.51), "f2efe6"]]},
+	"hydrant": {"size": Vector3(-0.16, 0.75, 0), "mass": 120.0, "hp": 500.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(-0.13, 0.6, 0), Vector3(0, -0.05, 0), "d9b52a"], [Vector3(-0.16, 0.1, 0), Vector3(0, 0.3, 0), "b8961f"],
+			[Vector3(0.36, 0.09, 0.09), Vector3(0, 0.08, 0), "b8961f"]]},
+	"cone": {"size": Vector3(-0.17, 0.7, 0), "mass": 2.0, "hp": 30.0, "surface": "wood", "throw": true, "flammable": false,
+		"parts": [[Vector3(0.4, 0.04, 0.4), Vector3(0, -0.33, 0), "1f1f22"], [Vector3(-0.12, 0.5, 0), Vector3(0, -0.06, 0), "ff6a13"],
+			[Vector3(-0.07, 0.12, 0), Vector3(0, 0.08, 0), "f2efe6"], [Vector3(-0.05, 0.12, 0), Vector3(0, 0.26, 0), "ff6a13"]]},
+	"planter": {"size": Vector3(1.4, 0.7, 0.7), "mass": 400.0, "hp": 300.0, "surface": "concrete", "throw": false, "flammable": false,
+		"parts": [[Vector3(1.4, 0.6, 0.7), Vector3(0, -0.05, 0), "9a968c"], [Vector3(1.3, 0.12, 0.6), Vector3(0, 0.28, 0), "3e2c1e"],
+			[Vector3(0.5, 0.45, 0.5), Vector3(-0.35, 0.5, 0), "3f7a3a"], [Vector3(0.45, 0.38, 0.45), Vector3(0.35, 0.46, 0), "4e8a44"]]},
+	"vending": {"size": Vector3(0.9, 1.85, 0.75), "mass": 260.0, "hp": 160.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(0.9, 1.85, 0.75), Vector3.ZERO, "b3261e"], [Vector3(0.55, 1.2, 0.02), Vector3(-0.1, 0.2, 0.38), "cfe6ee"],
+			[Vector3(0.18, 0.5, 0.02), Vector3(0.3, 0.3, 0.38), "202226"], [Vector3(0.7, 0.12, 0.02), Vector3(0, -0.65, 0.38), "1a1a1a"]]},
+	"wheelie_bin": {"size": Vector3(0.6, 1.07, 0.72), "mass": 14.0, "hp": 80.0, "surface": "metal", "throw": false, "flammable": true,
+		"parts": [[Vector3(0.58, 0.98, 0.7), Vector3(0, -0.04, 0), "2d3a2e"], [Vector3(0.62, 0.06, 0.76), Vector3(0, 0.48, 0.02), "232d24"],
+			[Vector3(-0.1, 0.06, 0), Vector3(-0.25, -0.48, -0.3), "151515"], [Vector3(-0.1, 0.06, 0), Vector3(0.25, -0.48, -0.3), "151515"]]},
+	"bike_rack": {"size": Vector3(2.0, 0.8, 0.5), "mass": 40.0, "hp": 200.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(0.05, 0.8, 0.5), Vector3(-0.9, 0, 0), "8a8d92"], [Vector3(0.05, 0.8, 0.5), Vector3(-0.3, 0, 0), "8a8d92"],
+			[Vector3(0.05, 0.8, 0.5), Vector3(0.3, 0, 0), "8a8d92"], [Vector3(0.05, 0.8, 0.5), Vector3(0.9, 0, 0), "8a8d92"],
+			[Vector3(2.0, 0.05, 0.05), Vector3(0, -0.38, 0), "6b6f72"]]},
+	"trolley": {"size": Vector3(0.6, 1.0, 0.95), "mass": 16.0, "hp": 120.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(0.56, 0.45, 0.85), Vector3(0, 0.1, 0), "b8bcc2"], [Vector3(0.6, 0.04, 0.04), Vector3(0, 0.45, -0.47), "c41f1f"],
+			[Vector3(0.5, 0.04, 0.8), Vector3(0, -0.32, 0), "8a8d92"], [Vector3(-0.06, 0.06, 0), Vector3(0, -0.47, 0.35), "151515"],
+			[Vector3(-0.06, 0.06, 0), Vector3(0, -0.47, -0.35), "151515"]]},
+	"tyres": {"size": Vector3(-0.38, 0.9, 0), "mass": 45.0, "hp": 400.0, "surface": "wood", "throw": false, "flammable": true,
+		"parts": [[Vector3(-0.38, 0.28, 0), Vector3(0, -0.31, 0), "1a1a1c"], [Vector3(-0.38, 0.28, 0), Vector3(0, -0.01, 0), "222224"],
+			[Vector3(-0.38, 0.28, 0), Vector3(0, 0.29, 0), "1a1a1c"], [Vector3(-0.16, 0.92, 0), Vector3(0, 0, 0), "3a3a3c"]]},
+	# ...and for the rooms.
+	"tv": {"size": Vector3(0.9, 0.55, 0.12), "mass": 10.0, "hp": 6.0, "surface": "glass", "throw": true, "flammable": false,
+		"parts": [[Vector3(0.9, 0.52, 0.08), Vector3(0, 0.015, 0), "141416"], [Vector3(0.84, 0.46, 0.01), Vector3(0, 0.015, 0.045), "2a3440"],
+			[Vector3(0.3, 0.03, 0.12), Vector3(0, -0.26, 0), "141416"]]},
+	"fridge": {"size": Vector3(0.6, 1.8, 0.65), "mass": 70.0, "hp": 150.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(0.6, 1.8, 0.65), Vector3.ZERO, "e8e6e0"], [Vector3(0.58, 0.01, 0.02), Vector3(0, 0.3, 0.33), "b9b7b0"],
+			[Vector3(0.03, 0.4, 0.04), Vector3(0.24, 0.6, 0.35), "8a8d92"], [Vector3(0.03, 0.3, 0.04), Vector3(0.24, 0.0, 0.35), "8a8d92"]]},
+	"washer": {"size": Vector3(0.6, 0.85, 0.6), "mass": 65.0, "hp": 140.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(0.6, 0.85, 0.6), Vector3.ZERO, "eeeeea"], [Vector3(-0.2, 0.02, 0), Vector3(0, -0.05, 0.3), "9ab4c0"],
+			[Vector3(0.5, 0.1, 0.02), Vector3(0, 0.34, 0.3), "c9c7c0"]]},
+	"armchair": {"size": Vector3(0.9, 0.85, 0.85), "mass": 25.0, "hp": 50.0, "surface": "wood", "throw": false, "flammable": true,
+		"parts": [[Vector3(0.9, 0.4, 0.85), Vector3(0, -0.22, 0), "7a4a3c"], [Vector3(0.9, 0.5, 0.18), Vector3(0, 0.17, -0.33), "6a3e32"],
+			[Vector3(0.16, 0.3, 0.85), Vector3(-0.37, 0.02, 0), "6a3e32"], [Vector3(0.16, 0.3, 0.85), Vector3(0.37, 0.02, 0), "6a3e32"]]},
+	"plant": {"size": Vector3(-0.22, 1.1, 0), "mass": 8.0, "hp": 15.0, "surface": "wood", "throw": true, "flammable": true,
+		"parts": [[Vector3(-0.18, 0.35, 0), Vector3(0, -0.375, 0), "a0522d"], [Vector3(0.45, 0.6, 0.45), Vector3(0, 0.15, 0), "3f7a3a"],
+			[Vector3(0.3, 0.3, 0.3), Vector3(0.05, 0.45, 0.05), "4e8a44"]]},
+	"bookcase": {"size": Vector3(0.9, 1.9, 0.35), "mass": 40.0, "hp": 70.0, "surface": "wood", "throw": false, "flammable": true,
+		"parts": [[Vector3(0.9, 1.9, 0.02), Vector3(0, 0, -0.165), "5f3f26"], [Vector3(0.03, 1.9, 0.35), Vector3(-0.435, 0, 0), "7b5232"],
+			[Vector3(0.03, 1.9, 0.35), Vector3(0.435, 0, 0), "7b5232"], [Vector3(0.86, 0.03, 0.33), Vector3(0, -0.5, 0), "7b5232"],
+			[Vector3(0.86, 0.03, 0.33), Vector3(0, 0.15, 0), "7b5232"], [Vector3(0.86, 0.03, 0.33), Vector3(0, 0.8, 0), "7b5232"],
+			[Vector3(0.7, 0.26, 0.22), Vector3(0, -0.36, 0.02), "8a2f20"], [Vector3(0.6, 0.24, 0.22), Vector3(-0.08, 0.29, 0.02), "2f5d8a"],
+			[Vector3(0.5, 0.26, 0.22), Vector3(0.1, 0.94, 0.02), "3f6b3a"]]},
+	"water_cooler": {"size": Vector3(-0.17, 1.3, 0), "mass": 22.0, "hp": 20.0, "surface": "glass", "throw": false, "flammable": false,
+		"parts": [[Vector3(0.34, 0.9, 0.34), Vector3(0, -0.2, 0), "e8e6e0"], [Vector3(-0.15, 0.38, 0), Vector3(0, 0.45, 0), "9fd0e8"]]},
 	"extinguisher": {"size": Vector3(-0.1, 0.55, 0), "mass": 9.0, "hp": 12.0, "surface": "metal", "throw": true, "puffs": true,
 		"parts": [[Vector3(-0.1, 0.48, 0), Vector3(0, -0.035, 0), "c41f1f"], [Vector3(0.06, 0.08, 0.14), Vector3(0, 0.25, 0.03), "202226"]]},
 }
@@ -275,6 +333,14 @@ func _furnish_module(b: Dictionary, rng: RandomNumberGenerator, kind: String, cx
 				add_prop("sofa", _local(b, cx, y, cz + 1.2, basis, PI))
 				if rng.randf() < 0.5:
 					add_prop("table", _local(b, cx, y, cz - 0.2, basis, 0.0))
+				elif rng.randf() < 0.6:
+					add_prop("cabinet", _local(b, cx, y, cz - 1.5, basis, 0.0))
+					add_prop("tv", _local(b, cx, y + 1.3, cz - 1.5, basis, 0.0))
+			elif roll < 0.6:
+				add_prop("armchair", _local(b, cx - 0.6, y, cz, basis, rng.randf_range(-0.5, 0.5)))
+				add_prop("plant", _local(b, cx + 1.4, y, cz + 1.4, basis, 0.0))
+			elif roll < 0.75:
+				add_prop("bookcase", _local(b, cx, y, cz + 1.6, basis, PI))
 			else:
 				_furnish_cell(b, rng, cx, y, cz, basis, false)
 		"bedroom":
@@ -283,6 +349,10 @@ func _furnish_module(b: Dictionary, rng: RandomNumberGenerator, kind: String, cx
 				add_prop("cabinet", _local(b, cx + 1.5, y, cz - 1.4, basis, 0.0))
 		"kitchen":
 			add_prop("counter", _local(b, cx, y, cz + 1.6, basis, PI))
+			if roll < 0.6:
+				add_prop("fridge", _local(b, cx + 1.4, y, cz - 1.2, basis, 0.0))
+			elif roll < 0.8:
+				add_prop("washer", _local(b, cx - 1.4, y, cz - 1.3, basis, 0.0))
 			for n in rng.randi_range(0, 3):
 				add_prop("bottle", _local(b, cx - 0.6 + n * 0.3, y + 1.01, cz + 1.6, basis, 0.0))
 			if rng.randf() < 0.5:
@@ -302,15 +372,22 @@ func _furnish_module(b: Dictionary, rng: RandomNumberGenerator, kind: String, cx
 					add_prop("crate", _local(b, cx - 0.3 + (n % 2) * 0.6, y + 0.15 + (n / 2) * 0.6, cz, basis, 0.0))
 			elif roll < 0.7:
 				add_prop("shelf", _local(b, cx, y, cz + 1.4, basis, PI))
-			elif roll < 0.85:
+			elif roll < 0.8:
 				add_prop("barrel", _local(b, cx, y, cz, basis, 0.0))
+			elif roll < 0.9:
+				add_prop("tyres", _local(b, cx, y, cz, basis, 0.0))
 			else:
 				add_prop("gas", _local(b, cx + 0.8, y, cz + 0.8, basis, 0.0))
 		"office":
 			add_prop("desk", _local(b, cx, y, cz, basis, PI if roll < 0.5 else 0.0))
 			add_prop("chair", _local(b, cx, y, cz + (0.7 if roll >= 0.5 else -0.7), basis, PI if roll >= 0.5 else 0.0))
-			if rng.randf() < 0.3:
+			var extra := rng.randf()
+			if extra < 0.3:
 				add_prop("cabinet", _local(b, cx + 1.6, y, cz + 1.5, basis, PI))
+			elif extra < 0.42:
+				add_prop("plant", _local(b, cx + 1.6, y, cz + 1.5, basis, 0.0))
+			elif extra < 0.5:
+				add_prop("water_cooler", _local(b, cx + 1.6, y, cz + 1.5, basis, 0.0))
 		"meeting":
 			add_prop("table", _local(b, cx, y, cz, basis, 0.0))
 			for n in 4:
@@ -319,6 +396,10 @@ func _furnish_module(b: Dictionary, rng: RandomNumberGenerator, kind: String, cx
 		"lobby":
 			if roll < 0.4:
 				add_prop("counter", _local(b, cx, y, cz, basis, 0.0))
+			elif roll < 0.55:
+				add_prop("vending", _local(b, cx, y, cz + 1.4, basis, PI))
+			elif roll < 0.7:
+				add_prop("plant", _local(b, cx, y, cz, basis, 0.0))
 			else:
 				add_prop("chair", _local(b, cx, y, cz, basis, rng.randf() * TAU))
 		"cell":
@@ -347,6 +428,7 @@ func _furnish_outdoors(blk: Dictionary, rng: RandomNumberGenerator, limit: int) 
 		var p: Vector3 = o + spots[k % 4] + Vector3(0, y, 0)
 		if not inside.call(p):
 			add_prop("bin" if k % 2 == 0 else "bench", Transform3D(Basis(Vector3.UP, 0.0 if k % 4 < 2 else PI / 2), p))
+	_street_furniture(blk, rng, limit, inside)
 	match blk.style:
 		"park":
 			for k in 8:
@@ -396,6 +478,44 @@ func _furnish_outdoors(blk: Dictionary, rng: RandomNumberGenerator, limit: int) 
 					add_prop("gas", Transform3D(Basis(), p))
 				else:
 					add_prop("bin", Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p))
+
+
+## Wave 5: what stands on the pavement depends on the district: phone
+## boxes, post boxes, vending machines, planters and bike racks downtown;
+## wheelie bins and post boxes on residential streets; tyres and cones in
+## the industrial yards and the docks; a hydrant on every block.
+func _street_furniture(blk: Dictionary, rng: RandomNumberGenerator, limit: int, inside: Callable) -> void:
+	var o: Vector3 = blk.offset
+	var e: float = (blk.rect as Rect2).size.x
+	var y := BlockGenerator.BASE_Y
+	var pool: Array
+	match String(blk.style):
+		"downtown", "station", "carpark":
+			pool = ["phone_box", "post_box", "vending", "planter", "planter", "bike_rack", "wheelie_bin"]
+		"residential":
+			pool = ["wheelie_bin", "wheelie_bin", "wheelie_bin", "post_box", "planter"]
+		"park":
+			pool = ["planter", "bike_rack", "post_box"]
+		_:
+			pool = ["tyres", "cone", "cone", "wheelie_bin"]
+	var n := rng.randi_range(4, 7)
+	for k in n + 1:
+		if _next_id >= limit - 4:
+			return
+		var along := rng.randf_range(5.0, e - 5.0)
+		var side := rng.randi_range(0, 3)
+		var spots := [Vector3(along, 0, 1.2), Vector3(along, 0, e - 1.2), Vector3(1.2, 0, along), Vector3(e - 1.2, 0, along)]
+		var yaws := [0.0, PI, PI / 2, -PI / 2]    # facing the road
+		var p: Vector3 = o + spots[side] + Vector3(0, y, 0)
+		if inside.call(p):
+			continue
+		var kind: String = "hydrant" if k == n else pool[rng.randi_range(0, pool.size() - 1)]
+		var at := p
+		add_prop(kind, Transform3D(Basis(Vector3.UP, yaws[side] + PI), at))
+		if kind == "cone" and rng.randf() < 0.6:
+			for c in rng.randi_range(1, 3):
+				var off := Basis(Vector3.UP, yaws[side]) * Vector3(0.9 * (c + 1), 0, 0)
+				add_prop("cone", Transform3D(Basis(), at + off))
 
 
 func _paint_container(id: int, rng: RandomNumberGenerator) -> void:
@@ -632,6 +752,8 @@ func _apply_break(id: int, at: Vector3, dir: Vector3) -> void:
 			Sfx.play(parent, "break_wood", at, 3.0 if d.mass < 15.0 else 6.0, 70.0, 0.08)
 			if d.mass >= 15.0:
 				Sfx.play(parent, "gun_thump", at, -4.0, 40.0, 0.15)
+		"concrete":
+			Sfx.play(parent, "break_concrete", at, 4.0, 70.0, 0.08)
 		_:
 			if not d.get("explosive", false):
 				Sfx.play(parent, "break_metal", at, 3.0, 70.0, 0.08)

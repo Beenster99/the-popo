@@ -53,6 +53,5 @@ and rebuilt, and the station's career is saved between sessions.
 - `tests/unit/test_station.gd`: Continue keeps the career.
 - `tests/unit/test_missions.gd`: things that just happen.
 
-![Repair crew](img/repair_site.png)
 ![Night](img/city_night.png)
 ![Rain](img/city_rain.png)
