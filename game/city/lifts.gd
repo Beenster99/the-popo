@@ -1,6 +1,6 @@
 class_name Lifts
 extends Node3D
-## v0.7.0: the lifts in the downtown towers. One car per tower runs up and
+## v0.9.0: the lifts in the downtown towers. One car per tower runs up and
 ## down the shaft beside the stairs (CityStyles._shaft). Press the use key
 ## at a lift door to call it; inside, press it again for the floor buttons.
 ## The doors on a floor slide open only while the car is standing there.

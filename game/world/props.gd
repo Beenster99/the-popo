@@ -139,7 +139,7 @@ const KINDS := {
 			[Vector3(0.5, 0.26, 0.22), Vector3(0.1, 0.94, 0.02), "3f6b3a"]]},
 	"water_cooler": {"size": Vector3(-0.17, 1.3, 0), "mass": 22.0, "hp": 20.0, "surface": "glass", "throw": false, "flammable": false,
 		"parts": [[Vector3(0.34, 0.9, 0.34), Vector3(0, -0.2, 0), "e8e6e0"], [Vector3(-0.15, 0.38, 0), Vector3(0, 0.45, 0), "9fd0e8"]]},
-	# v0.7.0: up on the roofs (reached by the stairs, the lifts' towers, or
+	# v0.9.0: up on the roofs (reached by the stairs, the lifts' towers, or
 	# a grapple): cover and clutter for rooftop fights.
 	"ac_unit": {"size": Vector3(1.3, 1.0, 0.9), "mass": 260.0, "hp": 260.0, "surface": "metal", "throw": false, "flammable": false,
 		"parts": [[Vector3(1.3, 1.0, 0.9), Vector3.ZERO, "c9ccd0"], [Vector3(-0.32, 0.04, 0), Vector3(-0.28, 0.0, 0.45), "2a2c30"],
@@ -328,7 +328,7 @@ func furnish_block(k: int) -> void:
 	_furnish_outdoors(blk, rng, (k + 1) * BLOCK_IDS - 1)
 
 
-## v0.7.0: plant on the roofs: air conditioning, vents, aerials, a water
+## v0.9.0: plant on the roofs: air conditioning, vents, aerials, a water
 ## tank on the tall ones. Kept off the stair hut and a metre in from the edge.
 func _furnish_roof(b: Dictionary, rng: RandomNumberGenerator) -> void:
 	if int(b.storeys) < 2 or b.type == "house":

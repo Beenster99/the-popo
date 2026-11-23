@@ -4,7 +4,7 @@ extends BlockGenerator
 ##
 ## A grid of GRID x GRID blocks with a road three modules wide (12 m, one
 ## lane each way plus kerbside parking) between neighbours and round the
-## outside. Since v0.7.0 the lots are not all the same size: each column of
+## outside. Since v0.9.0 the lots are not all the same size: each column of
 ## blocks is 9 to 15 modules wide and each row 9 to 15 deep (36 to 60 m),
 ## picked from the seed, so the streets are not an even grid. (The station's
 ## column and row stay 12.) The city is still under about 450 m across.
@@ -12,7 +12,7 @@ extends BlockGenerator
 ##   docks        the south row, on the water: warehouses, container yards
 ##   industrial   the two east columns: warehouses, garages, yards
 ##   downtown     the middle: offices and shops, three to five storeys, and
-##                towers of seven to ten storeys with a lift (v0.7.0)
+##                towers of seven to ten storeys with a lift (v0.9.0)
 ##   residential  the rest: houses, flats and corner shops
 ## plus the police station (home base and custody), two parks and a car park.
 ##

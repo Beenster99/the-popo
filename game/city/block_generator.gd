@@ -39,7 +39,7 @@ var _rng := RandomNumberGenerator.new()
 var offset := Vector3.ZERO
 var style := "block"
 var own_ground := true
-## v0.7.0: the lot's size in modules (city lots vary; a lone block is N x N).
+## v0.9.0: the lot's size in modules (city lots vary; a lone block is N x N).
 var nx := N
 var nz := N
 

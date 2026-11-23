@@ -87,7 +87,7 @@ func _process(delta: float) -> void:
 			lines.append("%s: start a range run" % use)
 			if Input.is_action_just_pressed("interact") and not PlayerInput.blocked:
 				rng.ask_start()
-	# v0.7.0: the tower lifts.
+	# v0.9.0: the tower lifts.
 	if o and Lifts.current and not LiftPanel.is_open() and not PauseMenu.is_open() and not (o is Officer and (o as Officer).in_car()):
 		var lp := Lifts.current.prompt_for(o.global_position)
 		if lp != "":
@@ -131,6 +131,10 @@ func _draw_arrows() -> void:
 		targets.append([call.marker, Color("ff5050") if call.kind not in [Dispatcher.Kind.TRAFFIC, Dispatcher.Kind.THEFT, Dispatcher.Kind.PURSUIT] else Color("ffb030")])
 	if _has_prisoner():
 		targets.append([dispatcher.bay_position(), Color("4a8cff")])
+	# A prisoner doing a runner in cuffs.
+	for s in dispatcher.suspects.values():
+		if (s as Suspect).state == Suspect.S.CUFF_RUN:
+			targets.append([(s as Suspect).global_position, Color("ff8030")])
 	var rect := _arrows.get_rect()
 	var centre := rect.size * 0.5
 	var o: Node3D = pawn_getter.call() if pawn_getter.is_valid() else null

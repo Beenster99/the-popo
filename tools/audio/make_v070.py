@@ -1,4 +1,4 @@
-"""v0.7.0: lift and grapple sounds made from scratch (no third-party audio).
+"""v0.9.0: lift and grapple sounds made from scratch (no third-party audio).
 
   lift_ding     the lift arriving: a soft two-note chime (1)
   grapple_fire  the grapple launcher: a hard pneumatic thump and the line

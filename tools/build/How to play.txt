@@ -12,7 +12,7 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
-TALLER CITY AND ROOFTOPS (0.7.0)
+TALLER CITY AND ROOFTOPS (0.9.0)
 The city blocks come in different sizes now, so the streets aren't an even
 grid. Downtown has towers of seven to ten storeys, each with a working lift
 beside the stairs: walk up to the lift door and press F to call it, step in
@@ -27,6 +27,14 @@ Abseil: stand at a roof edge facing out and press F to go over on the rope.
 W climbs, S slides down, Shift drops fast, right mouse aims and you can shoot
 from the rope. Space kicks off the wall and swings you in through the window
 in front of you (glass and all). F lets go.
+
+SHOUTED ORDERS (0.8.0)
+Y (d-pad up) shouts an order at whoever you're facing, out loud for
+everyone: "Drop the weapon!", "Hands on your head!", "Hold it right there!",
+"This is the Popo!". Sometimes they do it, sometimes they shout back. Tell a
+cuffed prisoner to stay put or walk with you; leave one alone and they may
+run for it in cuffs. Details under SHOUTED ORDERS below. The voices are
+stand-ins until the ElevenLabs takes are in.
 
 SMOKE, GAS AND GRENADES (0.6.2)
 Buy them at the ARMOURY (Gear): smoke grenades, CS gas and flashbangs. Once
@@ -87,8 +95,19 @@ vandals and drunks out on the streets; burglaries, raids, hostage jobs and
 building searches inside, floor by floor. Victims tell you what the suspect
 looks like and which way they went. Some crimes just happen up the street
 without a call: walk up and they're yours.
-Y (d-pad up): shout "Police! Get down!". Unarmed suspects mostly give up on
-the spot; drunks need to be close; armed ones only think about it.
+SHOUTED ORDERS, Y (d-pad up): your officer shouts at whoever you're facing:
+"Drop the weapon!" at someone armed, "Hold it right there!" at a runner,
+"Hands on your head!" at the rest, "This is the Popo!" with nobody about.
+They might do it (down on their knees, hands on head, gun on the floor) or
+tell you where to go: unarmed ones mostly listen, armed ones less, hardened
+gang fighters rarely, unless they're hurt, alone or looking down your gun.
+Keep shouting: every order ignored makes the next one harder to ignore.
+PRISONERS: hold F next to someone on their knees to cuff them; they walk with
+you. Y (or hold Y) tells them to stay put: they kneel and wait. Y again
+next to them: "With me!" and they follow. Leave one on their own too long
+and some get up and run for it, still in cuffs: shout, punch or kick them
+to stop them, or hold F on them to grab them. Walk them to a police car
+(F at a door puts them in) or to the custody bay.
 Big busts: GANG WAR (two crews shooting it out: let them thin each other out,
 then go in) and BANK JOB (armed robbers holding staff, a getaway driver out
 front who drives off when the shooting starts).

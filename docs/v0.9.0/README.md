@@ -1,4 +1,4 @@
-# v0.7.0: taller city and rooftops
+# v0.9.0: taller city and rooftops
 
 Asked for after the v0.6.0 screenshots: much taller buildings with working
 lifts, blocks of different sizes so the grid is less regular, and (beenster's
