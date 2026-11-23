@@ -205,6 +205,7 @@ sfx/radio_voice_6.wav,Made by tools/audio/make_wave5.py,Project's own (no third-
 music/menu.ogg,Made by tools/audio/make_wave5.py,Project's own (no third-party audio),"title theme, D minor (loops)"
 music/patrol.ogg,Made by tools/audio/make_wave5.py,Project's own (no third-party audio),"quiet patrol bed, A minor (loops)"
 music/action.ogg,Made by tools/audio/make_wave5.py,Project's own (no third-party audio),"gunfights and chases, E minor (loops)"
+<<<<<<< HEAD
 voice/drop_weapon_1.ogg,Piper TTS voice en_GB-alan-medium (https://huggingface.co/rhasspy/piper-voices) via tools/audio/make_voices.py,Piper voice model licence (placeholder until ElevenLabs takes),"cop: Police! Drop the weapon!"
 voice/drop_weapon_2.ogg,Piper TTS voice en_GB-northern_english_male-medium (https://huggingface.co/rhasspy/piper-voices) via tools/audio/make_voices.py,Piper voice model licence (placeholder until ElevenLabs takes),"cop: Police! Drop the weapon!"
 voice/drop_weapon_3.ogg,Piper TTS voice en_US-ryan-high (https://huggingface.co/rhasspy/piper-voices) via tools/audio/make_voices.py,Piper voice model licence (placeholder until ElevenLabs takes),"cop: Police! Drop the weapon!"
@@ -280,3 +281,23 @@ voice/brutality_3.ogg,Piper TTS voice en_GB-alan-medium (https://huggingface.co/
 voice/stopping_1.ogg,Piper TTS voice en_US-joe-medium (https://huggingface.co/rhasspy/piper-voices) via tools/audio/make_voices.py,Piper voice model licence (placeholder until ElevenLabs takes),"crook: Alright! Alright! I'm stopping!"
 voice/stopping_2.ogg,Piper TTS voice en_GB-northern_english_male-medium (https://huggingface.co/rhasspy/piper-voices) via tools/audio/make_voices.py,Piper voice model licence (placeholder until ElevenLabs takes),"crook: Alright! Alright! I'm stopping!"
 voice/stopping_3.ogg,Piper TTS voice en_GB-alan-medium (https://huggingface.co/rhasspy/piper-voices) via tools/audio/make_voices.py,Piper voice model licence (placeholder until ElevenLabs takes),"crook: Alright! Alright! I'm stopping!"
+=======
+sfx/nade_pin_1.wav,Made by tools/audio/make_grenades.py,Project's own (no third-party audio),"grenade pin pulled, spoon flies off"
+sfx/nade_pin_2.wav,Made by tools/audio/make_grenades.py,Project's own (no third-party audio),"grenade pin pulled, spoon flies off"
+sfx/nade_bounce_1.wav,Made by tools/audio/make_grenades.py,Project's own (no third-party audio),grenade clinks off the floor
+sfx/nade_bounce_2.wav,Made by tools/audio/make_grenades.py,Project's own (no third-party audio),grenade clinks off the floor
+sfx/nade_bounce_3.wav,Made by tools/audio/make_grenades.py,Project's own (no third-party audio),grenade clinks off the floor
+sfx/nade_bounce_4.wav,Made by tools/audio/make_grenades.py,Project's own (no third-party audio),grenade clinks off the floor
+sfx/flashbang_1.wav,Made by tools/audio/make_grenades.py,Project's own (no third-party audio),"flashbang: huge crack, thump, ringing can"
+sfx/flashbang_2.wav,Made by tools/audio/make_grenades.py,Project's own (no third-party audio),"flashbang: huge crack, thump, ringing can"
+sfx/frag_crack_1.wav,Made by tools/audio/make_grenades.py,Project's own (no third-party audio),frag grenade casing crack and shrapnel
+sfx/frag_crack_2.wav,Made by tools/audio/make_grenades.py,Project's own (no third-party audio),frag grenade casing crack and shrapnel
+sfx/smoke_pop_1.wav,Made by tools/audio/make_grenades.py,Project's own (no third-party audio),smoke or CS canister catching
+sfx/smoke_hiss_1.wav,Made by tools/audio/make_grenades.py,Project's own (no third-party audio),smoke canister pouring out (loops)
+sfx/cough_1.wav,Made by tools/audio/make_grenades.py,Project's own (no third-party audio),choking on CS gas
+sfx/cough_2.wav,Made by tools/audio/make_grenades.py,Project's own (no third-party audio),choking on CS gas
+sfx/cough_3.wav,Made by tools/audio/make_grenades.py,Project's own (no third-party audio),choking on CS gas
+sfx/cough_4.wav,Made by tools/audio/make_grenades.py,Project's own (no third-party audio),choking on CS gas
+sfx/cough_5.wav,Made by tools/audio/make_grenades.py,Project's own (no third-party audio),choking on CS gas
+sfx/cough_6.wav,Made by tools/audio/make_grenades.py,Project's own (no third-party audio),choking on CS gas
+>>>>>>> origin/main

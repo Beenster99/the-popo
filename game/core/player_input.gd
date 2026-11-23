@@ -20,6 +20,10 @@ const HOLSTER := 16384
 const TORCH := 32768   # a state, not a press: the torch is switched on
 const DRAG := 65536    # held: drag a downed teammate by the collar
 const SHOUT := 131072  # "Police! Get down!"
+const THROW := 262144  # throw a grenade
+## Which grenade is picked (Grenades.Kind 0-2), in two bits from here.
+const NADE_SHIFT := 19
+static var nade_kind := 0
 static var torch_on := false
 
 ## The stance key (Ctrl): tap to crouch or stand back up, hold to lie prone,
@@ -81,6 +85,11 @@ static func sample(cam: IsoCamera, from: Node3D) -> Dictionary:
 		alt_tool = true
 	if alt_tool:
 		buttons |= ALT_TOOL
+	if Input.is_action_just_pressed("grenade_next"):
+		nade_kind = (nade_kind + 1) % 3
+	if Input.is_action_pressed("throw"):
+		buttons |= THROW
+	buttons |= nade_kind << NADE_SHIFT
 	var aim_yaw := 0.0
 	var point := Vector3.ZERO
 	if cam and from:
