@@ -29,7 +29,8 @@ func test_clips_merge_mocap_and_hand_keys() -> void:
 	for n in ["idle", "walk", "run", "roll", "mantle", "climb", "slide", "crouch_walk", "crawl", "peek", "aim_hold", "punch", "kick"]:
 		t.check(lib.has_animation(n), "clip " + n)
 	print("    mocap clips: ", OfficerClips.mocap_clips)
-	t.check(OfficerClips.mocap_clips.size() == 5, "five mocap clips merged")
+	# Five from the video capture plus five 100STYLE walks.
+	t.check(OfficerClips.mocap_clips.size() == 10, "ten mocap clips merged")
 	var roll_end := OfficerClips.root_offset("roll", OfficerClips.clip_length("roll"))
 	print("    roll travel %s, mantle travel %s" % [roll_end, OfficerClips.root_offset("mantle", 99.0)])
 	t.check(roll_end.z > 1.0, "roll travels forward (+Z): %s" % roll_end)
@@ -127,7 +128,7 @@ func test_feet_step_round_instead_of_twisting() -> void:
 	cmd.aim_yaw = 2.0
 	await _run(o, cmd, 3)
 	t.check(o.turning, "big aim change: turning on the spot")
-	t.check(o.rig._lower_state(o) == "walk", "legs step while turning")
+	t.check(o.rig._lower_state(o) == "walk_ready", "legs step while turning (tactical walk, aiming)")
 	await _run(o, cmd, 40)
 	t.check(absf(angle_difference(o.rotation.y, 2.0)) < 0.15, "ends facing the aim: %f" % o.rotation.y)
 	t.check(not o.turning, "stops turning")

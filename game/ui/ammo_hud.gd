@@ -104,6 +104,8 @@ func _process(_delta: float) -> void:
 		s = "OUT OF AMMO"
 	elif o.ammo == 0:
 		s = "EMPTY - RELOAD"
+	if PlayerInput.walk_on:
+		s += ("   " if s != "" else "") + "WALK MODE"
 	_state.text = s
 	_state.visible = s != ""
 	_bar.visible = o.is_reloading() or o.treat_t > 0.0 or o._boot_t > 0.0 or o.cuff_t > 0.0
