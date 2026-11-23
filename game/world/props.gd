@@ -306,6 +306,7 @@ func _furnish_rooms(b: Dictionary, rng: RandomNumberGenerator, limit: int) -> vo
 	var door_x: float = door_local.dot(b.u)
 	add_prop("extinguisher", _local(b, minf(door_x + 1.3, b.w * M - 0.5), 0.0, 0.45, basis, 0.0))
 	var stair := Rect2((b.w - 1) * M, (b.d - 1) * M, M, M).grow(0.3)
+	var shaft := CityStyles.shaft_rect(b).grow(0.3)
 	for r in b.get("rooms", []):
 		if _next_id >= limit:
 			return
@@ -316,7 +317,7 @@ func _furnish_rooms(b: Dictionary, rng: RandomNumberGenerator, limit: int) -> vo
 			for j in int(rect.size.y / M):
 				var cx: float = rect.position.x + (i + 0.5) * M
 				var cz: float = rect.position.y + (j + 0.5) * M
-				if stair.has_point(Vector2(cx, cz)):
+				if stair.has_point(Vector2(cx, cz)) or shaft.has_point(Vector2(cx, cz)):
 					continue
 				if r.floor == 0 and cz < M and absf(cx - door_x) < M * 0.6:
 					continue    # keep the way in clear

@@ -38,6 +38,10 @@ const STYLES := {
 	"park": {"count": [0, 0], "w": [0, 0], "d": [0, 0], "storeys": [0, 0], "gap": 1.0, "types": []},
 	"carpark": {"count": [0, 0], "w": [0, 0], "d": [0, 0], "storeys": [0, 0], "gap": 1.0, "types": []},
 }
+## v0.7.0: tall downtown buildings with a lift beside the stairs.
+const MAX_TOWERS := 2
+const TOWER_CHANCE := 0.7
+const TOWER_STOREYS := Vector2i(7, 10)
 const WALL_COLORS := {
 	"downtown": [Color("7d8790"), Color("5e6f7f"), Color("e2dccf"), Color("9aa3a8"), Color("b9b2a2"), Color("4e5a66")],
 	"residential": [Color("8a3b2a"), Color("a04a33"), Color("d8cba8"), Color("c9b48a"), Color("b98a4e"), Color("6e4a3a")],
@@ -80,6 +84,7 @@ static func plan(g: BlockGenerator, rng: RandomNumberGenerator) -> void:
 		while g.buildings.size() > st.count[1]:
 			g.buildings.remove_at(rng.randi_range(0, g.buildings.size() - 1))
 	var colours: Array = WALL_COLORS.get(g.style, WALL_COLORS.residential)
+	var towers := 0
 	for b in g.buildings:
 		var types: Array = st.types
 		b.type = types[rng.randi_range(0, types.size() - 1)]
@@ -90,6 +95,14 @@ static func plan(g: BlockGenerator, rng: RandomNumberGenerator) -> void:
 			b.storeys = 1
 		if b.type == "house":
 			b.storeys = mini(b.storeys, 2)
+		# v0.7.0: downtown towers, up to ten storeys, with a lift.
+		b.lift = false
+		if g.style == "downtown" and towers < MAX_TOWERS and b.w >= 4 and b.d >= 3 \
+				and b.type in ["office", "flats"] and rng.randf() < TOWER_CHANCE:
+			towers += 1
+			b.type = "tower"
+			b.storeys = rng.randi_range(TOWER_STOREYS.x, TOWER_STOREYS.y)
+			b.lift = true
 		b.tint = colours[rng.randi_range(0, colours.size() - 1)]
 		b.enterable = true
 		b.locked = b.type != "station" and rng.randf() < 0.33
@@ -117,7 +130,8 @@ static func building(g: BlockGenerator, bi: int, rng: RandomNumberGenerator) -> 
 		door_at = 3
 	b.door = g._w(b, (door_at + 0.5) * M, 0.0, -1.0)
 	var stair_floors: int = b.storeys - 1
-	var windows: float = {"office": 0.95, "station": 0.7, "warehouse": 0.25, "garage": 0.2}.get(b.type, 0.75)
+	var lift: bool = b.get("lift", false)
+	var windows: float = {"office": 0.95, "tower": 0.95, "station": 0.7, "warehouse": 0.25, "garage": 0.2}.get(b.type, 0.75)
 	for s in b.storeys:
 		var y: float = s * STOREY
 		for i in w:
@@ -127,7 +141,8 @@ static func building(g: BlockGenerator, bi: int, rng: RandomNumberGenerator) -> 
 			else:
 				g._window_wall(b, bi, Basis(), cx, y, 0.0, rng.randf() < windows)
 		for i in w:
-			g._window_wall(b, bi, r180, (i + 0.5) * M, y, d * M, rng.randf() < windows * (0.6 if s > 0 else 0.35))
+			var back_window: bool = rng.randf() < windows * (0.6 if s > 0 else 0.35) and not (lift and i == w - 2)
+			g._window_wall(b, bi, r180, (i + 0.5) * M, y, d * M, back_window)
 		for j in d:
 			var cz := (j + 0.5) * M
 			g._window_wall(b, bi, r90, 0.0, y, cz, rng.randf() < windows * 0.4)
@@ -139,6 +154,8 @@ static func building(g: BlockGenerator, bi: int, rng: RandomNumberGenerator) -> 
 			for j in range(1, d):
 				g._add("column", g._xf(b, Basis(), i * M, y, j * M), true, Color(0, 0, 0, 0), -1, bi)
 		_rooms(g, b, bi, s, y, rng)
+		if lift:
+			_shaft(g, b, bi, y)
 		if s < stair_floors:
 			g._add("stairs", g._xf(b, r180, (w - 0.5) * M + 1.35, y, (d - 0.5) * M), true, Color(0, 0, 0, 0), -1, bi)
 		var top: float = y + STOREY
@@ -150,6 +167,8 @@ static func building(g: BlockGenerator, bi: int, rng: RandomNumberGenerator) -> 
 				if not roof and s < stair_floors and i == w - 1 and j == d - 1:
 					kind = "slab_stairwell"
 					basis = r180
+				if not roof and lift and i == w - 2 and j == d - 1:
+					continue    # the lift shaft
 				g._add(kind, g._xf(b, basis, (i + 0.5) * M, top, (j + 0.5) * M), true, Color(0, 0, 0, 0), -1, bi)
 	var ry: float = b.storeys * STOREY
 	for i in w:
@@ -160,6 +179,25 @@ static func building(g: BlockGenerator, bi: int, rng: RandomNumberGenerator) -> 
 		g._add("parapet", g._xf(b, r90 * r180, w * M, ry, (j + 0.5) * M), true, tint, -1, bi)
 
 
+## v0.7.0: the lift shaft walls on one storey: the module left of the
+## stairs at the back, with a doorway at the front for the lift doors.
+static func _shaft(g: BlockGenerator, b: Dictionary, bi: int, y: float) -> void:
+	var w: int = b.w
+	var d: int = b.d
+	var r90 := Basis(Vector3.UP, PI / 2)
+	var none := Color(0, 0, 0, 0)
+	g._add("int_wall", g._xf(b, r90, (w - 2) * M, y, (d - 0.5) * M), false, none, -1, bi)
+	g._add("int_wall", g._xf(b, r90, (w - 1) * M, y, (d - 0.5) * M), false, none, -1, bi)
+	g._add("int_wall_door", g._xf(b, Basis(), (w - 1.5) * M, y, (d - 1) * M), false, none, -1, bi)
+
+
+## The lift shaft's module in building-local metres (x, z), or an empty rect.
+static func shaft_rect(b: Dictionary) -> Rect2:
+	if not b.get("lift", false):
+		return Rect2()
+	return Rect2((b.w - 2) * M, (b.d - 1) * M, M, M)
+
+
 ## The ground-floor front module i: door, shop window, lobby glass, garage
 ## door or house window, by type.
 static func _front(g: BlockGenerator, b: Dictionary, bi: int, x: float, y: float, i: int, door_at: int, rng: RandomNumberGenerator) -> void:
@@ -168,7 +206,7 @@ static func _front(g: BlockGenerator, b: Dictionary, bi: int, x: float, y: float
 	var none := Color(0, 0, 0, 0)
 	var is_door := i == door_at
 	match b.type:
-		"shop", "office", "station":
+		"shop", "office", "station", "tower":
 			if is_door:
 				var wi := g._add("wall_shopdoor", xf, true, t, -1, bi)
 				g._add("glass_shopdoor", xf, false, none, wi, bi)
@@ -211,6 +249,8 @@ static func _rooms(g: BlockGenerator, b: Dictionary, bi: int, s: int, y: float, 
 		kind = "flats"
 	if s > 0 and kind == "station":
 		kind = "office"
+	if kind == "tower":
+		kind = "lobby" if s == 0 else "open_office"
 	var cuts_x: Array = []     # partitions across the depth at x = k * M
 	var cut_z := -1             # a partition along the width at z = cut_z * M
 	var cut_z_to := w           # ...from module 0 up to this one
@@ -245,6 +285,10 @@ static func _rooms(g: BlockGenerator, b: Dictionary, bi: int, s: int, y: float, 
 			for k in range(1, w - 1):
 				cuts_x.append(k)
 			room_kinds = ["lobby", "cell"]
+		"lobby":
+			room_kinds = ["lobby"]
+		"open_office":
+			room_kinds = ["office"]
 		"warehouse":
 			if s == 0 and w >= 3 and d >= 2:
 				cut_z = 1

@@ -11,7 +11,8 @@ extends BlockGenerator
 ## Districts:
 ##   docks        the south row, on the water: warehouses, container yards
 ##   industrial   the two east columns: warehouses, garages, yards
-##   downtown     the middle: offices and shops, three to five storeys
+##   downtown     the middle: offices and shops, three to five storeys, and
+##                towers of seven to ten storeys with a lift (v0.7.0)
 ##   residential  the rest: houses, flats and corner shops
 ## plus the police station (home base and custody), two parks and a car park.
 ##
