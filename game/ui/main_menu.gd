@@ -50,6 +50,9 @@ func _ready() -> void:
 	foot.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	foot.position = Vector2(120, get_viewport_rect().size.y - 44)
 	add_child(foot)
+	var theme_music := MusicDirector.make_player(MusicDirector.MENU, -8.0)
+	add_child(theme_music)
+	theme_music.play()
 	if Net.is_online():
 		Net.leave()
 	if Net.last_notice != "":

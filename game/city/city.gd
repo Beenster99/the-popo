@@ -140,6 +140,14 @@ func _ready() -> void:
 	var hud := AmmoHud.new()
 	hud.pawn_getter = func(): return sync.my_pawn()
 	add_child(hud)
+	var radio := PoliceRadio.new()
+	radio.name = "Radio"
+	radio.dispatcher = dispatch
+	add_child(radio)
+	var music := MusicDirector.new()
+	music.name = "Music"
+	music.pawn_getter = func(): return sync.my_pawn()
+	add_child(music)
 	var dhud := DispatchHud.new()
 	dhud.dispatcher = dispatch
 	dhud.armoury = armoury

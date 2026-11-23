@@ -41,11 +41,15 @@ const COUNTS := {"amb_air": 1, "amb_far_traffic": 1, "amb_street": 1, "body_hit"
 	"glass_settle": 4, "gore_hit": 5, "gun_dry": 5, "gun_far": 4, "gun_mech": 1, "gun_near": 5, "gun_sub": 3, "gun_crack_near": 3, "gun_tail_city": 3, "amb_docks": 1, "amb_industrial": 1, "amb_park": 1, "amb_rain": 1, "thunder": 3, "gun_shotgun_body": 3,
 	"gun_thump": 3, "holster": 2, "impact_concrete": 4, "impact_glass": 3, "impact_metal": 5, "impact_wood": 4,
 	"mag_drop_concrete": 2, "mag_drop_metal": 2, "mag_drop_wood": 2, "mag_in": 1, "mag_out": 1, "ping": 1,
-	"punch": 5, "ricochet": 4, "room_tone": 1, "rubble": 6, "shotgun_pump": 1, "siren_wail": 1, "siren_yelp": 1,
+	"punch": 5, "radio_key": 3, "radio_unkey": 2, "radio_voice": 6, "ricochet": 4, "room_tone": 1, "rubble": 6, "shotgun_pump": 1, "siren_wail": 1, "siren_yelp": 1,
 	"slide_rack": 1, "step_concrete": 6, "step_dirt": 6, "step_wood": 4, "tyre_skid": 1, "whoosh": 3}
 const BUS_AMBIENCE := "Ambience"
 const BUS_AMBIENCE_OUT := "AmbienceOut"
 const BUS_VEHICLES := "Vehicles"
+## Wave 5: the music and the police radio, straight to Master (not ducked
+## or muffled with the world).
+const BUS_MUSIC := "Music"
+const BUS_RADIO := "Radio"
 const FAR_RANGE := 90.0      # beyond this a shot is a distant pop through the air
 const SPEED_OF_SOUND := 343.0
 ## Gun kinds (as EnemyGuns: 0 and 1 are handguns, 2 a shotgun).
@@ -55,6 +59,8 @@ static var _cache := {}
 static var _rng := RandomNumberGenerator.new()
 ## The most recent sounds played, newest last, for tests and the debug HUD.
 static var history: Array = []
+## Wave 5: when the last gunshot within earshot was (msec), for the music.
+static var last_shot_ms := -100000
 
 
 static func ensure_buses() -> void:
@@ -107,6 +113,11 @@ static func ensure_buses() -> void:
 	AudioServer.add_bus_effect(amb_out, lp_out)
 	var veh := _add_bus(BUS_VEHICLES, BUS_SFX)
 	AudioServer.add_bus_effect(veh, AudioEffectAmplify.new())
+	_add_bus(BUS_MUSIC, "Master")
+	var radio := _add_bus(BUS_RADIO, "Master")
+	var hp := AudioEffectHighPassFilter.new()
+	hp.cutoff_hz = 300.0
+	AudioServer.add_bus_effect(radio, hp)
 	# The ear ring: a low-pass on everything, off until needed.
 	var ring := AudioEffectLowPassFilter.new()
 	ring.cutoff_hz = 20000.0
@@ -273,6 +284,8 @@ static func shot(parent: Node, pos: Vector3, kind := 0, own := false, weight := 
 	var lis: Variant = listener_position(parent)
 	var d: float = (lis as Vector3).distance_to(pos) if lis != null else 10.0
 	var sg := kind == SHOTGUN
+	if d < 140.0:
+		last_shot_ms = Time.get_ticks_msec()
 	var pitch := (0.82 if sg else 1.0) / pow(weight, 0.35)
 	var boom := (weight - 1.0) * 6.0
 	var p: AudioStreamPlayer3D
