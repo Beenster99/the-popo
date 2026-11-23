@@ -12,6 +12,20 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
+FRAME RATE (0.11.0)
+Big performance pass. Settings > Graphics > Apply a preset: Epic is the one
+to play on at 4K (it upscales from 77% with FSR 2, which also smooths the
+edges). Max is for screenshots, not for 4K play.
+F11 shows the frame rate counter at any time: fps, the slowest 1% of
+frames, how long the graphics card and the game took, and draw calls.
+BENCHMARK on the main menu flies a camera through the same city every time
+(street level, a blast, then over downtown) for about a minute and shows
+the results. It also saves them to ThePopo-benchmark.txt next to the game,
+so you can send them over. If V-Sync is on, the frame rate can't go above
+your screen's refresh rate.
+CARS: they no longer roll over on hard turns, and the handbrake is much
+gentler (it swings the tail out instead of spinning the car).
+
 TALLER CITY AND ROOFTOPS (0.10.0)
 The city blocks come in different sizes now, so the streets aren't an even
 grid. Downtown has towers of seven to ten storeys, each with a working lift
