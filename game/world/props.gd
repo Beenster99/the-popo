@@ -418,13 +418,15 @@ func _furnish_outdoors(blk: Dictionary, rng: RandomNumberGenerator, limit: int) 
 			if (city.buildings[bi].bounds as AABB).grow(1.0).has_point(p + Vector3(0, 0.5, 0)):
 				return true
 		return false
-	var e := r.size.x
+	var ex := r.size.x
+	var ez := r.size.y
 	# Bins and benches along the kerb.
 	for k in 6:
 		if _next_id >= limit:
 			return
-		var along := rng.randf_range(6.0, e - 6.0)
-		var spots := [Vector3(along, 0, 1.6), Vector3(along, 0, e - 1.6), Vector3(1.6, 0, along), Vector3(e - 1.6, 0, along)]
+		var ax := rng.randf_range(6.0, ex - 6.0)
+		var az := rng.randf_range(6.0, ez - 6.0)
+		var spots := [Vector3(ax, 0, 1.6), Vector3(ax, 0, ez - 1.6), Vector3(1.6, 0, az), Vector3(ex - 1.6, 0, az)]
 		var p: Vector3 = o + spots[k % 4] + Vector3(0, y, 0)
 		if not inside.call(p):
 			add_prop("bin" if k % 2 == 0 else "bench", Transform3D(Basis(Vector3.UP, 0.0 if k % 4 < 2 else PI / 2), p))
@@ -432,7 +434,7 @@ func _furnish_outdoors(blk: Dictionary, rng: RandomNumberGenerator, limit: int) 
 	match blk.style:
 		"park":
 			for k in 8:
-				var p := o + Vector3(rng.randf_range(8.0, e - 8.0), y - 0.05, rng.randf_range(8.0, e - 8.0))
+				var p := o + Vector3(rng.randf_range(8.0, ex - 8.0), y - 0.05, rng.randf_range(8.0, ez - 8.0))
 				add_prop("bench", Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p))
 		"docks", "industrial":
 			# Container stacks in the yards (good, hard cover), pallets and
@@ -441,7 +443,7 @@ func _furnish_outdoors(blk: Dictionary, rng: RandomNumberGenerator, limit: int) 
 			var placed := 0
 			while tries > 0 and placed < (8 if blk.style == "docks" else 3) and _next_id < limit - 4:
 				tries -= 1
-				var p := o + Vector3(rng.randf_range(6.0, e - 6.0), y, rng.randf_range(6.0, e - 6.0))
+				var p := o + Vector3(rng.randf_range(6.0, ex - 6.0), y, rng.randf_range(6.0, ez - 6.0))
 				var yaw := 0.0 if rng.randf() < 0.5 else PI / 2
 				var foot := AABB(p - Vector3(3.5, 0, 3.5), Vector3(7, 3, 7))
 				var clash := false
@@ -457,7 +459,7 @@ func _furnish_outdoors(blk: Dictionary, rng: RandomNumberGenerator, limit: int) 
 					_paint_container(id2, rng)
 				placed += 1
 			for k in 6:
-				var p := o + Vector3(rng.randf_range(6.0, e - 6.0), y, rng.randf_range(6.0, e - 6.0))
+				var p := o + Vector3(rng.randf_range(6.0, ex - 6.0), y, rng.randf_range(6.0, ez - 6.0))
 				if inside.call(p):
 					continue
 				add_prop("barrel" if rng.randf() < 0.4 else "pallet", Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p))
@@ -465,7 +467,7 @@ func _furnish_outdoors(blk: Dictionary, rng: RandomNumberGenerator, limit: int) 
 			for k in 6:
 				if _next_id >= limit:
 					return
-				var p := o + Vector3(rng.randf_range(6.0, e - 6.0), y, rng.randf_range(6.0, e - 6.0))
+				var p := o + Vector3(rng.randf_range(6.0, ex - 6.0), y, rng.randf_range(6.0, ez - 6.0))
 				if inside.call(p):
 					continue
 				var roll := rng.randf()
@@ -486,7 +488,8 @@ func _furnish_outdoors(blk: Dictionary, rng: RandomNumberGenerator, limit: int) 
 ## the industrial yards and the docks; a hydrant on every block.
 func _street_furniture(blk: Dictionary, rng: RandomNumberGenerator, limit: int, inside: Callable) -> void:
 	var o: Vector3 = blk.offset
-	var e: float = (blk.rect as Rect2).size.x
+	var ex: float = (blk.rect as Rect2).size.x
+	var ez: float = (blk.rect as Rect2).size.y
 	var y := BlockGenerator.BASE_Y
 	var pool: Array
 	match String(blk.style):
@@ -502,9 +505,10 @@ func _street_furniture(blk: Dictionary, rng: RandomNumberGenerator, limit: int, 
 	for k in n + 1:
 		if _next_id >= limit - 4:
 			return
-		var along := rng.randf_range(5.0, e - 5.0)
+		var ax := rng.randf_range(5.0, ex - 5.0)
+		var az := rng.randf_range(5.0, ez - 5.0)
 		var side := rng.randi_range(0, 3)
-		var spots := [Vector3(along, 0, 1.2), Vector3(along, 0, e - 1.2), Vector3(1.2, 0, along), Vector3(e - 1.2, 0, along)]
+		var spots := [Vector3(ax, 0, 1.2), Vector3(ax, 0, ez - 1.2), Vector3(1.2, 0, az), Vector3(ex - 1.2, 0, az)]
 		var yaws := [0.0, PI, PI / 2, -PI / 2]    # facing the road
 		var p: Vector3 = o + spots[side] + Vector3(0, y, 0)
 		if inside.call(p):

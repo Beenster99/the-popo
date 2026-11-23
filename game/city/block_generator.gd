@@ -39,6 +39,9 @@ var _rng := RandomNumberGenerator.new()
 var offset := Vector3.ZERO
 var style := "block"
 var own_ground := true
+## v0.7.0: the lot's size in modules (city lots vary; a lone block is N x N).
+var nx := N
+var nz := N
 
 
 static func generate(seed_value: int, opts := {}) -> BlockGenerator:
@@ -48,6 +51,8 @@ static func generate(seed_value: int, opts := {}) -> BlockGenerator:
 	g.offset = opts.get("offset", Vector3.ZERO)
 	g.style = opts.get("style", "block")
 	g.own_ground = opts.get("ground", true)
+	g.nx = int(opts.get("nx", N))
+	g.nz = int(opts.get("nz", N))
 	g._build()
 	return g
 
@@ -136,12 +141,13 @@ func _ground() -> void:
 ## and which way is inward (v). The front of each building faces -v.
 func _sides(d_north: int, d_south: int) -> Array:
 	var lo := 1
-	var hi := N - 1
+	var hx := nx - 1
+	var hz := nz - 1
 	return [
-		{"start": Vector3(lo * M, 0, lo * M), "u": Vector3.RIGHT, "v": Vector3.BACK, "len": hi - lo, "name": "north"},
-		{"start": Vector3(hi * M, 0, hi * M), "u": Vector3.LEFT, "v": Vector3.FORWARD, "len": hi - lo, "name": "south"},
-		{"start": Vector3(lo * M, 0, (hi - d_south) * M), "u": Vector3.FORWARD, "v": Vector3.RIGHT, "len": hi - lo - d_north - d_south, "name": "west"},
-		{"start": Vector3(hi * M, 0, (lo + d_north) * M), "u": Vector3.BACK, "v": Vector3.LEFT, "len": hi - lo - d_north - d_south, "name": "east"},
+		{"start": Vector3(lo * M, 0, lo * M), "u": Vector3.RIGHT, "v": Vector3.BACK, "len": hx - lo, "name": "north"},
+		{"start": Vector3(hx * M, 0, hz * M), "u": Vector3.LEFT, "v": Vector3.FORWARD, "len": hx - lo, "name": "south"},
+		{"start": Vector3(lo * M, 0, (hz - d_south) * M), "u": Vector3.FORWARD, "v": Vector3.RIGHT, "len": hz - lo - d_north - d_south, "name": "west"},
+		{"start": Vector3(hx * M, 0, (lo + d_north) * M), "u": Vector3.BACK, "v": Vector3.LEFT, "len": hz - lo - d_north - d_south, "name": "east"},
 	]
 
 

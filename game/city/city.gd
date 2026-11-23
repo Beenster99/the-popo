@@ -244,7 +244,7 @@ func _build(s: int) -> void:
 	civ_car = Car.new()
 	civ_car.color = Color("2f5f9a")
 	var lot: Vector3 = gen.blocks[gen.block_index(CityGenerator.STATION.x, CityGenerator.STATION.y)].offset
-	civ_car.position = lot + Vector3(20, 0.95, BlockGenerator.N * BlockGenerator.M + 2.4)
+	civ_car.position = lot + Vector3(20, 0.95, CityGenerator.lot_size(CityGenerator.STATION.x, CityGenerator.STATION.y).y + 2.4)
 	civ_car.rotation_degrees.y = -90.0
 	add_child(civ_car)
 	cars.add_car(civ_car)

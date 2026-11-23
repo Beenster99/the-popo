@@ -50,7 +50,6 @@ const WALL_COLORS := {
 
 static func plan(g: BlockGenerator, rng: RandomNumberGenerator) -> void:
 	var st: Dictionary = STYLES.get(g.style, STYLES.residential)
-	var N := BlockGenerator.N
 	if g.style == "station":
 		# One big building along the north side, the yard and car park behind.
 		g.buildings.append({"start": Vector3(2 * M, 0, 1 * M), "u": Vector3.RIGHT, "v": Vector3.BACK,
@@ -309,33 +308,48 @@ static func _rooms(g: BlockGenerator, b: Dictionary, bi: int, s: int, y: float, 
 
 static func furniture(g: BlockGenerator, _rng: RandomNumberGenerator) -> void:
 	# Lamp posts round the kerb, arms over the road.
-	var e := BlockGenerator.N * M
+	var ex := g.nx * M
+	var ez := g.nz * M
 	var y := BlockGenerator.BASE_Y
 	var spots := [
 		[Vector3(1.0, y, 0.6), Basis(Vector3.UP, PI / 2)],
-		[Vector3(e - 1.0, y, 0.6), Basis(Vector3.UP, PI / 2)],
-		[Vector3(1.0, y, e - 0.6), Basis(Vector3.UP, -PI / 2)],
-		[Vector3(e - 1.0, y, e - 0.6), Basis(Vector3.UP, -PI / 2)],
-		[Vector3(e * 0.5 + 6.0, y, 0.6), Basis(Vector3.UP, PI / 2)],
-		[Vector3(e * 0.5 - 6.0, y, e - 0.6), Basis(Vector3.UP, -PI / 2)],
-		[Vector3(0.6, y, e * 0.5 + 6.0), Basis()],
-		[Vector3(e - 0.6, y, e * 0.5 - 6.0), Basis(Vector3.UP, PI)],
+		[Vector3(ex - 1.0, y, 0.6), Basis(Vector3.UP, PI / 2)],
+		[Vector3(1.0, y, ez - 0.6), Basis(Vector3.UP, -PI / 2)],
+		[Vector3(ex - 1.0, y, ez - 0.6), Basis(Vector3.UP, -PI / 2)],
+		[Vector3(ex * 0.5 + 6.0, y, 0.6), Basis(Vector3.UP, PI / 2)],
+		[Vector3(ex * 0.5 - 6.0, y, ez - 0.6), Basis(Vector3.UP, -PI / 2)],
+		[Vector3(0.6, y, ez * 0.5 + 6.0), Basis()],
+		[Vector3(ex - 0.6, y, ez * 0.5 - 6.0), Basis(Vector3.UP, PI)],
 	]
 	for sp in spots:
 		g._add("lamp_post", Transform3D(sp[1], sp[0]), false)
+	# Bollards either side of the crossings (half way along each side; the
+	# crossing is on the middle module, or the pair either side of the
+	# middle on an even side).
 	for k in [-1.0, 1.0]:
-		var c: float = e * 0.5 + k * 2.4
-		g._add("bollard", Transform3D(Basis(), Vector3(c, y, 0.4)), false)
-		g._add("bollard", Transform3D(Basis(), Vector3(c, y, e - 0.4)), false)
-		g._add("bollard", Transform3D(Basis(), Vector3(0.4, y, c)), false)
-		g._add("bollard", Transform3D(Basis(), Vector3(e - 0.4, y, c)), false)
+		var cx: float = _crossing(g.nx) + k * 2.4
+		var cz: float = _crossing(g.nz) + k * 2.4
+		g._add("bollard", Transform3D(Basis(), Vector3(cx, y, 0.4)), false)
+		g._add("bollard", Transform3D(Basis(), Vector3(cx, y, ez - 0.4)), false)
+		g._add("bollard", Transform3D(Basis(), Vector3(0.4, y, cz)), false)
+		g._add("bollard", Transform3D(Basis(), Vector3(ex - 0.4, y, cz)), false)
 	# Parks and car parks get low walls round them.
 	if g.style == "park" or g.style == "carpark":
-		for i in range(1, BlockGenerator.N - 1):
-			if i == BlockGenerator.N / 2 or i == BlockGenerator.N / 2 - 1:
+		for i in range(1, g.nx - 1):
+			if i == g.nx / 2 or i == g.nx / 2 - 1:
 				continue    # the ways in
 			var c := (i + 0.5) * M
 			g._add("low_wall", Transform3D(Basis(), Vector3(c, y, 2.0)), true)
-			g._add("low_wall", Transform3D(Basis(), Vector3(c, y, e - 2.0)), true)
+			g._add("low_wall", Transform3D(Basis(), Vector3(c, y, ez - 2.0)), true)
+		for i in range(1, g.nz - 1):
+			if i == g.nz / 2 or i == g.nz / 2 - 1:
+				continue
+			var c := (i + 0.5) * M
 			g._add("low_wall", Transform3D(Basis(Vector3.UP, PI / 2), Vector3(2.0, y, c)), true)
-			g._add("low_wall", Transform3D(Basis(Vector3.UP, PI / 2), Vector3(e - 2.0, y, c)), true)
+			g._add("low_wall", Transform3D(Basis(Vector3.UP, PI / 2), Vector3(ex - 2.0, y, c)), true)
+
+
+## Where the zebra crossing sits along a lot side of n modules (its centre,
+## in metres from the lot corner): module n / 2, as CityGround lays it.
+static func _crossing(n: int) -> float:
+	return (n / 2 + 0.5) * M

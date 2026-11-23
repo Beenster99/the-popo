@@ -2,10 +2,13 @@ class_name CityGenerator
 extends BlockGenerator
 ## Wave 2, Phase 2.1: the whole city from one seed.
 ##
-## A grid of GRID x GRID blocks, each a 12 x 12 module lot (48 m) with a road
-## three modules wide (12 m, one lane each way plus kerbside parking) between
-## neighbours and round the outside. Block pitch 60 m, so the city is 372 m
-## across. Districts:
+## A grid of GRID x GRID blocks with a road three modules wide (12 m, one
+## lane each way plus kerbside parking) between neighbours and round the
+## outside. Since v0.7.0 the lots are not all the same size: each column of
+## blocks is 9 to 15 modules wide and each row 9 to 15 deep (36 to 60 m),
+## picked from the seed, so the streets are not an even grid. (The station's
+## column and row stay 12.) The city is still under about 450 m across.
+## Districts:
 ##   docks        the south row, on the water: warehouses, container yards
 ##   industrial   the two east columns: warehouses, garages, yards
 ##   downtown     the middle: offices and shops, three to five storeys
@@ -23,11 +26,18 @@ extends BlockGenerator
 ## laid as a few merged meshes by CityGround, from lot_rects() and roads().
 
 const GRID := 6
-const PITCH := (N + ROAD) * M         # 60 m from one block to the next
+const PITCH := (N + ROAD) * M         # the average distance from one block to the next
+const LOT_RANGE := Vector2i(9, 15)    # lot sizes, in modules
 const ROAD_W := ROAD * M              # 12 m
 const LANE := 2.6                     # m from the road's centre line to a lane's centre
 const PARK_LANE := 4.9                # m from the centre line to parked cars
 const STATION := Vector2i(2, 4)
+
+## Lot size in modules of each column (x) and row (z) of blocks. Static: the
+## city's layout is needed in static helpers everywhere, and there is one
+## city at a time. Set by generate_city (all 12 until then).
+static var cols: Array = [12, 12, 12, 12, 12, 12]
+static var rows: Array = [12, 12, 12, 12, 12, 12]
 
 ## [{bx, bz, style, district, offset (lot corner), rect (Rect2 in x/z),
 ##   pieces_from, pieces_to, buildings_from, buildings_to}]
@@ -38,28 +48,83 @@ static func generate_city(seed_value: int) -> CityGenerator:
 	var g := CityGenerator.new()
 	g.seed_value = seed_value
 	g._rng.seed = seed_value
+	pick_sizes(seed_value)
 	g._build_city()
 	return g
 
 
-## The whole city's size, roads included (it starts at 0, 0).
+## Lot sizes for a city from its seed (its own generator, so the rest of the
+## city's rolls are unchanged by it).
+static func pick_sizes(seed_value: int) -> void:
+	var r := RandomNumberGenerator.new()
+	r.seed = hash(seed_value * 31 + 1717)
+	cols = []
+	rows = []
+	for i in GRID:
+		cols.append(N if i == STATION.x else r.randi_range(LOT_RANGE.x, LOT_RANGE.y))
+		rows.append(N if i == STATION.y else r.randi_range(LOT_RANGE.x, LOT_RANGE.y))
+
+
+## Back to the even 12-module grid (tests of the old layout).
+static func even_sizes() -> void:
+	cols = []
+	rows = []
+	for i in GRID:
+		cols.append(N)
+		rows.append(N)
+
+
+## Where road k (0..GRID) starts, along x (axis 0: the roads running along
+## Z) or z (axis 1: the roads running along X), in metres.
+static func road_at(k: int, axis: int) -> float:
+	var sizes: Array = cols if axis == 0 else rows
+	var m := 0
+	for i in mini(k, GRID):
+		m += int(sizes[i]) + ROAD
+	return m * M
+
+
+## The city's size, roads included (it starts at 0, 0), across x and z.
+static func extent_x() -> float:
+	return road_at(GRID, 0) + ROAD_W
+
+
+static func extent_z() -> float:
+	return road_at(GRID, 1) + ROAD_W
+
+
+## The bigger of the two (for things that only need a bound).
 static func city_extent() -> float:
-	return ROAD_W + GRID * PITCH
+	return maxf(extent_x(), extent_z())
 
 
 ## Where block (bx, bz)'s lot starts.
 static func lot_origin(bx: int, bz: int) -> Vector3:
-	return Vector3(ROAD_W + bx * PITCH, 0, ROAD_W + bz * PITCH)
+	return Vector3(road_at(bx, 0) + ROAD_W, 0, road_at(bz, 1) + ROAD_W)
+
+
+## A block's lot size in metres (x, z).
+static func lot_size(bx: int, bz: int) -> Vector2:
+	return Vector2(int(cols[bx]) * M, int(rows[bz]) * M)
 
 
 ## Which block a point is over (its lot or the road north/west of it), or
 ## Vector2i(-1, -1) off the grid.
 static func block_at(p: Vector3) -> Vector2i:
-	var bx := floori((p.x - ROAD_W * 0.5) / PITCH)
-	var bz := floori((p.z - ROAD_W * 0.5) / PITCH)
-	if bx < 0 or bz < 0 or bx >= GRID or bz >= GRID:
+	var bx := _index_at(p.x, 0)
+	var bz := _index_at(p.z, 1)
+	if bx < 0 or bz < 0:
 		return Vector2i(-1, -1)
 	return Vector2i(bx, bz)
+
+
+static func _index_at(v: float, axis: int) -> int:
+	if v < ROAD_W * 0.5:
+		return -1
+	for i in GRID:
+		if v < road_at(i + 1, axis) + ROAD_W * 0.5:
+			return i
+	return -1
 
 
 func block_index(bx: int, bz: int) -> int:
@@ -116,10 +181,10 @@ func _build_city() -> void:
 			elif cell == carpark:
 				style = "carpark"
 			var sub := BlockGenerator.generate(hash(seed_value * 7919 + bz * GRID + bx), {
-				"offset": lot_origin(bx, bz), "style": style, "ground": false})
+				"offset": lot_origin(bx, bz), "style": style, "ground": false, "nx": cols[bx], "nz": rows[bz]})
 			var k := blocks.size()
 			var info := {"bx": bx, "bz": bz, "style": style, "district": district, "offset": lot_origin(bx, bz),
-				"rect": Rect2(lot_origin(bx, bz).x, lot_origin(bx, bz).z, N * M, N * M),
+				"rect": Rect2(lot_origin(bx, bz).x, lot_origin(bx, bz).z, int(cols[bx]) * M, int(rows[bz]) * M),
 				"pieces_from": pieces.size(), "buildings_from": buildings.size()}
 			var pbase := pieces.size()
 			var bbase := buildings.size()
@@ -151,16 +216,31 @@ func lot_rects() -> Array:
 ## and GRID + 1 along Z. They overlap at the junctions.
 static func roads() -> Array:
 	var out: Array = []
-	var e := city_extent()
+	var ex := extent_x()
+	var ez := extent_z()
 	for k in GRID + 1:
-		out.append({"axis": "x", "rect": Rect2(0, k * PITCH, e, ROAD_W), "centre": k * PITCH + ROAD_W * 0.5})
-		out.append({"axis": "z", "rect": Rect2(k * PITCH, 0, ROAD_W, e), "centre": k * PITCH + ROAD_W * 0.5})
+		var zk := road_at(k, 1)
+		var xk := road_at(k, 0)
+		out.append({"axis": "x", "rect": Rect2(0, zk, ex, ROAD_W), "centre": zk + ROAD_W * 0.5})
+		out.append({"axis": "z", "rect": Rect2(xk, 0, ROAD_W, ez), "centre": xk + ROAD_W * 0.5})
 	return out
 
 
 ## The centre of junction (i, j), i and j from 0 to GRID.
 static func junction(i: int, j: int) -> Vector3:
-	return Vector3(i * PITCH + ROAD_W * 0.5, 0, j * PITCH + ROAD_W * 0.5)
+	return Vector3(road_at(i, 0) + ROAD_W * 0.5, 0, road_at(j, 1) + ROAD_W * 0.5)
+
+
+## The nearest road (0..GRID) to v along an axis.
+static func nearest_road(v: float, axis: int) -> int:
+	var best := 0
+	var bd := INF
+	for k in GRID + 1:
+		var d := absf(v - (road_at(k, axis) + ROAD_W * 0.5))
+		if d < bd:
+			bd = d
+			best = k
+	return best
 
 
 ## Somewhere on the pavement near p (on the kerb strip of the nearest lot),
@@ -200,10 +280,10 @@ const Z_STREETS := ["Westbury Avenue", "Chapel Road", "Union Avenue", "Sterling 
 ## "Mercer Street near Chapel Road": the road a point is on (or nearest),
 ## and the nearest cross street.
 static func street_at(p: Vector3) -> String:
-	var kx := clampi(roundi((p.z - ROAD_W * 0.5) / PITCH), 0, GRID)
-	var kz := clampi(roundi((p.x - ROAD_W * 0.5) / PITCH), 0, GRID)
-	var dx := absf(p.z - (kx * PITCH + ROAD_W * 0.5))
-	var dz := absf(p.x - (kz * PITCH + ROAD_W * 0.5))
+	var kx := nearest_road(p.z, 1)
+	var kz := nearest_road(p.x, 0)
+	var dx := absf(p.z - (road_at(kx, 1) + ROAD_W * 0.5))
+	var dz := absf(p.x - (road_at(kz, 0) + ROAD_W * 0.5))
 	if dx <= dz:
 		return "%s near %s" % [X_STREETS[kx], Z_STREETS[kz]]
 	return "%s near %s" % [Z_STREETS[kz], X_STREETS[kx]]
