@@ -390,7 +390,7 @@ func _physics_process(delta: float) -> void:
 					set_state(S.STAGGER)   # takes a wild swing and falls about
 			elif _notices(t):
 				_react(t)
-			elif armed:
+			elif armed and not has_meta("stay"):
 				_wander_t -= delta
 				if _wander_t <= 0.0 or _goal == Vector3.INF:
 					_wander_t = _rng.randf_range(4.0, 8.0)

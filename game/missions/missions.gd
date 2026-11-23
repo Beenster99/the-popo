@@ -366,6 +366,7 @@ func setup_call(c: Dictionary, at := Vector3.INF) -> bool:
 			if not people.has(c.id):
 				people[c.id] = {"victim": null, "witness": null, "said": {}}
 			people[c.id].dealer = s
+			s.set_meta("stay", true)   # holds his corner, waiting for buyers
 			people[c.id].buy_t = 0.0
 			c.pos = p
 			c.text = "Sting: a dealer's selling %s. Go in plain clothes, walk up and buy (hold %s next to him), then take him. Uniforms will scare him off." % [d._side_name(p), "F"]

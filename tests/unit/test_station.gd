@@ -117,6 +117,7 @@ func test_undercover_and_stings() -> void:
 	t.check(id > 0, "a sting: %s" % (d.calls[id].text if id > 0 else "-"))
 	if id > 0:
 		var dealer: Suspect = d.suspects[d.calls[id].suspects[0]]
+		dealer.armed = true   # armed dealers hold their corner too
 		o.global_position = dealer.global_position + Vector3(1.4, 0, 0)
 		var src := s.sync.input_source
 		s.sync.input_source = func(): return {"buttons": PlayerInput.INTERACT, "move": Vector2.ZERO, "aim_yaw": 0.0, "aim_point": Vector3.ZERO}
