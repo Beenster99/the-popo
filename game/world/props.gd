@@ -523,10 +523,11 @@ func _paint_container(id: int, rng: RandomNumberGenerator) -> void:
 	if rb == null:
 		return
 	var col := Color(CONTAINER_COLOURS[rng.randi_range(0, CONTAINER_COLOURS.size() - 1)])
-	var meshes := rb.find_children("*", "MeshInstance3D", false, false)
-	for i in meshes.size():
-		var mi := meshes[i] as MeshInstance3D
-		mi.material_override = Cel.material(col.darkened(0.0 if i == 0 else 0.25), true, 0.02)
+	var mi := rb.find_children("*", "MeshInstance3D", false, false)[0] as MeshInstance3D
+	var firsts: Array = _kind_first.get("container", [])
+	for i in mi.mesh.get_surface_count():
+		var first: bool = i < firsts.size() and firsts[i]
+		mi.set_surface_override_material(i, Cel.material(col.darkened(0.0 if first else 0.25), true, 0.02))
 
 
 func _furnish_cell(b: Dictionary, rng: RandomNumberGenerator, cx: float, y: float, cz: float, basis: Basis, shop_front: bool) -> void:
@@ -606,8 +607,16 @@ func add_prop(kind: String, xf: Transform3D) -> int:
 		box.size = size
 		cs.shape = box
 	rb.add_child(cs)
-	for part in d.parts:
-		rb.add_child(_part_mesh(part[0], part[1], Color(part[2])))
+	# v0.8.1: one mesh per prop (its parts merged, one surface per colour)
+	# instead of a mesh per part: a city has thousands of props.
+	var pm_mi := MeshInstance3D.new()
+	pm_mi.mesh = _kind_mesh(kind)
+	pm_mi.visibility_range_end = OUTDOOR_RANGE if kind in OUTDOOR_KINDS else INDOOR_RANGE
+	pm_mi.visibility_range_end_margin = 4.0
+	pm_mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_DISABLED
+	if (size.x < 0.0 and -size.x < 0.25) or (size.x >= 0.0 and size.length() < 0.6):
+		pm_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	rb.add_child(pm_mi)
 	rb.transform = Transform3D(xf.basis, xf.origin + xf.basis.y * (size.y * 0.5 + 0.01))
 	rb.can_sleep = true
 	rb.sleeping = true
@@ -621,6 +630,60 @@ func add_prop(kind: String, xf: Transform3D) -> int:
 		if is_instance_valid(rb) and not rb.sleeping:
 			_awake[id] = true)
 	return id
+
+
+## v0.8.1: props past these distances (m) stop drawing.
+const INDOOR_RANGE := 55.0
+const OUTDOOR_RANGE := 110.0
+const OUTDOOR_KINDS := ["bench", "bin", "barrel", "gas", "crate", "pallet", "container", "post_box", "phone_box",
+	"hydrant", "cone", "planter", "vending", "wheelie_bin", "bike_rack", "trolley", "tyres", "extinguisher"]
+static var _kind_meshes := {}
+## kind -> per surface: whether it holds the kind's first part.
+static var _kind_first := {}
+
+
+## Every part of a kind merged into one mesh, a surface per colour.
+static func _kind_mesh(kind: String) -> ArrayMesh:
+	if _kind_meshes.has(kind):
+		return _kind_meshes[kind]
+	var by_colour := {}    # colour -> SurfaceTool
+	var order: Array = []
+	var first_col := ""
+	var parts: Array = KINDS[kind].parts
+	for pi in parts.size():
+		var part: Array = parts[pi]
+		var size: Vector3 = part[0]
+		var src: PrimitiveMesh
+		if size.x < 0.0:
+			var cm := CylinderMesh.new()
+			cm.top_radius = -size.x
+			cm.bottom_radius = -size.x
+			cm.height = size.y
+			cm.radial_segments = 12
+			src = cm
+		else:
+			var bm := BoxMesh.new()
+			bm.size = size
+			src = bm
+		var col := String(part[2])
+		if pi == 0:
+			first_col = col
+		if not by_colour.has(col):
+			var st := SurfaceTool.new()
+			st.begin(Mesh.PRIMITIVE_TRIANGLES)
+			by_colour[col] = st
+			order.append(col)
+		(by_colour[col] as SurfaceTool).append_from(src, 0, Transform3D(Basis(), part[1]))
+	var am := ArrayMesh.new()
+	var firsts: Array = []
+	for col in order:
+		var st: SurfaceTool = by_colour[col]
+		st.commit(am)
+		am.surface_set_material(am.get_surface_count() - 1, Cel.material(Color(col), true, 0.012))
+		firsts.append(col == first_col)
+	_kind_meshes[kind] = am
+	_kind_first[kind] = firsts
+	return am
 
 
 static func _part_mesh(size: Vector3, at: Vector3, color: Color) -> MeshInstance3D:

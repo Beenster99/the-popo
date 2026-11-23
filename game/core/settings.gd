@@ -63,7 +63,8 @@ const SCHEMA := [
 	["Graphics", "anisotropy", "Anisotropic filtering", "enum", 2, ["Off", "2x", "4x", "8x", "16x"]],
 	["Graphics", "mipmap_bias", "Texture sharpness (mipmap bias)", "range", 0.0, [-2.0, 1.0, 0.1, ""]],
 	["Graphics", "lod_threshold", "Level of detail (lower = more detail)", "range", 1.0, [0.0, 8.0, 0.25, "px"]],
-	["Graphics", "occlusion_culling", "Occlusion culling", "bool", false],
+	["Graphics", "occlusion_culling", "Occlusion culling", "bool", true,
+		null, "Skips drawing what buildings hide. Big saving in the city."],
 	["Graphics", "", "Shadows", "head"],
 	["Graphics", "sun_shadows", "Sun shadows", "bool", true],
 	["Graphics", "sun_shadow_size", "Sun shadow resolution", "enum", 2, ["1024", "2048", "4096", "8192", "16384"]],
@@ -166,26 +167,37 @@ const SCHEMA := [
 ]
 
 ## Graphics presets: key -> value, applied over the current settings.
+## v0.8.1: retuned for frame rate. Epic is the top everyday preset (aim:
+## 80+ fps at 4K on a strong card): FSR 2 upscaling from 77% does the
+## anti-aliasing better than MSAA + SMAA + TAA together did, at a fraction
+## of the cost. Max draws at full resolution with every effect up; it is
+## for screenshots, not for playing at 4K.
 const PRESETS := {
-	"Low": {"render_scale": 0.75, "scaling_mode": 1, "msaa": 0, "screen_aa": 1, "taa": false, "anisotropy": 1,
-		"sun_shadow_size": 0, "sun_shadow_splits": 1, "lamp_shadows": false, "shadow_filter": 1,
-		"ssao": false, "ssil": false, "ssr": false, "sdfgi": false, "glow": false, "vol_fog": false, "lod_threshold": 2.0},
-	"Medium": {"render_scale": 1.0, "scaling_mode": 0, "msaa": 1, "screen_aa": 0, "taa": false, "anisotropy": 2,
-		"sun_shadow_size": 2, "sun_shadow_splits": 2, "lamp_shadows": true, "shadow_filter": 2,
-		"ssao": false, "ssil": false, "ssr": false, "sdfgi": false, "glow": false, "vol_fog": false, "lod_threshold": 1.0},
-	"High": {"render_scale": 1.0, "scaling_mode": 0, "msaa": 2, "screen_aa": 0, "taa": false, "anisotropy": 3,
-		"sun_shadow_size": 2, "sun_shadow_splits": 2, "lamp_shadows": true, "shadow_filter": 3,
-		"ssao": true, "ssao_quality": 2, "ssil": false, "ssr": true, "sdfgi": false, "glow": true, "vol_fog": false, "lod_threshold": 1.0},
-	"Ultra": {"render_scale": 1.0, "scaling_mode": 0, "msaa": 2, "screen_aa": 2, "taa": true, "anisotropy": 4,
-		"sun_shadow_size": 3, "sun_shadow_splits": 2, "lamp_shadows": true, "shadow_filter": 4,
-		"ssao": true, "ssao_quality": 3, "ssil": true, "ssil_quality": 2, "ssr": true, "ssr_roughness": 2,
-		"sdfgi": true, "glow": true, "vol_fog": false, "lod_threshold": 0.5},
-	"Max": {"render_scale": 1.5, "scaling_mode": 0, "msaa": 3, "screen_aa": 2, "taa": true, "anisotropy": 4,
-		"sun_shadow_size": 4, "sun_shadow_splits": 2, "sun_shadow_distance": 150.0, "lamp_shadows": true,
-		"lamp_shadow_size": 3, "shadow_filter": 5, "shadow_16bit": false,
-		"ssao": true, "ssao_quality": 4, "ssil": true, "ssil_quality": 4, "ssr": true, "ssr_steps": 256, "ssr_roughness": 3,
-		"sdfgi": true, "sdfgi_rays": 6, "gi_half": false, "glow": true, "vol_fog": true, "vol_fog_size": 3,
-		"sss_quality": 3, "roughness_limiter": true, "lod_threshold": 0.0},
+	"Low": {"render_scale": 0.67, "scaling_mode": 1, "msaa": 0, "screen_aa": 1, "taa": false, "anisotropy": 1,
+		"sun_shadow_size": 0, "sun_shadow_splits": 1, "sun_shadow_distance": 50.0, "lamp_shadows": false, "shadow_filter": 1,
+		"ssao": false, "ssil": false, "ssr": false, "sdfgi": false, "glow": false, "vol_fog": false, "lod_threshold": 2.0,
+		"occlusion_culling": true},
+	"Medium": {"render_scale": 0.77, "scaling_mode": 2, "msaa": 0, "screen_aa": 0, "taa": false, "anisotropy": 2,
+		"sun_shadow_size": 1, "sun_shadow_splits": 1, "sun_shadow_distance": 60.0, "lamp_shadows": true, "lamp_shadow_size": 1,
+		"shadow_filter": 2, "ssao": false, "ssil": false, "ssr": false, "sdfgi": false, "glow": true, "vol_fog": false,
+		"lod_threshold": 1.0, "occlusion_culling": true},
+	"High": {"render_scale": 0.77, "scaling_mode": 2, "msaa": 0, "screen_aa": 0, "taa": false, "anisotropy": 3,
+		"sun_shadow_size": 2, "sun_shadow_splits": 2, "sun_shadow_distance": 80.0, "lamp_shadows": true, "lamp_shadow_size": 2,
+		"shadow_filter": 2, "ssao": true, "ssao_quality": 1, "ssao_half": true, "ssil": false, "ssr": false,
+		"sdfgi": false, "glow": true, "vol_fog": false, "lod_threshold": 1.0, "occlusion_culling": true},
+	"Epic": {"render_scale": 0.77, "scaling_mode": 2, "fsr_sharpness": 0.2, "msaa": 0, "screen_aa": 0, "taa": false, "anisotropy": 4,
+		"sun_shadow_size": 2, "sun_shadow_splits": 2, "sun_shadow_distance": 90.0, "lamp_shadows": true, "lamp_shadow_size": 2,
+		"shadow_filter": 3, "shadow_16bit": true, "ssao": true, "ssao_quality": 2, "ssao_half": true,
+		"ssil": true, "ssil_quality": 1, "ssil_half": true, "ssr": true, "ssr_steps": 48, "ssr_roughness": 1,
+		"sdfgi": true, "sdfgi_rays": 2, "sdfgi_converge": 3, "gi_half": true, "glow": true, "vol_fog": false,
+		"lod_threshold": 1.0, "occlusion_culling": true},
+	"Max": {"render_scale": 1.0, "scaling_mode": 2, "msaa": 0, "screen_aa": 0, "taa": false, "anisotropy": 4,
+		"sun_shadow_size": 3, "sun_shadow_splits": 2, "sun_shadow_distance": 140.0, "lamp_shadows": true,
+		"lamp_shadow_size": 3, "shadow_filter": 4, "shadow_16bit": false,
+		"ssao": true, "ssao_quality": 3, "ssao_half": false, "ssil": true, "ssil_quality": 3, "ssil_half": false,
+		"ssr": true, "ssr_steps": 128, "ssr_roughness": 2,
+		"sdfgi": true, "sdfgi_rays": 4, "gi_half": false, "glow": true, "vol_fog": true, "vol_fog_size": 2,
+		"sss_quality": 2, "roughness_limiter": true, "lod_threshold": 0.5, "occlusion_culling": true},
 }
 
 var values := {}
@@ -412,7 +424,13 @@ func _apply_node(n: Node) -> void:
 			DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS][values.sun_shadow_splits]
 		l.shadow_blur = values.sun_shadow_blur
 	elif n is OmniLight3D or n is SpotLight3D:
-		(n as Light3D).shadow_enabled = values.lamp_shadows
+		# v0.8.1: only lights made to cast shadows (torches, blasts) get
+		# them. Before, every lamp, light bar and fire cast one, which cost
+		# more than anything else at night.
+		var l := n as Light3D
+		if not l.has_meta("wants_shadow"):
+			l.set_meta("wants_shadow", l.shadow_enabled)
+		l.shadow_enabled = values.lamp_shadows and bool(l.get_meta("wants_shadow"))
 	elif n is IsoCamera:
 		var c := n as IsoCamera
 		c.rotate_speed_deg = values.cam_rotate_speed
@@ -530,18 +548,32 @@ func _save() -> void:
 	for e in SCHEMA:
 		if e[3] in ["bool", "enum", "range"]:
 			cfg.set_value(e[0], e[1], values[e[1]])
+	cfg.set_value("Meta", "rev", REV)
 	cfg.save(SAVE_PATH)
+
+
+## v0.8.1: settings saved by older builds get these reset to the new
+## defaults once (the performance pass changed what they should be).
+const REV := 2
+const REV_RESET := {2: ["occlusion_culling", "sun_shadow_distance", "lod_threshold"]}
 
 
 func _load() -> void:
 	var cfg := ConfigFile.new()
 	if cfg.load(SAVE_PATH) != OK:
 		return
+	var rev: int = cfg.get_value("Meta", "rev", 1)
 	for e in SCHEMA:
 		if e[3] in ["bool", "enum", "range"] and cfg.has_section_key(e[0], e[1]):
 			var v = cfg.get_value(e[0], e[1])
 			if typeof(v) == typeof(e[4]) or (e[3] == "range" and typeof(v) in [TYPE_INT, TYPE_FLOAT]):
 				values[e[1]] = v
+	for r in REV_RESET:
+		if rev < r:
+			for k in REV_RESET[r]:
+				values[k] = entry(k)[4]
+	if rev < REV:
+		_save()
 
 
 func _wanted_override() -> Dictionary:

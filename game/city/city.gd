@@ -118,11 +118,22 @@ func _ready() -> void:
 		if resume and not saved.is_empty():
 			s = saved.seed
 			KitLibrary.detail = int(saved.get("detail", KitLibrary.detail))
+		if Perf.benchmark_pending:
+			s = Perf.BENCH_SEED
+			KitLibrary.detail = int(Settings.values.get("debris_detail", 2))
 		if s == 0:
 			s = randi_range(1, 999999)
 		next_seed = 0
 		_build(s)
-		if tutorial:
+		if Perf.benchmark_pending:
+			Perf.benchmark_pending = false
+			state.no_save = true
+			dispatch.enabled = false
+			var bench := BenchmarkRun.new()
+			bench.name = "Benchmark"
+			bench.city = self
+			add_child(bench)
+		elif tutorial:
 			state.no_save = true
 			dispatch.enabled = false
 			first_shift = FirstShift.new()
