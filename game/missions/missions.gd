@@ -51,7 +51,12 @@ const TEMPLATES := {
 	# Phase 3.4: big busts.
 	Dispatcher.Kind.GANGWAR: {"d": [0.5, 0.7, 1.5, 2], "h": [0.1, 0.3, 1, 1.5]},
 	Dispatcher.Kind.BANK: {"d": [1.2, 0.2, 0.2, 0], "h": [1, 1, 0.3, 0]},
+	# Phase 3.7: stings (only once the station has plain clothes).
+	Dispatcher.Kind.BAITCAR: {"d": [1, 2, 2, 1], "h": [0.5, 0.5, 1.5, 2], "needs": Armoury.PLAIN},
+	Dispatcher.Kind.BUY: {"d": [1, 1, 2, 2], "h": [0.3, 0.5, 1.5, 2], "needs": Armoury.PLAIN},
 }
+const BAIT_LOCK := 5.0       # s of driving before the bait car is shut down
+const BUY_TIME := 2.0        # s close to the dealer, holding interact, to make the buy
 const FLOOR_NAMES := ["Ground floor", "First floor", "Second floor", "Third floor", "Fourth floor", "Fifth floor"]
 const DISTRICTS := ["downtown", "residential", "industrial", "docks"]
 
@@ -96,6 +101,8 @@ func _physics_process(delta: float) -> void:
 	_talk_step()
 	_floors_step()
 	_getaway_step()
+	_bait_step(delta)
+	_buy_step(delta)
 	_hidden_step(delta)
 	if enabled and dispatcher.enabled:
 		_encounter_t -= delta
@@ -118,7 +125,9 @@ func pick_kind(exclude: Array = []) -> Dispatcher.Kind:
 			continue
 		if k == Dispatcher.Kind.TRAFFIC and dispatcher.civ_car == null:
 			continue
-		if k in [Dispatcher.Kind.THEFT, Dispatcher.Kind.PURSUIT] and dispatcher.traffic == null:
+		if k in [Dispatcher.Kind.THEFT, Dispatcher.Kind.PURSUIT, Dispatcher.Kind.BAITCAR] and dispatcher.traffic == null:
+			continue
+		if TEMPLATES[k].has("needs") and not Armoury.owns(TEMPLATES[k].needs):
 			continue
 		var w: float = float(TEMPLATES[k].d[di]) * float(TEMPLATES[k].h[slot])
 		if w > 0.0:
@@ -331,9 +340,97 @@ func setup_call(c: Dictionary, at := Vector3.INF) -> bool:
 					people[c.id].getaway = {"dr": dr, "s": drv}
 			c.pos = b.door
 			c.text = "Bank job at the %s on %s: %d armed inside with staff held, and a getaway car out front. Box the car in, then go in." % [b.type, CityGenerator.street_at(b.door), n]
+		Dispatcher.Kind.BAITCAR:
+			if d.traffic == null:
+				return false
+			var dr := d.traffic.borrow_car(street)
+			if dr.is_empty():
+				return false
+			var car: CivilianVehicle = dr.car
+			var door := car.door_point(0)
+			door.y = BlockGenerator.BASE_Y
+			if d.nav and d.nav.ready_to_use:
+				var q := d.nav.closest(door)
+				if q.distance_to(door) < 3.0:
+					door = q
+			var th := d.spawn_suspect(door, Suspect.S.LOITER, false, c.id)
+			th.home = door
+			c.suspects.append(th.net_id)
+			d._thefts[c.id] = {"dr": dr, "suspect": th, "t": -10.0, "bait": true}
+			c.pos = car.global_position
+			c.text = "Sting: our bait car's on %s and someone's sizing it up. Keep the uniforms and marked cars out of sight and let him take it." % CityGenerator.street_at(c.pos)
+		Dispatcher.Kind.BUY:
+			var p := at if at != Vector3.INF else d._gang_spot()
+			var s := d.spawn_suspect(p, Suspect.S.LOITER, _rng.randf() < 0.4, c.id)
+			c.suspects.append(s.net_id)
+			if not people.has(c.id):
+				people[c.id] = {"victim": null, "witness": null, "said": {}}
+			people[c.id].dealer = s
+			people[c.id].buy_t = 0.0
+			c.pos = p
+			c.text = "Sting: a dealer's selling %s. Go in plain clothes, walk up and buy (hold %s next to him), then take him. Uniforms will scare him off." % [d._side_name(p), "F"]
 		_:
 			return false
 	return true
+
+
+# --- stings (Phase 3.7) ------------------------------------------------------------------
+
+var _baits := {}     # call id -> {dr, s, t}
+
+
+## The bait car's been taken: shut it down after a few seconds.
+func bait_taken(id: int, dr: Dictionary, s: Suspect) -> void:
+	_baits[id] = {"dr": dr, "s": s, "t": 0.0}
+	dispatcher.say("DISPATCH: he's taken the bait car. Let him get going... we'll shut it down.")
+
+
+func _bait_step(delta: float) -> void:
+	for id in _baits.keys():
+		var b: Dictionary = _baits[id]
+		var s: Suspect = b.s
+		if not is_instance_valid(s) or s.state != Suspect.S.DRIVE:
+			_baits.erase(id)
+			continue
+		b.t += delta
+		if b.t >= BAIT_LOCK:
+			_baits.erase(id)
+			var car: CivilianVehicle = b.dr.car
+			dispatcher.traffic._bail(b.dr)
+			b.dr.hold = true
+			car.linear_velocity *= 0.15
+			s.set_state(Suspect.S.SURRENDER)
+			s.suspicion = Suspect.MADE
+			dispatcher.calls[id].marker = car.global_position
+			dispatcher.say("DISPATCH: bait car's locked down on %s. Engine's dead, doors are locked: he's sitting there with his hands up. Go and get him." % CityGenerator.street_at(car.global_position))
+
+
+## The fake buy: a plain-clothes officer next to the dealer holding interact.
+func _buy_step(delta: float) -> void:
+	for id in people.keys():
+		var e: Dictionary = people[id]
+		if not e.has("dealer"):
+			continue
+		var s: Suspect = e.dealer
+		var c: Dictionary = dispatcher.calls.get(id, {})
+		if c.is_empty() or c.state != Dispatcher.CallState.ACTIVE or not is_instance_valid(s) or s.state != Suspect.S.LOITER:
+			e.erase("dealer")
+			continue
+		var buyer: Officer = null
+		for n in get_tree().get_nodes_in_group("officers"):
+			var o := n as Officer
+			if o and o.undercover() and o.global_position.distance_to(s.global_position) < 2.2 and (o.buttons & PlayerInput.INTERACT) != 0:
+				buyer = o
+		if buyer == null:
+			e.buy_t = maxf(0.0, float(e.buy_t) - delta)
+			continue
+		s._face(buyer.global_position)
+		e.buy_t = float(e.buy_t) + delta
+		if e.buy_t >= BUY_TIME:
+			e.erase("dealer")
+			c.bought = true
+			dispatcher.earn(300)
+			dispatcher.say("DISPATCH: that's the buy, on tape. Evidence bonus £300. Take him.")
 
 
 ## Phase 3.4: the bank job's getaway driver waits by the car until the

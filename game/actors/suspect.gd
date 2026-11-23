@@ -204,6 +204,7 @@ func on_shout(at: Vector3, reach: float) -> void:
 	var d := global_position.distance_to(at)
 	if d > reach or not is_free():
 		return
+	suspicion = MADE   # "Police!" gives the game away
 	var q := PhysicsRayQueryParameters3D.create(global_position + Vector3(0, 1.5, 0), at + Vector3(0, 1.4, 0), 1, [get_rid()])
 	var heard_clearly := get_world_3d().direct_space_state.intersect_ray(q).is_empty() or d < 6.0
 	if not heard_clearly:
@@ -359,6 +360,8 @@ func _physics_process(delta: float) -> void:
 		return
 	if state in [S.DOWN, S.BOOKED, S.DRIVE]:
 		return
+	if not civilian and part == "":
+		_suspicion_step(delta)
 	var t := _threat()
 	if t.o and t.los:
 		_last_seen = (t.o as Officer).global_position
@@ -489,7 +492,7 @@ func _physics_process(delta: float) -> void:
 							_swing_t = EnemyGuns.RELOAD[weapon]
 						else:
 							_swing_t = _rng.randf_range(0.5, 1.4)
-							_fire_at(aim_at, 0.12)
+							_fire_at(aim_at, 0.07)
 			elif _notices(t) and _rng.randf() < delta * 1.5:
 				brawl_with = null
 				_react(t)
@@ -642,6 +645,32 @@ func _back_to_route() -> void:
 
 
 ## The nearest officer on their feet: {o, d, los}.
+## Phase 3.7: how sure they are that the plain-clothes officer hanging about
+## is the police (1: they've made them, and they're treated like uniforms).
+var suspicion := 0.0
+const MADE := 1.0
+
+
+func _suspicion_step(delta: float) -> void:
+	var near := false
+	for n in get_tree().get_nodes_in_group("officers"):
+		var o := n as Officer
+		if o == null or not o.plain:
+			continue
+		var d := o.global_position.distance_to(global_position)
+		if d > 14.0:
+			continue
+		if not o.undercover() and d < 20.0:
+			suspicion = MADE   # a gun out, or a marked car: that's the police
+			return
+		near = true
+		# Lingering close is what gives you away; across the street is fine.
+		suspicion += delta * (0.22 if d < 3.0 else (0.08 if d < 7.0 else 0.025))
+	if not near:
+		suspicion = maxf(0.0, suspicion - 0.04 * delta)
+	suspicion = minf(suspicion, MADE)
+
+
 func _threat() -> Dictionary:
 	var best: Officer = null
 	var bd := INF
@@ -649,6 +678,8 @@ func _threat() -> Dictionary:
 		var o := n as Officer
 		if o == null or o.state == Officer.S.DOWNED:
 			continue
+		if o.undercover() and suspicion < MADE and not civilian:
+			continue   # just someone on the street
 		var d := o.global_position.distance_to(global_position)
 		if d < bd:
 			bd = d

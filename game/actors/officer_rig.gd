@@ -433,7 +433,7 @@ func _update_spare_mag(o: Officer) -> void:
 		_spare_mag = model.find_child("spare_mag", true, false) as Node3D
 		if _spare_mag == null:
 			return
-	var k := 1.0 - o.reload_t / Officer.RELOAD_TIME if o.is_reloading() else 0.0
+	var k := 1.0 - o.reload_t / o.reload_time() if o.is_reloading() else 0.0
 	_spare_mag.visible = k > 0.33 and k < 0.59
 
 

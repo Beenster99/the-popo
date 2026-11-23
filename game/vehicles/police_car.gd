@@ -277,7 +277,7 @@ signal commandeered(by: Node)
 
 
 func can_enter() -> bool:
-	return true
+	return not has_meta("locked")   # Phase 3.5: not bought yet
 
 
 func commandeer(by: Node) -> void:

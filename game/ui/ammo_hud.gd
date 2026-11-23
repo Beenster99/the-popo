@@ -105,7 +105,7 @@ func _process(_delta: float) -> void:
 	_state.visible = s != ""
 	_bar.visible = o.is_reloading() or o.treat_t > 0.0 or o._boot_t > 0.0 or o.cuff_t > 0.0
 	if o.is_reloading():
-		_bar.value = 1.0 - o.reload_t / Officer.RELOAD_TIME
+		_bar.value = 1.0 - o.reload_t / o.reload_time()
 	elif o.cuff_t > 0.0:
 		_bar.value = o.cuff_t / Officer.CUFF_TIME
 	elif o._boot_t > 0.0:

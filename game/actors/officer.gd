@@ -159,6 +159,16 @@ const RESERVE_START := 60
 const RESERVE_MAX := 90
 var reserve := RESERVE_START
 const WEAPON_NAME := "Service pistol"
+## Phase 3.5: which pistol this officer carries and what it's loaded with
+## (Armoury: bits 0-2 pistol, 3-4 ammo). The station's upgrades apply on top.
+var kit := 0
+## Phase 3.6: breach charges or C4 left (refilled from a patrol car's boot).
+var charges := 0
+## Phase 3.7: in plain clothes (synced). Suspects take you for anyone on the
+## street until you get your gun out, turn up in a marked car, shout, or
+## hang about too close for too long.
+var plain := false
+var _plain_shown := false
 ## Phase 1.5: a gun picked up off the floor (EnemyGuns.PISTOL or SHOTGUN),
 ## or EnemyGuns.NONE for the service pistol. It has only the rounds that
 ## were in it: no reloading. Empty, or H, drops it.
@@ -469,6 +479,15 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 
 
 func _fire_step() -> void:
+	# Phase 3.6: with the charges selected (2), fire places one where you aim.
+	if buttons & PlayerInput.ALT_TOOL and charges > 0 and gun == EnemyGuns.NONE:
+		if _pressed(PlayerInput.FIRE) and is_aiming() and _cooldown <= 0.0 and reload_t <= 0.0:
+			_cooldown = 0.8
+			charges -= 1
+			if Net.is_host():
+				var muzzle := muzzle_position()
+				fired.emit(muzzle, shot_direction(muzzle), true)
+		return
 	if buttons & PlayerInput.FIRE and (is_aiming() or is_blind_firing()) and _cooldown <= 0.0 and reload_t <= 0.0 and gun != EnemyGuns.NONE:
 		_cooldown = EnemyGuns.GAP[gun]
 		if gun_ammo <= 0:
@@ -486,20 +505,20 @@ func _fire_step() -> void:
 					fired.emit(muzzle, pd, false)
 			bloom = minf(bloom + (0.8 if gun == EnemyGuns.PISTOL else 2.0), 4.0)
 	elif buttons & PlayerInput.FIRE and (is_aiming() or is_blind_firing()) and _cooldown <= 0.0 and reload_t <= 0.0:
-		_cooldown = FIRE_GAP
+		_cooldown = Armoury.fire_gap(kit)
 		if ammo <= 0:
 			if reserve > 0:
-				reload_t = RELOAD_TIME   # dry: reload by itself
+				reload_t = reload_time()   # dry: reload by itself
 		else:
 			ammo -= 1
-			recoil = 1.0
+			recoil = minf(Armoury.kick(kit), 1.6)
 			var blind := is_blind_firing()
 			if blind:
 				blind_t = 0.4
 			if Net.is_host():
 				var muzzle := muzzle_position()
 				fired.emit(muzzle, _spread(shot_direction(muzzle), blind), false)
-			bloom = minf(bloom + 0.7, 4.0)
+			bloom = minf(bloom + 0.7 * Armoury.kick(kit), 4.0)
 
 
 func _fwd() -> Vector3:
@@ -508,11 +527,76 @@ func _fwd() -> Vector3:
 
 ## Damage of one bullet (or pellet) from the gun in hand.
 func shot_damage() -> float:
-	return Gunfire.BULLET_DAMAGE if gun == EnemyGuns.NONE else float(EnemyGuns.DAMAGE[gun])
+	return Armoury.damage(kit) if gun == EnemyGuns.NONE else float(EnemyGuns.DAMAGE[gun])
 
 
 func weapon_name() -> String:
-	return WEAPON_NAME if gun == EnemyGuns.NONE else String(EnemyGuns.NAMES[gun])
+	return String(Armoury.pistol_of(kit).name) if gun == EnemyGuns.NONE else String(EnemyGuns.NAMES[gun])
+
+
+## Phase 3.7: passing for a civilian right now.
+func undercover() -> bool:
+	if not plain or not holstered or is_aiming() or state == S.DOWNED:
+		return false
+	if state == S.VEHICLE and car and not car.has_meta("unmarked") and car.is_police:
+		return false
+	return true
+
+
+## Host: in or out of plain clothes (only once the station has bought them).
+func set_plain(on: bool) -> void:
+	plain = on and Armoury.owns(Armoury.PLAIN)
+
+
+## Everyone: dress the model to match.
+func _show_plain() -> void:
+	if plain == _plain_shown or rig == null or rig.model == null:
+		return
+	_plain_shown = plain
+	if plain:
+		SuspectLook.apply(rig.model, 97 + peer_id % 50)
+		return
+	for n in rig.model.find_children("*", "MeshInstance3D", true, false):
+		var mi := n as MeshInstance3D
+		if String(mi.name) in SuspectLook.HIDE or String(mi.name) == "cap":
+			mi.visible = String(mi.name) != "spare_mag"
+		for i in mi.get_surface_override_material_count():
+			mi.set_surface_override_material(i, null)
+	Cel.apply(rig.model, true, 0.012)
+
+
+## Phase 3.5: the carried pistol's numbers (with the station's upgrades).
+func mag_size() -> int:
+	return Armoury.mag_size(kit)
+
+
+func reload_time() -> float:
+	return Armoury.reload_time(kit)
+
+
+func reserve_max() -> int:
+	return Armoury.reserve_max(kit)
+
+
+## Host: carry another pistol, or load other rounds (bought ones only).
+## The new gun comes out of the locker fully loaded.
+func set_kit(k: int) -> void:
+	var p := k & 7
+	var a := Armoury.ammo_of(k)
+	if p >= Armoury.PISTOLS.size() or not Armoury.owns(p):
+		return
+	if (a == Armoury.Ammo.HOLLOW and not Armoury.owns(Armoury.HOLLOW)) or (a == Armoury.Ammo.AP and not Armoury.owns(Armoury.AP)):
+		return
+	var g := Armoury.gear_of(k)
+	if g >= Armoury.GEAR_ITEM.size() or (g > 0 and not Armoury.owns(Armoury.GEAR_ITEM[g])):
+		return
+	var new_gear := g != Armoury.gear_of(kit)
+	kit = k
+	ammo = mag_size()
+	reserve = mini(maxi(reserve, 60), reserve_max())
+	if new_gear:
+		charges = Armoury.charges_max(kit)
+	reload_t = 0.0
 
 
 ## The nearest gun on the floor within reach, or null.
@@ -567,6 +651,7 @@ func _drop_gun() -> void:
 func take_damage(amount: float, dir := Vector3.ZERO, where := "") -> void:
 	if not Net.is_host() or state == S.DOWNED or amount <= 0.0:
 		return
+	amount *= Armoury.armour_k()
 	hp -= amount
 	_wound(amount, where)
 	if hp <= 0.0 and state == S.VEHICLE:
@@ -694,7 +779,8 @@ func _boot_and_treat(delta: float) -> void:
 		_boot_t += delta
 		if _boot_t >= BOOT_TIME:
 			_boot_t = 0.0
-			reserve = RESERVE_MAX
+			reserve = reserve_max()
+			charges = Armoury.charges_max(kit)
 			pouch = POUCH_MAX
 			injuries = 0
 			hp = minf(hp + 25.0, MAX_HP)
@@ -997,8 +1083,9 @@ func respawn() -> void:
 	hp = MAX_HP
 	injuries = 0
 	pouch = POUCH_MAX
-	ammo = MAG
-	reserve = RESERVE_MAX
+	ammo = mag_size()
+	reserve = reserve_max()
+	charges = Armoury.charges_max(kit)
 	reload_t = 0.0
 	revive_t = 0.0
 	gun = EnemyGuns.NONE
@@ -1093,9 +1180,9 @@ func is_reviving() -> bool:
 
 ## Host only: refill the belt (an ammo box). Returns true if any was taken.
 func refill_ammo() -> bool:
-	if not Net.is_host() or reserve >= RESERVE_MAX:
+	if not Net.is_host() or reserve >= reserve_max():
 		return false
-	reserve = RESERVE_MAX
+	reserve = reserve_max()
 	return true
 
 
@@ -1119,13 +1206,13 @@ func _weapon(delta: float) -> void:
 		drawing = false
 		holster_t = HOLSTER_TIME
 		reload_t = 0.0
-	if _pressed(PlayerInput.RELOAD) and gun == EnemyGuns.NONE and gun_up() and holster_t <= 0.0 and ammo < MAG and reserve > 0 and reload_t <= 0.0:
-		reload_t = RELOAD_TIME
+	if _pressed(PlayerInput.RELOAD) and gun == EnemyGuns.NONE and gun_up() and holster_t <= 0.0 and ammo < mag_size() and reserve > 0 and reload_t <= 0.0:
+		reload_t = reload_time()
 	if reload_t > 0.0:
 		reload_t -= delta
 		if reload_t <= 0.0:
 			reload_t = 0.0
-			var take := mini(MAG - ammo, reserve)
+			var take := mini(mag_size() - ammo, reserve)
 			ammo += take
 			reserve -= take
 
@@ -1133,7 +1220,7 @@ func _weapon(delta: float) -> void:
 ## Bullets go where you point, give or take: steady aimed shots are tight,
 ## rapid fire opens up, blind fire from cover is wild.
 func _spread(dir: Vector3, blind: bool) -> Vector3:
-	var deg := 0.4 + bloom * 1.2 + (9.0 if blind else 0.0) + (2.2 if injuries & ARM else 0.0)
+	var deg := Armoury.spread(kit) + bloom * 1.2 + (9.0 if blind else 0.0) + (2.2 if injuries & ARM else 0.0)
 	if state == S.VEHICLE:
 		deg += 1.0 + car.linear_velocity.length() * 0.08 if car else 1.0
 	if state == S.PRONE:
@@ -1575,6 +1662,8 @@ func encode_state(b: StreamPeerBuffer) -> void:
 	b.put_half(cuff_t)
 	b.put_u8(gun)
 	b.put_u8(gun_ammo)
+	b.put_u8(kit)
+	b.put_u8(charges | (128 if plain else 0))
 
 
 func decode_state(b: StreamPeerBuffer) -> Dictionary:
@@ -1589,7 +1678,7 @@ func decode_state(b: StreamPeerBuffer) -> Dictionary:
 		"ammo": b.get_u8(), "rs": b.get_u8(), "rl": b.get_half(), "ht": b.get_half(), "cd": b.get_half(), "bl": b.get_half(),
 		"hp": b.get_u8(), "rv": b.get_half(), "bg": b.get_u8() == 1, "sg": b.get_half(),
 		"car": b.get_8(), "seat": b.get_u8() - 1, "inj": b.get_u8(), "tr": b.get_half(), "bt": b.get_half(), "cf": b.get_half(),
-		"gn": b.get_u8(), "ga": b.get_u8(),
+		"gn": b.get_u8(), "ga": b.get_u8(), "kit": b.get_u8(), "chg": b.get_u8(),
 	}
 
 
@@ -1618,6 +1707,9 @@ func apply_state(s: Dictionary) -> void:
 	reserve = s.rs
 	gun = s.gn
 	gun_ammo = s.ga
+	kit = s.kit
+	charges = s.chg & 127
+	plain = (s.chg & 128) != 0
 	reload_t = s.rl
 	holster_t = absf(s.ht)
 	drawing = s.ht < 0.0
@@ -1677,6 +1769,7 @@ func _process(delta: float) -> void:
 					var right: bool = (g.name == "shotgun") == (gun == EnemyGuns.SHOTGUN)
 					(g as Node3D).visible = show and right
 		_update_torch()
+		_show_plain()
 
 
 ## The torch: a beam from the chest along the aim, on while the player has it
@@ -1689,6 +1782,11 @@ func _update_torch() -> void:
 		_torch.light_energy = 6.0
 		_torch.spot_range = 16.0
 		_torch.spot_angle = 18.0
+	if _torch and on:
+		var tac := Armoury.gear_of(kit) == Armoury.Gear.TORCH
+		_torch.light_energy = 12.0 if tac else 6.0
+		_torch.spot_range = 32.0 if tac else 16.0
+		_torch.spot_angle = 22.0 if tac else 18.0
 		_torch.spot_attenuation = 0.6
 		_torch.shadow_enabled = true
 		add_child(_torch)

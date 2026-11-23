@@ -227,4 +227,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			Net.leave()
 			tree.change_scene_to_file("res://game/ui/main_menu.tscn")
 			return
+		if ArmouryScreen.is_open():
+			return   # it closes itself
 		PauseMenu.toggle(tree)

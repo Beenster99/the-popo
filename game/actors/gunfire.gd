@@ -8,19 +8,22 @@ extends RefCounted
 const BULLET_DAMAGE := 25.0
 
 
-static func resolve(world: DestructionWorld, cars: CarSync, origin: Vector3, dir: Vector3, alt: bool, shooter: Officer) -> Vector3:
+static func resolve(world: DestructionWorld, cars: CarSync, origin: Vector3, dir: Vector3, alt: bool, shooter: Officer, through := false) -> Vector3:
 	var hit := Melee.bullet_ray(shooter.get_world_3d().direct_space_state, origin, dir, shooter)
-	if Net.is_host():
+	if Net.is_host() and not through:
 		shooter.get_tree().call_group("alarm_listeners", "on_alarm", origin, 45.0)
 	if alt:
-		var at: Vector3 = hit.position if hit else origin + dir * 8.0
-		Blast.go(shooter.get_tree(), world, cars, at, 3.5, 200.0, 9.0)
+		# Phase 3.6: a breach charge or C4, stuck where you aimed (in reach).
+		var at: Vector3 = hit.position if hit and (hit.position as Vector3).distance_to(origin) < 12.0 else origin + dir * 3.0
+		Charge.place(shooter.get_tree(), shooter.get_parent(), world, cars, at, Armoury.charge_blast(shooter.kit), Armoury.gear_of(shooter.kit) == Armoury.Gear.C4)
 	elif hit and hit.collider is Officer:
 		var o := hit.collider as Officer
 		o.take_damage(shooter.shot_damage(), dir, o.body_part_at(hit.position))
 	elif hit and hit.collider is Suspect:
 		var sp := hit.collider as Suspect
 		sp.take_damage(shooter.shot_damage(), dir)
+	elif hit and hit.collider.has_method("on_bullet"):
+		hit.collider.on_bullet(hit.position, shooter)   # a range target
 	elif hit and hit.collider is Car and cars:
 		var surface := cars.bullet_hit(hit.collider, hit.position, dir)
 		if world:
@@ -34,6 +37,12 @@ static func resolve(world: DestructionWorld, cars: CarSync, origin: Vector3, dir
 		_sound(origin, end, Sfx.surface_of(hit.collider) if hit else "concrete", what, shooter)
 	if not alt:
 		whizz(shooter.get_tree(), origin, end, shooter)
+	# Phase 3.5: armour-piercing rounds go on through a car, glass, a door or
+	# a thin wall, and hit whatever's behind.
+	if not alt and not through and hit and shooter.gun == EnemyGuns.NONE and Armoury.ammo_of(shooter.kit) == Armoury.Ammo.AP \
+			and not (hit.collider is Officer or hit.collider is Suspect) \
+			and (hit.collider is Car or Sfx.surface_of(hit.collider) in ["glass", "wood", "metal", "plaster"]):
+		resolve(world, cars, (hit.position as Vector3) + dir * 0.45, dir, false, shooter, true)
 	return end
 
 

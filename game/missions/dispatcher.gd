@@ -22,7 +22,7 @@ extends Node
 ## turns up. Arrests and suspects shot count the same: no conduct score.
 
 enum Kind { ROBBERY, ARMED, TRAFFIC, GANG, THEFT, PURSUIT, MUGGING, SHOPLIFT, FIGHT, DOMESTIC, DEAL, VANDAL, DRUNK,
-	BURGLARY, RAID, HOSTAGE, SEARCH, GANGWAR, BANK }
+	BURGLARY, RAID, HOSTAGE, SEARCH, GANGWAR, BANK, BAITCAR, BUY }
 enum CallState { ACTIVE, CLOSED, LOST, HIDDEN }
 
 const MSG_STATE := 80        # host -> all: calls, suspects, dropped guns (10 a second)
@@ -43,7 +43,7 @@ const BOOK_TIME := 1.2
 const LAP := [Vector3(-6, 0, -6), Vector3(54, 0, -6), Vector3(54, 0, 54), Vector3(-6, 0, 54)]
 const KIND_NAMES := ["Robbery in progress", "Armed suspect", "Traffic stop", "Shots fired", "Car theft", "Pursuit",
 	"Mugging", "Shoplifter", "Fight", "Domestic", "Drug deal", "Vandalism", "Drunk and disorderly",
-	"Burglary", "Raid", "Hostages", "Building search", "Gang war", "Bank job"]
+	"Burglary", "Raid", "Hostages", "Building search", "Gang war", "Bank job", "Bait car", "Sting: buy"]
 ## Phase 3.4: pay. Every job closed pays the station; each suspect brought in
 ## (booked or down, the same: no conduct score) pays a bit more. Story
 ## characters brought in alive pay a bonus. Spent at the armoury (Phase 3.5).
@@ -52,7 +52,7 @@ const PAY_STORY_ALIVE := 500
 const PAY_JOB := {Kind.ROBBERY: 200, Kind.ARMED: 250, Kind.TRAFFIC: 150, Kind.GANG: 450, Kind.THEFT: 150,
 	Kind.PURSUIT: 300, Kind.MUGGING: 150, Kind.SHOPLIFT: 100, Kind.FIGHT: 100, Kind.DOMESTIC: 150, Kind.DEAL: 200,
 	Kind.VANDAL: 100, Kind.DRUNK: 80, Kind.BURGLARY: 200, Kind.RAID: 700, Kind.HOSTAGE: 800, Kind.SEARCH: 250,
-	Kind.GANGWAR: 900, Kind.BANK: 1200}
+	Kind.GANGWAR: 900, Kind.BANK: 1200, Kind.BAITCAR: 500, Kind.BUY: 400}
 ## Wave 2: how long a car thief takes to get into the car.
 const BREAK_IN_TIME := 22.0
 
@@ -913,7 +913,12 @@ func _theft_step(delta: float) -> void:
 		th.t += delta
 		var car: CivilianVehicle = th.dr.car
 		s._face(car.global_position)
-		if th.t > BREAK_IN_TIME and traffic and th.dr.mode == "parked":
+		if th.t > BREAK_IN_TIME and traffic and th.dr.mode == "parked" and th.get("bait", false):
+			# Phase 3.7: he's taken the bait. Missions locks it down.
+			traffic.getaway(th.dr, s)
+			missions.bait_taken(id, th.dr, s)
+			_thefts.erase(id)
+		elif th.t > BREAK_IN_TIME and traffic and th.dr.mode == "parked":
 			traffic.getaway(th.dr, s)
 			calls[id].kind = Kind.PURSUIT
 			say("DISPATCH: they're in the car and away, heading along %s. Pursue." % CityGenerator.street_at(car.global_position))

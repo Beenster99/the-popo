@@ -6,6 +6,7 @@ extends CanvasLayer
 ## to the custody bay.
 
 var dispatcher: Dispatcher
+var armoury: Armoury
 var pawn_getter: Callable   # () -> Officer, or null
 
 var _calls: Label
@@ -74,6 +75,34 @@ func _process(delta: float) -> void:
 		lines.append("%s%s" % [Dispatcher.KIND_NAMES[call.kind].to_upper(), d])
 	if _has_prisoner():
 		lines.append("PRISONER: take them to the custody bay")
+	# Phase 3.5/3.6: the armoury counter and the range mark.
+	var use := Controls.describe(Controls.pc_event("interact"))
+	if o and armoury and not ArmouryScreen.is_open() and not PauseMenu.is_open():
+		var rng := armoury.get_parent().get_node_or_null("Range") as FiringRange
+		if armoury.near_counter(o.global_position):
+			lines.append("%s: open the armoury" % use)
+			if Input.is_action_just_pressed("interact") and not PlayerInput.blocked:
+				ArmouryScreen.open(get_tree(), armoury, pawn_getter)
+		elif rng and rng.near_start(o.global_position) and not rng.running:
+			lines.append("%s: start a range run" % use)
+			if Input.is_action_just_pressed("interact") and not PlayerInput.blocked:
+				rng.ask_start()
+	# Phase 3.7: undercover, and how close the nearest crook is to making you.
+	if o is Officer and (o as Officer).plain:
+		var worst := 0.0
+		for sp in dispatcher.suspects.values():
+			var su := sp as Suspect
+			if su.is_free() and not su.civilian and su.part == "" and su.global_position.distance_to(o.global_position) < 15.0:
+				worst = maxf(worst, su.suspicion)
+		if not (o as Officer).undercover():
+			lines.append("PLAIN CLOTHES (they can see you're police)")
+		elif worst >= Suspect.MADE:
+			lines.append("UNDERCOVER: you've been made!")
+		else:
+			var bars := int(round(worst * 10.0))
+			lines.append("UNDERCOVER  suspicion [%s%s]" % ["|".repeat(bars), ".".repeat(10 - bars)])
+	if o is Officer and PlayerInput.alt_tool and (o as Officer).charges > 0:
+		lines.append("%s: %d left (1 for the pistol)" % [Armoury.GEAR_NAMES[Armoury.gear_of((o as Officer).kit)].to_upper(), (o as Officer).charges])
 	_calls.text = "\n".join(lines)
 	_arrows.queue_redraw()
 
