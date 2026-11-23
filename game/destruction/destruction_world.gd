@@ -54,6 +54,10 @@ const SLABS := ["slab", "slab_half", "slab_stairwell", "roof", "roof_half"]
 enum { BREAK_SHATTER, BREAK_RELEASE, BREAK_BODY_SHATTER }
 
 signal piece_broken(id: int)
+## Wave 4: a repair crew put a piece back, or carted a chunk of rubble off.
+signal piece_restored(id: int)
+const MSG_CLEAR := 23     # host -> all: these rubble bodies are carted away (u32 each)
+const MSG_RESTORE := 24   # host -> all: this piece is built again (u32)
 
 ## Set by the scene so clients can read the interpolation clock.
 var sync: PawnSync
@@ -79,13 +83,15 @@ func _ready() -> void:
 	Net.register(MSG_BREAK, _on_break_msg)
 	Net.register(MSG_SETTLE, _on_settle_msg)
 	Net.register(MSG_FX, _on_fx_msg)
+	Net.register(MSG_CLEAR, _on_clear_msg)
+	Net.register(MSG_RESTORE, _on_restore_msg)
 	if sync:
 		sync.extra_writers.append(_write_snapshot)
 		sync.extra_readers.append(_read_snapshot)
 
 
 func _exit_tree() -> void:
-	for m in [MSG_BREAK, MSG_SETTLE, MSG_FX]:
+	for m in [MSG_BREAK, MSG_SETTLE, MSG_FX, MSG_CLEAR, MSG_RESTORE]:
 		Net.unregister(m)
 
 
@@ -98,6 +104,23 @@ func _exit_tree() -> void:
 func add_piece(kind: String, xform: Transform3D, bears := true, tint := Color(0, 0, 0, 0), held_by := -1, group := 0) -> int:
 	var id := _next_id
 	_next_id += 1
+	var kit := KitLibrary.get_piece(kind)
+	var body := _piece_node(id, kind, xform, tint)
+	var world_aabb: AABB = xform * (kit.aabb as AABB)
+	pieces[id] = {
+		"id": id, "kind": kind, "node": body, "xform": xform, "aabb": world_aabb,
+		"hp": HP.get(kind, 100.0), "bears": bears, "state": "intact",
+		"anchored": world_aabb.position.y < ANCHOR_Y and held_by < 0, "below": [],
+		"tint": tint, "held_by": held_by, "group": group,
+	}
+	if not _groups.has(group):
+		_groups[group] = []
+	_groups[group].append(id)
+	_cell_add(id, world_aabb)
+	return id
+
+
+func _piece_node(id: int, kind: String, xform: Transform3D, tint: Color) -> StaticBody3D:
 	var kit := KitLibrary.get_piece(kind)
 	var body := StaticBody3D.new()
 	body.name = "Piece%d" % id
@@ -115,18 +138,92 @@ func add_piece(kind: String, xform: Transform3D, bears := true, tint := Color(0,
 		cs.position = ch.offset
 		body.add_child(cs)
 	add_child(body)
-	var world_aabb: AABB = xform * (kit.aabb as AABB)
-	pieces[id] = {
-		"id": id, "kind": kind, "node": body, "xform": xform, "aabb": world_aabb,
-		"hp": HP.get(kind, 100.0), "bears": bears, "state": "intact",
-		"anchored": world_aabb.position.y < ANCHOR_Y and held_by < 0, "below": [],
-		"tint": tint, "held_by": held_by, "group": group,
-	}
-	if not _groups.has(group):
-		_groups[group] = []
-	_groups[group].append(id)
-	_cell_add(id, world_aabb)
-	return id
+	return body
+
+
+# --- Repairs (Wave 4) ---------------------------------------------------------
+
+## Host: cart rubble bodies away (net ids), for everyone.
+func clear_bodies(nids: Array) -> void:
+	if not Net.is_host() or nids.is_empty():
+		return
+	var b := StreamPeerBuffer.new()
+	b.put_u16(nids.size())
+	for n in nids:
+		b.put_u32(n)
+	if Net.is_online():
+		Net.broadcast(MSG_CLEAR, b.data_array, Net.RELIABLE)
+	b.seek(0)
+	_apply_clear(b)
+
+
+## Host: build a piece again where it stood, for everyone. Whatever is left
+## of it lying about (its chunks, or the whole piece fallen) goes.
+func restore_piece(id: int) -> void:
+	if not Net.is_host() or not pieces.has(id) or pieces[id].state == "intact":
+		return
+	var b := StreamPeerBuffer.new()
+	b.put_u32(id)
+	if Net.is_online():
+		Net.broadcast(MSG_RESTORE, b.data_array, Net.RELIABLE)
+	_apply_restore(id)
+
+
+func _on_clear_msg(_from: int, data: PackedByteArray) -> void:
+	if Net.is_host():
+		return
+	var b := StreamPeerBuffer.new()
+	b.data_array = data
+	_apply_clear(b)
+
+
+func _on_restore_msg(_from: int, data: PackedByteArray) -> void:
+	if Net.is_host():
+		return
+	var b := StreamPeerBuffer.new()
+	b.data_array = data
+	_apply_restore(b.get_u32())
+
+
+func _apply_clear(b: StreamPeerBuffer) -> void:
+	for i in b.get_u16():
+		var nid := b.get_u32()
+		var rb: RigidBody3D = bodies.get(nid)
+		bodies.erase(nid)
+		_buffers.erase(nid)
+		_priority.erase(nid)
+		if rb and is_instance_valid(rb):
+			rb.queue_free()
+
+
+func _apply_restore(id: int) -> void:
+	var p: Dictionary = pieces.get(id, {})
+	if p.is_empty() or p.state == "intact":
+		return
+	for k in 64:
+		var nid: int = id * 64 + k
+		if bodies.has(nid):
+			var rb: RigidBody3D = bodies[nid]
+			bodies.erase(nid)
+			_buffers.erase(nid)
+			_priority.erase(nid)
+			if is_instance_valid(rb):
+				rb.queue_free()
+	_released.erase(id)
+	p.state = "intact"
+	p.hp = HP.get(p.kind, 100.0)
+	p.node = _piece_node(id, p.kind, p.xform, p.tint)
+	piece_restored.emit(id)
+
+
+## The synced rubble bodies (chunks and fallen pieces) within r of p.
+func rubble_near(p: Vector3, r: float) -> Array:
+	var out: Array = []
+	for nid in bodies:
+		var rb: RigidBody3D = bodies[nid]
+		if is_instance_valid(rb) and rb.global_position.distance_to(p) < r:
+			out.append(nid)
+	return out
 
 
 ## What a kit piece sounds like when hit (Sfx surfaces).

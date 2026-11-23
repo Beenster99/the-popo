@@ -752,7 +752,7 @@ func _recycle() -> void:
 			dr.wi = 0
 			_append_lane(dr, ln[0], ln[1], (l2[0] as Vector3).distance_to(p))
 			dr.mode = "drive"
-			dr.look = _rng.randi_range(0, 255)
+			dr.look = _rng.randi_range(0, SuspectLook.WORKER - 1)
 			_seat_driver(dr)
 			return
 

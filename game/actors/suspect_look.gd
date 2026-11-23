@@ -9,6 +9,10 @@ const SHIRTS := [Color("b8322c"), Color("6f7378"), Color("3f6b3a"), Color("2a2a3
 	Color("7a4a8c"), Color("2f5f8a")]
 const TROUSERS := [Color("3b5677"), Color("232327"), Color("8a7c5e"), Color("55585e"), Color("2c3e5c")]
 const SKIN := [Color("e8c3a0"), Color("c99a74"), Color("9a6b4a"), Color("6a4630"), Color("f0d2b8")]
+## Looks from WORKER up are council workers: hi-vis vest and a hard hat.
+const WORKER := 240
+const HI_VIS := Color("ff8a1a")
+const HARD_HAT := Color("f2c81e")
 const HATS := [Color("1f1f24"), Color("6b1e22"), Color("2b3a55"), Color("4a4a42"), Color("c8c2b4")]
 
 
@@ -29,9 +33,18 @@ static func apply(model: Node, look: int) -> void:
 	if model == null:
 		return
 	var c := colours(look)
+	var worker := look >= WORKER
+	if worker:
+		c.beanie = true
+		c.hat = HARD_HAT
 	for n in model.find_children("*", "MeshInstance3D", true, false):
 		var mi := n as MeshInstance3D
 		var nm := String(mi.name)
+		if worker and nm == "vest":
+			mi.visible = true
+			for i in mi.mesh.get_surface_count():
+				mi.set_surface_override_material(i, Cel.material(HI_VIS, true, 0.012))
+			continue
 		if nm in HIDE or ((nm == "cap") and not c.beanie):
 			mi.visible = false
 			continue
