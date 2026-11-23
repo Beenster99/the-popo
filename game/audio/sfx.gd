@@ -38,7 +38,7 @@ const COUNTS := {"amb_air": 1, "amb_far_traffic": 1, "amb_street": 1, "body_hit"
 	"car_door_close": 1, "car_door_open": 1, "car_engine": 1, "car_horn": 1, "car_start": 1,
 	"casing_concrete": 3, "casing_metal": 3, "casing_wood": 3, "cloth": 4, "door_close": 4, "door_open": 2,
 	"dry_fire": 1, "ear_ring": 1, "explosion": 1, "explosion_body": 2, "fire_loop": 1, "fire_whoomph": 2, "gas_hiss": 1, "gear": 4, "glass_big": 3, "glass_break": 3,
-	"glass_settle": 4, "gore_hit": 5, "gun_dry": 5, "gun_far": 4, "gun_mech": 1, "gun_near": 5, "gun_shotgun_body": 3,
+	"glass_settle": 4, "gore_hit": 5, "gun_dry": 5, "gun_far": 4, "gun_mech": 1, "gun_near": 5, "gun_sub": 3, "gun_crack_near": 3, "gun_tail_city": 3, "amb_docks": 1, "amb_industrial": 1, "amb_park": 1, "gun_shotgun_body": 3,
 	"gun_thump": 3, "holster": 2, "impact_concrete": 4, "impact_glass": 3, "impact_metal": 5, "impact_wood": 4,
 	"mag_drop_concrete": 2, "mag_drop_metal": 2, "mag_drop_wood": 2, "mag_in": 1, "mag_out": 1, "ping": 1,
 	"punch": 5, "ricochet": 4, "room_tone": 1, "rubble": 6, "shotgun_pump": 1, "siren_wail": 1, "siren_yelp": 1,
@@ -286,6 +286,21 @@ static func shot(parent: Node, pos: Vector3, kind := 0, own := false) -> void:
 	if d < 28.0:
 		var thump_db := (6.0 if indoor else 4.0) + (3.0 if sg else 0.0)
 		play(parent, "gun_shotgun_body" if sg else "gun_thump", pos, thump_db, 60.0, 0.08, BUS_INDOOR if indoor else BUS_OUTDOOR)
+	# Wave 2: the front of a close shot cracks like a whip, and a sub-bass
+	# boom underneath you feel in your chest.
+	if d < 22.0:
+		var c := play(parent, "gun_crack_near", pos, 1.0 + (2.0 if indoor else 0.0), 45.0, 0.06, BUS_INDOOR if indoor else BUS_OUTDOOR)
+		if c and sg:
+			c.pitch_scale *= 0.8
+	if d < 45.0:
+		play(parent, "gun_sub", pos, 7.0 + (3.0 if sg else 0.0) + (2.0 if indoor else 0.0), 90.0, 0.05, BUS_SFX)
+	# Outdoors the shot rolls round the streets, and from further off that
+	# rolling echo is most of what you hear.
+	if not indoor:
+		var tail_db := -7.0 + (2.0 if sg else 0.0)
+		if d > 35.0:
+			tail_db = 1.0 + (2.0 if sg else 0.0) - 14.0 * log(d / 60.0) / log(10.0)
+		later(parent, minf(d / SPEED_OF_SOUND, 1.2) * 0.25, "gun_tail_city", pos, minf(tail_db, 4.0), 450.0, 0.07, BUS_OUTDOOR, pitch)
 	if d < 7.0:
 		play(parent, "gun_mech", pos, -14.0, 10.0, 0.08)
 	if not indoor and d < 160.0:

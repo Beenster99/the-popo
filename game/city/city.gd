@@ -41,6 +41,11 @@ var fire: FireSystem
 var state: BlockState
 var seed_value := 0
 var police_cars: Array = []
+var traffic: TrafficSystem
+var env: Environment
+var skyline: CitySkyline
+var peds: PedSystem
+var _alarm_t := 0.0
 var build_ms := 0
 var _names := {}
 var _furnish_t := 0.0
@@ -48,7 +53,7 @@ var _furnish_t := 0.0
 
 func _ready() -> void:
 	BlockState.save_path = SAVE_PATH
-	ProtoWorld.environment(self)
+	env = ProtoWorld.environment(self).environment
 	var sun := ProtoWorld.sun(self)
 	sun.directional_shadow_max_distance = 140.0
 	cam = IsoCamera.new()
@@ -172,6 +177,10 @@ func _build(s: int) -> void:
 	ground.name = "Ground"
 	add_child(ground)
 	ground.build(gen)
+	skyline = CitySkyline.new()
+	skyline.name = "Skyline"
+	add_child(skyline)
+	skyline.build(gen, world, env)
 	cars = CarSync.new()
 	cars.destruction = world
 	cars.use_seats = true
@@ -195,6 +204,11 @@ func _build(s: int) -> void:
 	civ_car.rotation_degrees.y = -90.0
 	add_child(civ_car)
 	cars.add_car(civ_car)
+	# Traffic and parked cars (the same cars in the same order everywhere).
+	traffic = TrafficSystem.new()
+	traffic.name = "Traffic"
+	add_child(traffic)
+	traffic.build(gen, cars, dispatch)
 	add_child(sync)
 	nav = CityNav.new()
 	nav.name = "CityNav"
@@ -202,6 +216,18 @@ func _build(s: int) -> void:
 	if Net.is_host():
 		nav.bake_city(world, gen, _spawn_point(0))
 	dispatch.setup(gen, world, cars, nav, civ_car)
+	dispatch.traffic = traffic
+	peds = PedSystem.new()
+	peds.name = "Peds"
+	peds.gen = gen
+	peds.dispatch = dispatch
+	peds.nav = nav
+	add_child(peds)
+	# Something big coming down: people and drivers near it scatter.
+	world.piece_broken.connect(func(id):
+		if Net.is_host() and _alarm_t <= 0.0 and world.pieces.has(id):
+			_alarm_t = 0.6
+			get_tree().call_group("alarm_listeners", "on_alarm", (world.pieces[id].aabb as AABB).get_center(), 30.0))
 	props = PropWorld.new()
 	props.name = "Props"
 	props.world = world
@@ -252,6 +278,7 @@ func _physics_process(delta: float) -> void:
 	if not Net.is_host() or gen == null:
 		return
 	_furnish_t -= delta
+	_alarm_t -= delta
 	if _furnish_t <= 0.0:
 		_furnish_t = 1.0
 		_furnish_near(false)

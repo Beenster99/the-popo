@@ -55,7 +55,7 @@ func _plain_stage(cam_at: Vector3, look: Vector3) -> Node3D:
 
 func _run() -> void:
 	match shot:
-		"city_aerial", "city_street", "city_inside", "city_docks", "city_downtown":
+		"city_aerial", "city_street", "city_inside", "city_docks", "city_downtown", "city_traffic", "city_skyline":
 			# Wave 2: the whole city.
 			City.next_seed = 4242
 			var s := await _scene("res://game/city/city.tscn")
@@ -70,6 +70,18 @@ func _run() -> void:
 					s.add_child(cam)
 					cam.far = 2000.0
 					cam.look_at_from_position(Vector3(e * 0.5 - 160, 260, e + 170), Vector3(e * 0.5, 0, e * 0.45))
+					cam.current = true
+				"city_traffic", "city_skyline":
+					var cam := Camera3D.new()
+					s.add_child(cam)
+					cam.far = 2000.0
+					var j := CityGenerator.junction(2, 3)
+					if shot == "city_traffic":
+						cam.look_at_from_position(j + Vector3(-16, 5.5, -13), j + Vector3(2, 0.5, 4))
+						await _frames(420)
+					else:
+						var j0 := CityGenerator.junction(0, 3)
+						cam.look_at_from_position(j0 + Vector3(-2, 3.0, 2.6), j0 + Vector3(300, 8, 2.6))
 					cam.current = true
 				"city_docks", "city_downtown":
 					var cam := Camera3D.new()

@@ -496,6 +496,10 @@ func add_prop(kind: String, xf: Transform3D) -> int:
 		rb.freeze = true
 	add_child(rb)
 	props[id] = {"id": id, "kind": kind, "body": rb, "hp": float(d.hp), "broken": false, "burning": false}
+	# Wave 2: only awake props are looked at each frame (a city has thousands).
+	rb.sleeping_state_changed.connect(func():
+		if is_instance_valid(rb) and not rb.sleeping:
+			_awake[id] = true)
 	return id
 
 
@@ -677,18 +681,24 @@ func _fragments(kind: String, xf: Transform3D, lv: Vector3, dir: Vector3) -> voi
 
 # --- host: knocks and sync --------------------------------------------------------------
 
+var _awake := {}    # host: prop id -> true while its body is awake
+
+
 func _physics_process(delta: float) -> void:
 	_clock += delta
 	if not Net.is_host():
 		_follow(delta)
 		return
 	# Hard knocks hurt: a chair thrown at a wall, a bottle dropped.
-	for p in props.values():
-		if p.broken:
+	for id in _awake.keys():
+		var p: Dictionary = props.get(id, {})
+		if p.is_empty() or p.broken or not is_instance_valid(p.body):
+			_awake.erase(id)
 			continue
 		var rb: RigidBody3D = p.body
 		if rb.sleeping or rb.freeze:
 			_prev_v.erase(p.id)
+			_awake.erase(id)
 			continue
 		var v := rb.linear_velocity
 		var pv: Vector3 = _prev_v.get(p.id, v)

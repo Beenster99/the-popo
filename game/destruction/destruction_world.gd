@@ -346,6 +346,7 @@ func _apply_break(b: StreamPeerBuffer) -> void:
 			if p.state != "intact":
 				return
 			p.state = "released"
+			_released[p.id] = true
 			p.node.queue_free()
 			_spawn_released(p)
 			_stability_dirty = true
@@ -478,14 +479,18 @@ func _spawn_released(p: Dictionary) -> void:
 	bodies[nid] = rb
 	# Pieces that stood on this one but are still held up elsewhere would
 	# clamp its edge like a vice; let it tear free from under them instead.
-	for other in pieces.values():
+	# (Only its own block's pieces: support never crosses between blocks.)
+	var mates: Array = _groups.get(p.group, [])
+	for oid in mates:
+		var other: Dictionary = pieces[oid]
 		if other.state == "intact" and other.below.has(p.id) and is_instance_valid(other.node):
 			rb.add_collision_exception_with(other.node)
 	# The pieces it was touching when it let go (the next slab along, the
 	# wall it hung off). Scraping past them as it tips is not an impact.
 	var torn_from: Array = []
 	var near: AABB = p.aabb.grow(0.1)
-	for other in pieces.values():
+	for oid in mates:
+		var other: Dictionary = pieces[oid]
 		if other.id != p.id and other.state == "intact" and near.intersects(other.aabb):
 			torn_from.append(other.id)
 	rb.set_meta("torn_from", torn_from)
@@ -526,8 +531,11 @@ const SHATTER_GRACE_STEPS := 6
 const TEAR_SCRAPE_SPEED := 4.0
 
 func _check_released_impacts(_delta: float) -> void:
-	for p in pieces.values():
-		if p.state != "released":
+	# Wave 2: only the pieces let go (a city has tens of thousands of pieces).
+	for id in _released.keys():
+		var p: Dictionary = pieces.get(id, {})
+		if p.is_empty() or p.state != "released":
+			_released.erase(id)
 			continue
 		var rb: RigidBody3D = bodies.get(p.id * 64 + RELEASED_BIT)
 		if rb == null or not is_instance_valid(rb):
@@ -566,6 +574,7 @@ func _watch_sleep(rb: RigidBody3D, nid: int) -> void:
 const MAX_BODIES_PER_SNAPSHOT := 110
 const POS_SCALE := 64.0
 var _priority := {}
+var _released := {}     # host: piece ids falling free (state "released")
 var awake_total := 0
 
 func _write_snapshot(b: StreamPeerBuffer) -> void:
@@ -698,6 +707,7 @@ func _restore_body(p: Dictionary, k: int, xf: Transform3D) -> void:
 		rb.collision_layer = FALLING_LAYER
 		rb.set_meta("released_piece", p.id)
 		p.state = "released"
+		_released[p.id] = true
 		if Net.is_host():
 			rb.contact_monitor = true
 			rb.max_contacts_reported = 6

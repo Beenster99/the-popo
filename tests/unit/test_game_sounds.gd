@@ -162,8 +162,9 @@ func test_echoes_off_buildings() -> void:
 		await get_tree().process_frame
 	var late := Sfx.history.slice(before).map(func(s): return s.stem)
 	t.check(late.has("gun_far"), "the shot slaps back off the wall 23 m away: %s" % [late])
-	var echo: Dictionary = Sfx.history.slice(before)[0]
+	var echo: Dictionary = Sfx.history.slice(before).filter(func(e): return e.stem == "gun_far")[0]
 	t.check((echo.pos as Vector3).z > 20.0, "from the wall")
+	t.check(late.has("gun_tail_city"), "and rolls on down the street (Wave 2)")
 
 
 func test_breaking_sounds_like_what_broke() -> void:

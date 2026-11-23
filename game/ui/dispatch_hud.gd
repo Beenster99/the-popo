@@ -90,7 +90,7 @@ func _draw_arrows() -> void:
 		return
 	var targets := []
 	for call in dispatcher.active_calls():
-		targets.append([call.marker, Color("ff5050") if call.kind != Dispatcher.Kind.TRAFFIC else Color("ffb030")])
+		targets.append([call.marker, Color("ff5050") if call.kind not in [Dispatcher.Kind.TRAFFIC, Dispatcher.Kind.THEFT, Dispatcher.Kind.PURSUIT] else Color("ffb030")])
 	if _has_prisoner():
 		targets.append([dispatcher.bay_position(), Color("4a8cff")])
 	var rect := _arrows.get_rect()

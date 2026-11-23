@@ -81,7 +81,9 @@ var parts := {}
 func _init() -> void:
 	mass = 1250.0
 	collision_layer = 4
-	collision_mask = 1 | 2 | 4 | 16 | 32
+	# Not people (layer 2): TrafficSystem knocks down whoever a car hits,
+	# instead of the car stopping dead against them like a post.
+	collision_mask = 1 | 4 | 16 | 32
 	contact_monitor = true
 	max_contacts_reported = 8
 	continuous_cd = true
