@@ -12,6 +12,21 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
+SLOWER, MORE TACTICAL FIGHTS (0.9.0)
+Officers jog rather than dash, and speed up and slow down with more weight.
+A gun just brought up takes a moment to settle, and shooting on the move
+goes wide: stop, aim, then fire. A head shot drops a crook. Getting hit
+hurts more too, so use cover.
+Crooks with guns watch the whole street now and react to gunfire and being
+shot: they get into cover behind cars and walls, peek and shoot, blind fire,
+flank and fall back instead of standing in the road.
+One job at a time: after each job there's a quiet spell (a minute and a
+half to three) before the next call comes in. Chance encounters and story
+jobs only turn up when nothing else is on.
+The radio: dispatch reads each job out in a clear voice (the details are on
+screen). Other units only talk now and then, quietly, between jobs.
+Wounds now sit on the body (no more dark blob by a shot crook's head).
+
 SMOKE, GAS AND GRENADES (0.6.2)
 Buy them at the ARMOURY (Gear): smoke grenades, CS gas and flashbangs. Once
 the station has them, every officer carries two of each, refilled at a

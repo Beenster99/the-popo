@@ -22,7 +22,7 @@ extends Node
 const DAY_MINUTES := 1440.0
 const MINUTES_PER_SECOND := 0.5          # 48 real minutes a day
 const START_MINUTE := 9 * 60.0
-const ENCOUNTER_GAP := Vector2(40.0, 80.0)
+const ENCOUNTER_GAP := Vector2(200.0, 360.0)   # quiet time between chance encounters (2026-11-23)
 const ENCOUNTER_SEEN := 22.0             # m: an officer this close (in sight) has found it
 const ENCOUNTER_LIFE := 120.0            # s before an unfound encounter is over
 const TALK_REACH := 3.5
@@ -109,11 +109,13 @@ func _physics_process(delta: float) -> void:
 	_buy_step(delta)
 	_hidden_step(delta)
 	if enabled and dispatcher.enabled:
-		_encounter_t -= delta
-		if _encounter_t <= 0.0:
+		if dispatcher.quiet():
+			_encounter_t -= delta
+		if _encounter_t <= 0.0 and dispatcher.quiet():
 			_encounter_t = _rng.randf_range(ENCOUNTER_GAP.x, ENCOUNTER_GAP.y)
-			if dispatcher._active_count() < Dispatcher.MAX_CALLS + 1:
-				start_encounter()
+			start_encounter()
+			# Whichever comes first, a call or a find: the other waits.
+			dispatcher._next_call_t = maxf(dispatcher._next_call_t, 60.0)
 
 
 ## A job for here and now, weighted by the district the officers are in

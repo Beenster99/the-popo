@@ -18,10 +18,14 @@ func test_radio_and_music() -> void:
 	var radio: PoliceRadio = s.get_node("Radio")
 	var music: MusicDirector = s.get_node("Music")
 	var n0 := radio.lines
-	s.dispatch.say("DISPATCH: test line, all units.")
+	s.dispatch.say("DISPATCH: Shots fired, on Mill Street. 3 armed, they're dug in. Use cover.")
 	await _frames(2)
 	t.check(radio.lines == n0 + 1 and radio.player.playing, "a radio line keys the radio")
 	t.check(String(radio.player.stream.resource_path).contains("radio_key"), "it starts with the key-up click")
+	t.check(radio.last_voice == "dsp_shots", "dispatch reads the job out in words: %s" % radio.last_voice)
+	t.check(radio._queue.any(func(p): return String((p[0] as AudioStream).resource_path).ends_with("dsp_shots.ogg")), "the spoken line is queued")
+	t.check(PoliceRadio.voice_for("DISPATCH: robbery in progress call closed. Thanks, units. +£200") == "dsp_closed", "a close is heard as a close")
+	t.check(PoliceRadio.voice_for("WEATHER: rain coming in.") == "", "weather stays on the screen")
 	t.check(music.patrol.playing and music.patrol.stream.loop and music.heat < 0.05, "a quiet patrol bed under the game")
 	Sfx.shot(s, s.sync.my_pawn().global_position + Vector3(10, 0, 0))
 	for i in 180:

@@ -17,7 +17,7 @@ extends Node
 ## The last job of a story is the big one. (Saving story progress between
 ## sessions is Phase 4.4.)
 
-const GAP := Vector2(70.0, 130.0)     # s between story jobs
+const GAP := Vector2(300.0, 480.0)    # s of quiet between story jobs (2026-11-23: less non-stop)
 const K := Dispatcher.Kind
 const FINALE_PAY := 1500   # Phase 3.4: a story finished
 
@@ -71,7 +71,7 @@ func _physics_process(delta: float) -> void:
 	if not Net.is_host() or dispatcher == null or dispatcher.city == null:
 		return
 	_watch()
-	if not enabled or not dispatcher.enabled or not _active.is_empty():
+	if not enabled or not dispatcher.enabled or not _active.is_empty() or not dispatcher.quiet():
 		return
 	_t -= delta
 	if _t <= 0.0:

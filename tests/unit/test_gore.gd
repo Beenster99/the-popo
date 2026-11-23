@@ -31,7 +31,13 @@ func test_a_shot_bleeds_onto_the_wall_and_the_body() -> void:
 	# A head shot leaves a hole, and on Extreme bits fly.
 	var before := find_children("*", "RigidBody3D", true, false).size()
 	Gore.hit(self, Vector3(0, 1.65, 4), Vector3(0, 1.65, -1.45))
-	t.check(s.find_children("*", "MeshInstance3D", true, false).any(func(m): return m.mesh is SphereMesh), "a hole in the head")
+	var wounds := s.find_children("*", "Decal", true, false)
+	t.check(wounds.size() == 3, "a wound and a hole in the head: %d" % wounds.size())
+	# Painted on the body, not floating out on the collision capsule.
+	var head_at: Vector3 = (wounds[2] as Decal).global_position
+	t.check(Vector2(head_at.x - s.global_position.x, head_at.z - s.global_position.z).length() < 0.2, "the hole is on the head: %s" % head_at)
+	t.check(wounds.all(func(d): return (d as Decal).cull_mask == Gore.BODY_LAYER), "wounds paint only bodies")
+	t.check(not s.find_children("*", "MeshInstance3D", true, false).any(func(m): return m.mesh is SphereMesh), "no ball stuck on the head")
 	t.check(find_children("*", "RigidBody3D", true, false).size() >= before + 4, "and bits come off")
 
 

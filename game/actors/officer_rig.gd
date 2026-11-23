@@ -45,6 +45,10 @@ func _ready() -> void:
 	model = MODEL.instantiate()
 	add_child(model)
 	Cel.apply(model, true, 0.012)
+	# People draw on their own layer, so world blood decals skip them and
+	# wound decals paint only bodies (not the road under them).
+	for vi in model.find_children("*", "VisualInstance3D", true, false):
+		(vi as VisualInstance3D).layers = Gore.BODY_LAYER
 	skeleton = model.find_children("*", "Skeleton3D", true, false)[0]
 	anim_player = model.find_children("*", "AnimationPlayer", true, false)[0]
 	# Mocap base plus hand-keyed clips, merged once and shared by every officer.

@@ -15,6 +15,9 @@ extends RefCounted
 ## event (SfxSync), so nothing extra goes over the network.
 
 const RAGDOLL_LAYER := 64
+## Render layer for people's meshes (see OfficerRig): world decals leave it
+## alone and wound decals touch nothing else.
+const BODY_LAYER := 2
 const MAX_DECALS := [0, 120, 220, 360]
 const SPRAY := [0, 10, 22, 40]
 const SPLAT_SIZE := [0.0, 0.45, 0.8, 1.25]
@@ -229,6 +232,10 @@ static func _spray(parent: Node, at: Vector3, dir: Vector3, n: int) -> void:
 
 
 ## A wound on the body: a dark patch that moves with the bone it is on.
+## The bullet's hit point is on the collision capsule, which stands well off
+## the body, so the wound is put on the bone itself, on the side the bullet
+## came from (2026-11-23: a dark ball floating by shot suspects' heads was
+## the old head hole sitting out on the capsule).
 static func _wound(who: Node3D, at: Vector3, dir: Vector3, head: bool, lv: int) -> void:
 	var rig := _rig_of(who)
 	if rig == null or rig.skeleton == null:
@@ -236,37 +243,43 @@ static func _wound(who: Node3D, at: Vector3, dir: Vector3, head: bool, lv: int) 
 	var sk := rig.skeleton
 	var best := -1
 	var bd := INF
+	var bone_at := Vector3.ZERO
 	for i in sk.get_bone_count():
 		var bp := (sk.global_transform * sk.get_bone_global_pose(i)).origin
-		var d := bp.distance_to(at)
+		# Measured across the shot, so the nearest bone along the line wins.
+		var off := bp - at
+		var d := (off - dir * off.dot(dir)).length()
 		if d < bd:
 			bd = d
 			best = i
+			bone_at = bp
 	if best < 0:
 		return
 	var att := BoneAttachment3D.new()
 	att.bone_idx = best
 	sk.add_child(att)
+	var surface := bone_at - dir * (0.1 if head else 0.13)
 	var d := Decal.new()
 	d.texture_albedo = _splat_tex(4)
-	d.modulate = BLOOD_DARK
-	var s := (0.16 if head else 0.12) * (1.0 + lv * 0.25)
-	d.size = Vector3(s, 0.5, s)
+	d.modulate = BLOOD
+	var s := (0.12 if head else 0.1) * (1.0 + lv * 0.2)
+	d.size = Vector3(s, 0.3, s)
 	d.albedo_mix = 1.0
+	d.cull_mask = BODY_LAYER
 	att.add_child(d)
 	var up := -dir
 	var side := up.cross(Vector3.UP if absf(up.y) < 0.9 else Vector3.RIGHT).normalized()
-	d.global_transform = Transform3D(Basis(side, up, side.cross(up)), at)
+	d.global_transform = Transform3D(Basis(side, up, side.cross(up)), surface)
 	if head and lv >= 2:
-		# The hole itself: a dark socket where it went in.
-		var hole := MeshInstance3D.new()
-		var sm := SphereMesh.new()
-		sm.radius = 0.035 + 0.01 * lv
-		sm.height = sm.radius * 2.0
-		hole.mesh = sm
-		hole.material_override = Cel.material(Color(0.12, 0.0, 0.0), false)
+		# The hole itself: a small dark socket, set into the head.
+		var hole := Decal.new()
+		hole.texture_albedo = _splat_tex(4)
+		hole.modulate = BLOOD_DARK
+		hole.size = Vector3(0.045, 0.3, 0.045)
+		hole.albedo_mix = 1.0
+		hole.cull_mask = BODY_LAYER
 		att.add_child(hole)
-		hole.global_position = at - dir * 0.02
+		hole.global_transform = d.global_transform
 
 
 ## Extreme: a broken bone through the skin of a limb.

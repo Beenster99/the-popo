@@ -394,6 +394,31 @@ func _run() -> void:
 				await _frames(200)
 			await _frames(60)
 			await _save()
+		"gore_close":
+			# 2026-11-23: wounds sit on the body (no dark ball off the head,
+			# no stain on the road by a shot suspect).
+			Block.next_seed = 4242
+			var s := await _scene("res://prototypes/p08_block/block.tscn")
+			await _frames(10)
+			s.find_children("*", "NetOverlay", false, false)[0].queue_free()
+			(s.dispatch as Dispatcher).enabled = false
+			s.sync.my_pawn().global_position = Vector3(-20, 0.2, -20)
+			var sp := Suspect.new()
+			s.add_child(sp)
+			sp.global_position = Vector3(1.5, 0.2, 3.0)
+			sp.rotation.y = PI
+			await _frames(20)
+			# Shot from the front: chest, belly, head (on the capsule's skin).
+			for y in [1.25, 1.0, 1.62]:
+				Gore.hit(s, Vector3(1.5, y, -3.0), Vector3(1.5, y, 2.72))
+			var cam := Camera3D.new()
+			s.add_child(cam)
+			cam.global_position = Vector3(2.3, 1.55, 1.4)
+			cam.look_at(Vector3(1.5, 1.3, 3.0))
+			cam.fov = 40.0
+			cam.current = true
+			await _frames(40)
+			await _save()
 		"block_overview", "block_street", "block_inside":
 			var s := await _scene("res://prototypes/p08_block/block.tscn")
 			s.find_children("*", "NetOverlay", false, false)[0].queue_free()
