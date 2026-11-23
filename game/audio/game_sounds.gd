@@ -75,6 +75,9 @@ func _ready() -> void:
 	sync = SfxSync.new()
 	sync.name = "SfxSync"
 	add_child(sync)
+	var voices := Voices.new()
+	voices.name = "Voices"
+	add_child(voices)
 	listener = AudioListener3D.new()
 	listener.name = "Ears"
 	listener.add_to_group(Sfx.LISTENER_GROUP)

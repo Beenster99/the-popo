@@ -164,8 +164,9 @@ func _prompt(o: Officer) -> String:
 		return "DOWN   %s   or a teammate holds %s on you   (you get up here in %d s)" % [first, use, ceili(up)]
 	if o.state not in [Officer.S.MOVE, Officer.S.CROUCH]:
 		return ""
-	if o.cuff_target():
-		return "Hold %s: cuff the suspect" % use
+	var ct := o.cuff_target()
+	if ct:
+		return ("Hold %s: grab the runner" if ct.state == Suspect.S.CUFF_RUN else "Hold %s: cuff the suspect") % use
 	var fg := o.gun_on_floor()
 	if fg:
 		return "%s pick up the %s (%d rounds)" % [use, String(EnemyGuns.NAMES[fg.kind]).to_lower(), fg.rounds]
@@ -179,8 +180,11 @@ func _prompt(o: Officer) -> String:
 			var dp := pc.door_point(i)
 			if Vector2(dp.x - o.global_position.x, dp.z - o.global_position.z).length() < Officer.ENTER_RANGE + (0.4 if pr else 0.0):
 				return ("%s put the suspect in the car" % use) if pr else ("%s get in" % use)
+	var sh := Controls.describe(Controls.pc_event("shout"))
+	if pr and pr.stay:
+		return "%s tell your prisoner to get up and walk with you" % sh
 	if pr:
-		return "Walk them to a police car (they follow you), or straight to the custody bay"
+		return "Walk them to a police car (they follow you), or straight to the custody bay.   %s tell them to stay put" % sh
 	if o.pouch > 0:
 		var tt := o.treat_target()
 		if tt == o:
