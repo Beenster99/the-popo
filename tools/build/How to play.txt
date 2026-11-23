@@ -12,6 +12,22 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
+TALLER CITY AND ROOFTOPS (0.10.0)
+The city blocks come in different sizes now, so the streets aren't an even
+grid. Downtown has towers of seven to ten storeys, each with a working lift
+beside the stairs: walk up to the lift door and press F to call it, step in
+and press F again for the floor buttons (or a number key, 0 for G).
+Most buildings of two storeys or more have stairs up to a little hut on the
+roof (some huts are locked: kick the door in). Roofs have air conditioning
+units, vents, water tanks, dishes and aerials to fight round.
+GRAPPLE HOOK (armoury, Gear, 1500): bought once, everyone carries one.
+Hold right mouse and aim at a building from outside, then press F: the hook
+bites the roof edge and hauls you up and over onto the roof.
+Abseil: stand at a roof edge facing out and press F to go over on the rope.
+W climbs, S slides down, Shift drops fast, right mouse aims and you can shoot
+from the rope. Space kicks off the wall and swings you in through the window
+in front of you (glass and all). F lets go.
+
 SHOUTED ORDERS (0.8.0)
 Y (d-pad up) shouts an order at whoever you're facing, out loud for
 everyone: "Drop the weapon!", "Hands on your head!", "Hold it right there!",
