@@ -12,6 +12,10 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
+EVERYTHING TOGETHER (0.11.1)
+One build with all of the below: the frame rate work, the taller city, walk
+mode, and the slower, more tactical fights with one job at a time.
+
 FRAME RATE (0.11.0)
 Big performance pass. Settings > Graphics > Apply a preset: Epic is the one
 to play on at 4K (it upscales from 77% with FSR 2, which also smooths the
