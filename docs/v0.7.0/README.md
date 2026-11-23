@@ -35,7 +35,7 @@ that crashes in through windows.
 
 ## Grapple and abseil
 
-- `game/station/armoury.gd`: item 24, Grapple hook (Gear, 1500).
+- `game/station/armoury.gd`: item 27, Grapple hook (Gear, 1500).
 - `game/city/rooftops.gd` (Rooftops): building lookup, roof height and the
   nearest outside wall.
 - `game/actors/officer.gd`: states GRAPPLE (hook flies, line hauls you up,

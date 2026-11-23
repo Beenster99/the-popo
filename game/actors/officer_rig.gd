@@ -369,8 +369,8 @@ func _upper_state(o: Officer) -> String:
 		return "none"
 	if o.state == Officer.S.VEHICLE and o.seat == 0:
 		return "drive"
-	if o.punch_t > 0.0:
-		return "punch"
+	if o.punch_t > 0.0 or o.throw_t > 0.0:
+		return "punch"   # the throwing arm comes over the same way
 	if o.holster_t > 0.0 and not o.is_aiming():
 		return "draw" if o.drawing else "holster"
 	if o.is_reloading() and not o.holstered:

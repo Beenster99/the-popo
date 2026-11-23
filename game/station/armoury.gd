@@ -61,6 +61,10 @@ const ITEMS := [
 	# Phase 3.7: undercover.
 	{"cat": Cat.UNDERCOVER, "name": "Plain clothes", "price": 1000, "about": "Street clothes from the locker. Crooks take you for anyone until you draw, shout, turn up in a marked car or hang about too close."},
 	{"cat": Cat.UNDERCOVER, "name": "Unmarked car", "price": 2000, "needs": 16, "about": "A plain grey saloon. Nobody looks twice at it."},
+	# Throwables (2026-11-23): every officer carries two of each the station owns.
+	{"cat": Cat.GEAR, "name": "Smoke grenades", "price": 300, "about": "Two each. A thick grey cloud for half a minute: crooks can't shoot what they can't see. Throw with Q (pad: D-pad right), 3 picks which."},
+	{"cat": Cat.GEAR, "name": "CS gas", "price": 500, "about": "Two each. A stinging cloud: anyone in it coughs and can't aim, and most crooks stumble out and give up. Mind your mates."},
+	{"cat": Cat.GEAR, "name": "Flashbangs", "price": 700, "about": "Two each. A blinding flash and a deafening bang: anyone looking is stunned for a few seconds."},
 	# v0.7.0: rooftops.
 	{"cat": Cat.GEAR, "name": "Grapple hook", "price": 1500, "about": "Everyone carries a grapple launcher and rope. Aim at a roof edge and press the use key to be hauled up onto the roof. At a roof edge, press the use key to abseil down; W/S to climb or slide, Shift to drop fast, Space to swing in through a window."},
 ]
@@ -81,7 +85,12 @@ const GARAGE := 16
 const RANGE := 17
 const PLAIN := 22
 const UNMARKED := 23
-const GRAPPLE := 24
+const SMOKE_ITEM := 24
+const GAS_ITEM := 25
+const FLASH_ITEM := 26
+## Item of each throwable (Grenades.Kind smoke, gas, flash).
+const NADE_ITEMS := [SMOKE_ITEM, GAS_ITEM, FLASH_ITEM]
+const GRAPPLE := 27
 
 const MSG_BUY := 100      # client -> host: buy item (u8)
 const MSG_KIT := 101      # client -> host: my kit (u8)
@@ -262,6 +271,12 @@ func _buy(i: int) -> bool:
 	dispatcher.paid.emit(-int(ITEMS[i].price), dispatcher.pay)
 	owned |= 1 << i
 	dispatcher.say("ARMOURY: the station's bought the %s." % item_name(i))
+	# New throwables go straight into everyone's pouches.
+	var nk := NADE_ITEMS.find(i)
+	if nk >= 0:
+		for n in get_tree().get_nodes_in_group("officers"):
+			if n is Officer:
+				(n as Officer).nades = Grenades.with_count((n as Officer).nades, nk, Grenades.CARRY)
 	_broadcast()
 	changed.emit()
 	return true
