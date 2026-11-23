@@ -36,10 +36,15 @@ static var _stance_down_at := -1.0
 static var _stance_used := false
 
 static var alt_tool := false
-## Walk toggle (Alt): moves at a walk instead of a run. A controller walks
-## by tilting the stick part of the way.
+## Walk mode (Alt, or tap L3 on a controller): moves at a walk instead of a
+## run, with the mocap walk (tactical with the gun out, relaxed holstered).
+## Sprint still runs while held. A controller also walks by tilting the
+## stick part of the way.
 static var walk_on := false
-const WALK_SCALE := 0.42        # of the run speed: about 1.5 m/s
+const WALK_SPEED := 1.3         # m/s, a steady patrol pace
+## Tapping L3 (shorter than this) switches walk mode; holding it sprints.
+const PAD_WALK_TAP := 0.25
+static var _l3_down_at := -1.0
 ## Where the local player is aiming, for the reticle.
 static var aim_point := Vector3.ZERO
 static var aim_normal := Vector3.UP
@@ -68,8 +73,10 @@ static func sample(cam: IsoCamera, from: Node3D) -> Dictionary:
 	var world := cam.view_relative(raw) if cam else Vector3(raw.x, 0, raw.y)
 	if InputMap.has_action("walk") and Input.is_action_just_pressed("walk"):
 		walk_on = not walk_on
+	if pad_walk_tap(_any_pad_l3(), Time.get_ticks_msec() / 1000.0):
+		walk_on = not walk_on
 	if walk_on and not Input.is_action_pressed("sprint"):
-		world = world.limit_length(WALK_SCALE)
+		world = world.limit_length(WALK_SPEED / Officer.RUN)
 	var buttons := 0
 	for a in _MAP:
 		if Input.is_action_pressed(a):
@@ -119,6 +126,27 @@ static func sample(cam: IsoCamera, from: Node3D) -> Dictionary:
 		var d2 := point - from.global_position
 		aim_yaw = atan2(d2.x, d2.z)
 	return {"move": Vector2(world.x, world.z), "buttons": buttons, "aim_yaw": aim_yaw, "aim_point": point}
+
+
+## L3 on a controller: a quick tap switches walk mode (a hold is sprint).
+## Returns true on the tap's release.
+static func pad_walk_tap(held: bool, now: float) -> bool:
+	if held:
+		if _l3_down_at < 0.0:
+			_l3_down_at = now
+		return false
+	if _l3_down_at < 0.0:
+		return false
+	var tap := now - _l3_down_at < PAD_WALK_TAP
+	_l3_down_at = -1.0
+	return tap
+
+
+static func _any_pad_l3() -> bool:
+	for dev in Input.get_connected_joypads():
+		if Input.is_joy_button_pressed(dev, JOY_BUTTON_LEFT_STICK):
+			return true
+	return false
 
 
 ## Turns the stance key into officer presses. held: the key is down now;

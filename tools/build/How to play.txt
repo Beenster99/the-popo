@@ -42,6 +42,15 @@ W climbs, S slides down, Shift drops fast, right mouse aims and you can shoot
 from the rope. Space kicks off the wall and swings you in through the window
 in front of you (glass and all). F lets go.
 
+WALK MODE (0.9.1)
+Alt switches between walking and running (controller: tap L3; holding L3 is
+still sprint, and tilting the stick part way still walks). Shift sprints
+even in walk mode.
+The walks are real motion capture now. Gun holstered, the officer strolls.
+Gun out, it's a tactical walk: knees soft, weight low, pistol at the ready.
+Aiming (right mouse / LT) you can back off and sidestep facing your target,
+a bit slower than walking forwards.
+
 SHOUTED ORDERS (0.8.0)
 Y (d-pad up) shouts an order at whoever you're facing, out loud for
 everyone: "Drop the weapon!", "Hands on your head!", "Hold it right there!",

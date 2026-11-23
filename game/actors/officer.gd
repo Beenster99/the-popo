@@ -246,6 +246,21 @@ func _ready() -> void:
 	OfficerClips._ensure_loaded()
 
 
+## Aiming on the move: backing off and sidestepping are slower than walking
+## forward, the way the tactical walk mocap moves (1.0 forward, 0.8 sideways,
+## 0.65 straight back).
+const STRAFE_SIDE := 0.8
+const STRAFE_BACK := 0.65
+
+
+func strafe_scale(wish: Vector3) -> float:
+	if wish.length() < 0.1:
+		return 1.0
+	var f := Vector3(sin(rotation.y), 0, cos(rotation.y))
+	var c := wish.normalized().dot(f)   # 1 forward, 0 sideways, -1 back
+	return lerpf(STRAFE_SIDE, 1.0, c) if c >= 0.0 else lerpf(STRAFE_SIDE, STRAFE_BACK, -c)
+
+
 func is_aiming() -> bool:
 	if state == S.VEHICLE:
 		return (buttons & PlayerInput.AIM) != 0 and gun_up() and seat > 0
@@ -423,6 +438,8 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 				speed = WALK_AIM
 			elif buttons & PlayerInput.SPRINT and not injuries & LEG:
 				speed = SPRINT
+	if state == S.MOVE and is_aiming():
+		speed *= strafe_scale(wish)
 	if injuries & LEG:
 		speed = minf(speed, LIMP_SPEED)
 	var dragged := drag_target()

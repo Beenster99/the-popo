@@ -9,11 +9,18 @@ extends Node3D
 
 const MODEL := preload("res://assets/models/characters/officer.glb")
 const UPPER_BONES := ["spine", "chest_2", "neck_2", "head_2", "upper_arm.L", "forearm.L", "hand.L", "upper_arm.R", "forearm.R", "hand.R"]
-const LOWER_STATES := ["idle", "walk", "run", "crouch_idle", "crouch_walk", "prone_idle", "crawl", "cover_idle",
+const LOWER_STATES := ["idle", "walk", "walk_ready", "run", "crouch_idle", "crouch_walk", "prone_idle", "crawl", "cover_idle",
 	"peek", "slide", "roll", "mantle", "climb", "jump", "fall", "kick", "cover_low_idle", "limp", "sit", "kneel"]
 const UPPER_STATES := ["none", "aim_hold", "ready_hold", "punch", "reload", "holster", "draw", "drive", "hands_up", "cuffed"]
 var RUN_CLIP_SPEED := 3.3    # m/s of the run cycle (2.27 for the mocap run)
-const WALK_CLIP_SPEED := 1.4
+var WALK_CLIP_SPEED := 1.4   # m/s of the walk cycle (0.87 for the mocap walk)
+## The tactical walk (gun out or aiming): four 100STYLE "SWAT" mocap loops in
+## a 2D blend by the direction of travel against the facing. Their speeds
+## (m/s, from tools/blender/mocap/walks.json) set the playback rate.
+const TAC_WALKS := {"walk_ready": Vector2(0, 1), "walk_back": Vector2(0, -1), "walk_left": Vector2(-1, 0), "walk_right": Vector2(1, 0)}
+const TAC_FWD_SPEED := 1.09
+const TAC_BACK_SPEED := 0.54
+const TAC_SIDE_SPEED := 0.58
 ## Upper-body crossfade time (seconds), see _build_tree.
 const UPPER_BLEND := 0.2
 const CROUCH_CLIP_SPEED := 1.0
@@ -39,6 +46,9 @@ const LIMP_TIME := 1.2
 var downed := false
 var _aim_smooth := Vector3.INF
 var _upper_t := 0.0          # seconds in the current upper-body state
+## The mocap tactical walks are loaded (else the plain walk stands in).
+var _tac_ok := false
+var _tac_d := Vector2(0, 1)
 
 
 func _ready() -> void:
@@ -51,11 +61,14 @@ func _ready() -> void:
 	var lib := OfficerClips.library(anim_player, skeleton)
 	anim_player.remove_animation_library("")
 	anim_player.add_animation_library("", lib)
-	for n in ["idle", "walk", "run", "crouch_idle", "crouch_walk", "prone_idle", "crawl", "cover_idle", "cover_low_idle", "fall", "aim_hold", "ready_hold", "peek", "limp", "sit", "drive", "kneel", "hands_up", "cuffed"]:
+	for n in ["idle", "walk", "walk_ready", "walk_back", "walk_left", "walk_right", "run", "crouch_idle", "crouch_walk", "prone_idle", "crawl", "cover_idle", "cover_low_idle", "fall", "aim_hold", "ready_hold", "peek", "limp", "sit", "drive", "kneel", "hands_up", "cuffed"]:
 		if lib.has_animation(n):
 			lib.get_animation(n).loop_mode = Animation.LOOP_LINEAR
 	if "run" in OfficerClips.mocap_clips:
 		RUN_CLIP_SPEED = 2.27
+	if "walk" in OfficerClips.mocap_clips:
+		WALK_CLIP_SPEED = 0.87
+	_tac_ok = lib.has_animation("walk_ready")
 	_build_tree()
 	procedural = OfficerProcedural.new()
 	skeleton.add_child(procedural)
@@ -75,8 +88,9 @@ func _build_tree() -> void:
 	for i in LOWER_STATES.size():
 		lower.set_input_name(i, LOWER_STATES[i])
 		lower.set_input_reset(i, LOWER_STATES[i] in ["slide", "roll", "mantle", "climb", "jump", "kick"])
-		var an := AnimationNodeAnimation.new()
-		an.animation = LOWER_STATES[i]
+		var an: AnimationNode = _tac_blend() if LOWER_STATES[i] == "walk_ready" and _tac_ok else AnimationNodeAnimation.new()
+		if an is AnimationNodeAnimation:
+			(an as AnimationNodeAnimation).animation = LOWER_STATES[i] if LOWER_STATES[i] != "walk_ready" or _tac_ok else "walk"
 		var ts := AnimationNodeTimeScale.new()
 		bt.add_node("a_" + LOWER_STATES[i], an)
 		bt.add_node("ts_" + LOWER_STATES[i], ts)
@@ -111,6 +125,33 @@ func _build_tree() -> void:
 	# roll, mantle, climb and slide is taken out of the pose here.
 	tree.root_motion_track = NodePath("%s:root" % skel_path)
 	tree.active = true
+
+
+## The tactical walk: forward, back and sidestep loops blended by direction
+## (x: right +, y: forward +).
+func _tac_blend() -> AnimationNodeBlendSpace2D:
+	var bs := AnimationNodeBlendSpace2D.new()
+	bs.blend_mode = AnimationNodeBlendSpace2D.BLEND_MODE_INTERPOLATED
+	bs.sync = true
+	for n in TAC_WALKS:
+		var an := AnimationNodeAnimation.new()
+		an.animation = n
+		bs.add_blend_point(an, TAC_WALKS[n], -1, StringName(n))
+	return bs
+
+
+## Travel direction against the facing (x: right +, y: forward +), and the
+## speed the blended tactical clip covers at normal playback.
+static func tac_dir(o: Node3D, v: Vector3) -> Vector2:
+	var local := o.global_transform.basis.inverse() * Vector3(v.x, 0, v.z)
+	var d := Vector2(-local.x, local.z)
+	return d.normalized() if d.length() > 0.05 else Vector2(0, 1)
+
+
+static func tac_clip_speed(d: Vector2) -> float:
+	var fwd := TAC_FWD_SPEED if d.y >= 0.0 else TAC_BACK_SPEED
+	var w := absf(d.x) + absf(d.y)
+	return (absf(d.y) * fwd + absf(d.x) * TAC_SIDE_SPEED) / maxf(w, 0.001)
 
 
 # Every physics tick, so the pull holds even when frames are slow.
@@ -257,7 +298,15 @@ func update_from(o: Officer, delta: float) -> void:
 	var hs := Vector2(o.velocity.x, o.velocity.z).length()
 	tree.set("parameters/ts_run/scale", clampf(hs / RUN_CLIP_SPEED, 0.6, 1.7))
 	tree.set("parameters/ts_limp/scale", clampf(hs / WALK_CLIP_SPEED, 0.5, 1.6))
-	tree.set("parameters/ts_walk/scale", 0.9 if o.turning and hs < 0.2 else clampf(hs / WALK_CLIP_SPEED, 0.5, 1.6))
+	tree.set("parameters/ts_walk/scale", 0.9 if o.turning and hs < 0.2 else clampf(hs / WALK_CLIP_SPEED, 0.5, 1.8))
+	if _tac_ok:
+		var d := tac_dir(o, o.velocity) if hs > 0.2 else Vector2(0, 1)
+		_tac_d = _tac_d.lerp(d, 1.0 - exp(-10.0 * delta))
+		tree.set("parameters/a_walk_ready/blend_position", _tac_d)
+		var sc := 0.8 if hs < 0.2 else clampf(hs / tac_clip_speed(_tac_d), 0.5, 1.8)
+		tree.set("parameters/ts_walk_ready/scale", sc)
+	else:
+		tree.set("parameters/ts_walk_ready/scale", 0.9 if o.turning and hs < 0.2 else clampf(hs / WALK_CLIP_SPEED, 0.5, 1.8))
 	tree.set("parameters/ts_crouch_walk/scale", clampf(hs / CROUCH_CLIP_SPEED, 0.5, 1.8))
 	tree.set("parameters/ts_crawl/scale", clampf(hs / CRAWL_CLIP_SPEED, 0.5, 2.0))
 	tree.set("parameters/ts_roll/scale", Officer.ROLL_PLAYBACK)
@@ -357,11 +406,16 @@ func _lower_state(o: Officer) -> String:
 			return "crouch_walk" if hs > 0.2 else "cover_idle"
 	if o.is_reviving():
 		return "crouch_idle"
+	# Gun out or aiming: the tactical walk (knees soft, weight low, and it
+	# backs off and sidesteps facing the aim). Holstered: a relaxed walk.
+	var tac := o.is_aiming() or not o.holstered
 	if hs < 0.2:
-		return "walk" if o.turning else "idle"
+		return ("walk_ready" if tac else "walk") if o.turning else "idle"
 	if o.injuries & Officer.LEG:
 		return "limp"
-	return "walk" if hs < 2.2 else "run"
+	if hs < 2.2:
+		return "walk_ready" if tac else "walk"
+	return "run"
 
 
 func _upper_state(o: Officer) -> String:
@@ -401,7 +455,7 @@ func update_pose(lower: String, upper: String, hs: float, delta: float, aim_at :
 		_upper = upper
 	tree.set("parameters/split/blend_amount", 0.0 if upper == "none" else 1.0)
 	tree.set("parameters/ts_run/scale", clampf(hs / RUN_CLIP_SPEED, 0.6, 1.7))
-	tree.set("parameters/ts_walk/scale", clampf(hs / WALK_CLIP_SPEED, 0.5, 1.6))
+	tree.set("parameters/ts_walk/scale", clampf(hs / WALK_CLIP_SPEED, 0.5, 1.8))
 	tree.set("parameters/ts_crouch_walk/scale", clampf(hs / CROUCH_CLIP_SPEED, 0.5, 1.8))
 	var root := get_parent() as Node3D
 	procedural.aim_active = aim_at != Vector3.ZERO and root != null
@@ -413,7 +467,7 @@ func update_pose(lower: String, upper: String, hs: float, delta: float, aim_at :
 			if sl and sl.get_parent() is BoneAttachment3D:
 				procedural.slide_rel = (sl.get_parent() as Node3D).global_transform.affine_inverse() * sl.global_transform
 				procedural.have_slide = true
-	procedural.feet_enabled = lower in ["idle", "walk", "run", "crouch_idle", "crouch_walk"]
+	procedural.feet_enabled = lower in ["idle", "walk", "walk_ready", "run", "crouch_idle", "crouch_walk"]
 	procedural.hand_lock = false
 	procedural.recoil = 0.0
 	procedural.reload_k = 0.0
