@@ -51,6 +51,19 @@ func test_lift_carries_an_officer_up() -> void:
 	if lifts == null or lifts.lifts.is_empty():
 		s.queue_free()
 		return
+	var stable := s.world.compute_stable()
+	var intact := s.world.pieces.values().filter(func(p): return p.state == "intact").size()
+	if stable.size() != intact:
+		var kinds := {}
+		for p in s.world.pieces.values():
+			if p.state == "intact" and not stable.has(p.id):
+				kinds[p.kind] = kinds.get(p.kind, 0) + 1
+				if kinds[p.kind] < 4:
+					print("    %s at %s below %s %s" % [p.kind, p.aabb, p.below, p.below.map(func(i): return [s.world.pieces[i].kind, s.world.pieces[i].aabb, s.world.pieces[i].group])])
+		print("    unstable: %s" % kinds)
+	t.check(stable.size() == intact, "the whole city stands up, towers and roof huts too (%d of %d)" % [stable.size(), intact])
+	var huts: Array = s.gen.buildings.filter(func(b): return b.has("roof_door"))
+	t.check(huts.size() > 20, "stairs up to a roof hut on most buildings (%d)" % huts.size())
 	var L: Dictionary = lifts.lifts[0]
 	var o: Officer = s.sync.my_pawn()
 	# Call it from the ground floor door: the doors open.

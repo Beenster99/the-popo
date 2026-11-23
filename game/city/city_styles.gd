@@ -103,6 +103,9 @@ static func plan(g: BlockGenerator, rng: RandomNumberGenerator) -> void:
 			b.type = "tower"
 			b.storeys = rng.randi_range(TOWER_STOREYS.x, TOWER_STOREYS.y)
 			b.lift = true
+		# v0.7.0: stairs up to a hut on the roof, so roofs can be reached
+		# from inside as well as by grapple.
+		b.roof_access = b.storeys >= 2 and b.type not in ["house", "station"]
 		b.tint = colours[rng.randi_range(0, colours.size() - 1)]
 		b.enterable = true
 		b.locked = b.type != "station" and rng.randf() < 0.33
@@ -112,7 +115,8 @@ static func plan(g: BlockGenerator, rng: RandomNumberGenerator) -> void:
 		var corner_a: Vector3 = b.origin
 		var corner_b: Vector3 = b.origin + b.u * (b.w * M) + b.v * (b.d * M)
 		var lo := Vector3(minf(corner_a.x, corner_b.x), 0, minf(corner_a.z, corner_b.z))
-		var hi := Vector3(maxf(corner_a.x, corner_b.x), BlockGenerator.BASE_Y + b.storeys * STOREY + 1.0, maxf(corner_a.z, corner_b.z))
+		var top: float = b.storeys * STOREY + (STOREY if b.roof_access else 1.0)
+		var hi := Vector3(maxf(corner_a.x, corner_b.x), BlockGenerator.BASE_Y + top, maxf(corner_a.z, corner_b.z))
 		b.bounds = AABB(lo, hi - lo).grow(0.3)
 
 
@@ -129,9 +133,11 @@ static func building(g: BlockGenerator, bi: int, rng: RandomNumberGenerator) -> 
 	if b.type == "station":
 		door_at = 3
 	b.door = g._w(b, (door_at + 0.5) * M, 0.0, -1.0)
-	var stair_floors: int = b.storeys - 1
+	var roof_access: bool = b.get("roof_access", false)
+	var stair_floors: int = b.storeys if roof_access else b.storeys - 1
 	var lift: bool = b.get("lift", false)
 	var windows: float = {"office": 0.95, "tower": 0.95, "station": 0.7, "warehouse": 0.25, "garage": 0.2}.get(b.type, 0.75)
+	var shaft_back := -1    # the shaft's back wall has no floor under it: each hangs on the one below
 	for s in b.storeys:
 		var y: float = s * STOREY
 		for i in w:
@@ -141,7 +147,10 @@ static func building(g: BlockGenerator, bi: int, rng: RandomNumberGenerator) -> 
 			else:
 				g._window_wall(b, bi, Basis(), cx, y, 0.0, rng.randf() < windows)
 		for i in w:
-			var back_window: bool = rng.randf() < windows * (0.6 if s > 0 else 0.35) and not (lift and i == w - 2)
+			var back_window: bool = rng.randf() < windows * (0.6 if s > 0 else 0.35)
+			if lift and i == w - 2:
+				shaft_back = g._add("wall", g._xf(b, r180, (i + 0.5) * M, y, d * M), true, tint, shaft_back, bi)
+				continue
 			g._window_wall(b, bi, r180, (i + 0.5) * M, y, d * M, back_window)
 		for j in d:
 			var cz := (j + 0.5) * M
@@ -164,7 +173,7 @@ static func building(g: BlockGenerator, bi: int, rng: RandomNumberGenerator) -> 
 			for j in d:
 				var kind := "roof" if roof else "slab"
 				var basis := Basis()
-				if not roof and s < stair_floors and i == w - 1 and j == d - 1:
+				if s < stair_floors and i == w - 1 and j == d - 1:
 					kind = "slab_stairwell"
 					basis = r180
 				if not roof and lift and i == w - 2 and j == d - 1:
@@ -173,10 +182,37 @@ static func building(g: BlockGenerator, bi: int, rng: RandomNumberGenerator) -> 
 	var ry: float = b.storeys * STOREY
 	for i in w:
 		g._add("parapet", g._xf(b, Basis(), (i + 0.5) * M, ry, 0.0), true, tint, -1, bi)
-		g._add("parapet", g._xf(b, r180, (i + 0.5) * M, ry, d * M), true, tint, -1, bi)
+		if not (roof_access and i == w - 1):
+			g._add("parapet", g._xf(b, r180, (i + 0.5) * M, ry, d * M), true, tint, -1, bi)
 	for j in d:
 		g._add("parapet", g._xf(b, r90, 0.0, ry, (j + 0.5) * M), true, tint, -1, bi)
-		g._add("parapet", g._xf(b, r90 * r180, w * M, ry, (j + 0.5) * M), true, tint, -1, bi)
+		if not (roof_access and j == d - 1):
+			g._add("parapet", g._xf(b, r90 * r180, w * M, ry, (j + 0.5) * M), true, tint, -1, bi)
+	if roof_access:
+		_roof_hut(g, b, bi, ry, rng)
+
+
+## v0.7.0: the hut over the stairs on the roof, with a door out onto it.
+## About a third are locked: kick it in, or come up the stairs.
+static func _roof_hut(g: BlockGenerator, b: Dictionary, bi: int, ry: float, rng: RandomNumberGenerator) -> void:
+	var w: int = b.w
+	var d: int = b.d
+	var t: Color = b.tint
+	var none := Color(0, 0, 0, 0)
+	var r90 := Basis(Vector3.UP, PI / 2)
+	var r180 := Basis(Vector3.UP, PI)
+	var fx := g._xf(b, Basis(), (w - 0.5) * M, ry, (d - 1) * M)
+	var wi := g._add("wall_door", fx, true, t, -1, bi)
+	if rng.randf() < 0.33:
+		g._add("door_closed", fx, false, none, wi, bi)
+	g._add("wall", g._xf(b, r90, (w - 1) * M, ry, (d - 0.5) * M), true, t, -1, bi)
+	g._add("wall", g._xf(b, r180, (w - 0.5) * M, ry, d * M), true, t, -1, bi)
+	g._add("wall", g._xf(b, r90 * r180, w * M, ry, (d - 0.5) * M), true, t, -1, bi)
+	for cx in [(w - 1) * M, w * M]:
+		for cz in [(d - 1) * M, d * M]:
+			g._add("column", g._xf(b, Basis(), cx, ry, cz), true, none, -1, bi)
+	g._add("roof", g._xf(b, Basis(), (w - 0.5) * M, ry + STOREY, (d - 0.5) * M), true, none, -1, bi)
+	b.roof_door = g._w(b, (w - 0.5) * M, ry, (d - 1) * M - 1.0)
 
 
 ## v0.7.0: the lift shaft walls on one storey: the module left of the
