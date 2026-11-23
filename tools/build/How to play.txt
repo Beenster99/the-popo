@@ -12,6 +12,26 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
+SMOKE, GAS AND GRENADES (0.6.2)
+Buy them at the ARMOURY (Gear): smoke grenades, CS gas and flashbangs. Once
+the station has them, every officer carries two of each, refilled at a
+patrol car's boot or when you respawn.
+Q throws the picked grenade at the dot in the middle of the screen; 3 picks
+which (smoke, CS gas, flashbang). The bottom right shows what you carry.
+Controller: D-pad right throws, D-pad left picks.
+SMOKE: a thick grey cloud for half a minute. Crooks can't see through it,
+so they can't shoot you through it either. Use it to cross a street or get
+to a downed friend.
+CS GAS: a stinging cloud for about twenty seconds. Anyone in it coughs and
+can't aim. Most crooks double over and give up; the hard ones stumble out
+of it. It gets you too if you walk in.
+FLASHBANG: a blinding flash and a deafening bang. Crooks who see it are
+stunned for a few seconds (in go the cuffs). Don't look at it yourself.
+FRAG GRENADES: some armed crooks carry one or two, and throw them when
+you're dug in behind cover or bunched up. Listen for the clink and look for
+the red GRENADE! warning, then move. They break walls, throw people, and
+the shrapnel hits like bullets (blood follows the Gore setting).
+
 CONTENT AND POLISH (0.6.0)
 New to the game? Pick FIRST SHIFT on the main menu: a step-by-step walk
 through the job, from the station door to booking your first prisoner (it
@@ -220,8 +240,8 @@ Left stick move, right stick aim, LT (L2) aim, RT (R2) fire,
 A (Cross) jump / handbrake, B (Circle) crouch (hold: prone), X (Square)
 reload, Y (Triangle) holster / horn (hold by a downed teammate: drag them),
 LB (L1) cover, RB (R1) punch,
-R3 kick, L3 sprint, View (Share) use / revive, D-pad left/right rotate
-camera, D-pad up zoom in, D-pad down torch, touchpad ping (PlayStation),
+R3 kick, L3 sprint, View (Share) use / revive, D-pad right throw grenade,
+D-pad left pick grenade, D-pad up shout, D-pad down torch, touchpad ping (PlayStation),
 Start menu.
 
 Your saved key changes were reset once in this version, because cover

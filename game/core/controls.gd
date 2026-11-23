@@ -28,7 +28,9 @@ const KEYS := {
 	"horn": [KEY_H],
 	"weapon_1": [KEY_1],
 	"weapon_2": [KEY_2],
-	"cam_rotate_left": [KEY_Q],
+	"grenade_next": [KEY_3],      # smoke, CS gas, flashbang
+	"throw": [KEY_Q],             # throw the picked grenade at the crosshair
+	"cam_rotate_left": [],
 	"cam_rotate_right": [KEY_E],
 	"handbrake": [KEY_SPACE],
 	"toggle_net_overlay": [KEY_F3],
@@ -58,8 +60,8 @@ const PAD_BUTTONS := {
 	"sprint": [JOY_BUTTON_LEFT_STICK],      # L3
 	"interact": [JOY_BUTTON_BACK],          # View (Share)
 	"ping": [JOY_BUTTON_TOUCHPAD],          # (touchpad)
-	"cam_rotate_left": [JOY_BUTTON_DPAD_LEFT],
-	"cam_rotate_right": [JOY_BUTTON_DPAD_RIGHT],
+	"grenade_next": [JOY_BUTTON_DPAD_LEFT],
+	"throw": [JOY_BUTTON_DPAD_RIGHT],
 	"shout": [JOY_BUTTON_DPAD_UP],
 	"cam_zoom_out": [JOY_BUTTON_MISC1],
 	"back_to_launcher": [JOY_BUTTON_START],
@@ -86,6 +88,7 @@ const REBINDABLE := [
 	["cover", "Take cover (with a direction: run to the next cover)"], ["reload", "Reload"],
 	["holster", "Holster / draw"], ["torch", "Torch on / off"], ["punch", "Punch"], ["kick", "Kick"], ["shout", "Shout: Police! Get down!"], ["interact", "Use / revive (hold)"], ["drag", "Drag a downed teammate (hold)"],
 	["aim", "Aim / peek from cover"], ["fire", "Fire"], ["ping", "Ping a spot for everyone"], ["horn", "Car horn"], ["handbrake", "Handbrake"],
+	["throw", "Throw grenade"], ["grenade_next", "Pick grenade: smoke, CS gas, flashbang"],
 	["cam_rotate_left", "Rotate camera left"], ["cam_rotate_right", "Rotate camera right"],
 ]
 const SAVE_PATH := "user://controls.cfg"

@@ -12,6 +12,7 @@ var _state: Label
 var _bar: ProgressBar
 var _health: Label
 var _hint: Label
+var _nades: Label
 
 
 func _ready() -> void:
@@ -55,6 +56,8 @@ func _ready() -> void:
 	v.add_child(_bar)
 	_health = _label(14, Color(1.0, 0.45, 0.4))
 	v.add_child(_health)
+	_nades = _label(14, Color(0.8, 0.85, 0.9))
+	v.add_child(_nades)
 	# Prompts for what interact does here, bottom centre.
 	_hint = _label(18, Color(1, 0.96, 0.85))
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -116,6 +119,27 @@ func _process(_delta: float) -> void:
 	_health.text = "%s\nFIRST AID %d" % ["  ".join(wounds), o.pouch] if not wounds.is_empty() else "FIRST AID %d" % o.pouch
 	_health.add_theme_color_override("font_color", Color(1.0, 0.45, 0.4) if not wounds.is_empty() else Color(0.7, 0.75, 0.8))
 	_hint.text = _prompt(o)
+	_nades.text = _nade_line(o)
+	_nades.visible = _nades.text != ""
+
+
+## The grenades carried, the picked one in brackets, and the keys.
+func _nade_line(o: Officer) -> String:
+	var any := false
+	for k in 3:
+		if Armoury.owns(Armoury.NADE_ITEMS[k]):
+			any = true
+	if not any:
+		return ""
+	var parts: PackedStringArray = []
+	for k in 3:
+		if not Armoury.owns(Armoury.NADE_ITEMS[k]):
+			continue
+		var t := "%s %d" % [Grenades.SHORT[k], Grenades.count(o.nades, k)]
+		parts.append("[%s]" % t if k == PlayerInput.nade_kind else t)
+	var keys := "pad: D-pad right / left" if PlayerInput.using_pad else "%s throw  %s pick" % [
+		Controls.describe(Controls.pc_event("throw")), Controls.describe(Controls.pc_event("grenade_next"))]
+	return "%s\n%s" % ["  ".join(parts), keys]
 
 
 ## One line on what the use key does here.
