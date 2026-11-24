@@ -102,6 +102,9 @@ var _wander_t := 0.0
 var _alone_t := 0.0
 var _check_t := 0.0
 var _last_spot := Vector3.INF
+## v0.24.0: how keen this one is to run upstairs and up onto the roof when
+## they flee (rolled once, 0 to 1; fighters lean higher).
+var climb := -1.0
 var _stuck_t := 0.0             # running but going nowhere
 var _stuck_p := Vector3.ZERO
 var _stuck_n := 0
@@ -1067,6 +1070,12 @@ func _pick_hide(t: Dictionary) -> Vector3:
 		if _last_spot != Vector3.INF and p.distance_to(_last_spot) < 3.0:
 			continue
 		var score := p.distance_to(threat_p) - p.distance_to(global_position) * 0.35 + _rng.randf() * 6.0
+		if climb < 0.0:
+			climb = _rng.randf() * (1.0 if fighter or armed else 0.7)
+		# v0.24.0: up the stairs, away from the officers below.
+		var rise := p.y - global_position.y
+		if rise > 2.0 and threat_p.y < p.y - 2.0:
+			score += minf(rise, 20.0) * climb * 1.6
 		if score <= best_score:
 			continue
 		if nav and nav.ready_to_use and not nav.reaches(global_position, p):
