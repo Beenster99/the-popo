@@ -20,6 +20,29 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
+SHORTCUT BAR
+A bar along the bottom of the screen holds your kit: 1 pistol, 2 charge
+(breach or C4 loadout), 3 smoke, 4 CS gas, 5 flashbang, 6 first aid,
+7 grapple hook. Each slot shows its key and how many you have; empty ones
+are dimmed and flash red if you pick them. Pick one and left mouse uses it:
+shoots, sticks the charge on, throws the grenade at the dot, patches up a
+hurt teammate or yourself (hold), or fires the grapple at a building. Q
+still throws the picked grenade straight away.
+Controller: D-pad left / right steps along the bar, RT uses it.
+Settings > Gameplay > Shortcut bar hides it (the keys still work). Your
+saved key changes were reset once, because 3-7 and the D-pad moved.
+
+AMBULANCES
+Nobody lies dead in the street for long now. About half a minute after
+someone is killed, an ambulance comes for them: blue lights and a two-tone
+siren (traffic pulls over and it goes through red lights). It turns the
+siren off as it gets close, pulls up at the kerb, and two paramedics in
+green get out the back with a trolley stretcher. They wheel it over, put
+the body in a bag on the stretcher, wheel it back, load it and drive off.
+Bodies lying close together go in the same trip. The blood stays.
+Shoot near the paramedics and they run and hide until it's quiet; if both
+go down, a fresh pair gets out a little later.
+
 FRAME RATE, LIFTS AND SKID MARKS (0.19.0)
 Your benchmark showed the graphics card was fine (5 ms a frame); the game's
 own code was the slow part. Parked cars now really go to sleep (before,
@@ -216,9 +239,9 @@ SMOKE, GAS AND GRENADES (0.6.2)
 Buy them at the ARMOURY (Gear): smoke grenades, CS gas and flashbangs. Once
 the station has them, every officer carries two of each, refilled at a
 patrol car's boot or when you respawn.
-Q throws the picked grenade at the dot in the middle of the screen; 3 picks
+Q throws the picked grenade at the dot in the middle of the screen; 3, 4, 5 pick
 which (smoke, CS gas, flashbang). The bottom right shows what you carry.
-Controller: D-pad right throws, D-pad left picks.
+Controller: pick it with D-pad left / right, RT throws.
 SMOKE: a thick grey cloud for half a minute. Crooks can't see through it,
 so they can't shoot you through it either. Use it to cross a street or get
 to a downed friend.
@@ -451,8 +474,7 @@ Left stick move, right stick aim, LT (L2) aim, RT (R2) fire,
 A (Cross) jump / handbrake, B (Circle) crouch (hold: prone), X (Square)
 reload, Y (Triangle) holster / horn (hold by a downed teammate: drag them),
 LB (L1) cover, RB (R1) punch,
-R3 kick, L3 sprint, View (Share) use / revive, D-pad right throw grenade,
-D-pad left pick grenade, D-pad up shout, D-pad down torch, touchpad ping (PlayStation),
+R3 kick, L3 sprint, View (Share) use / revive, D-pad left / right shortcut bar, D-pad up shout, D-pad down torch, touchpad ping (PlayStation),
 Start menu.
 
 Your saved key changes were reset once in this version, because cover

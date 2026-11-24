@@ -27,7 +27,8 @@ const TIPS := {
 	"hurt": "You're wounded (bottom right). Hold {interact} for first aid from your pouch. A patrol car's boot patches everything.",
 	"down": "You're down. A teammate can hold {interact} on you to get you up, or press {reload} to respawn once the wait is over.",
 	"mate_down": "A teammate is down. Hold {interact} next to them to get them up, or hold {drag} to drag them into cover first.",
-	"nades": "Grenades: {throw} throws the picked one at the dot, {grenade_next} picks smoke, CS gas or flashbang.",
+	"nades": "Grenades are on the shortcut bar at the bottom: {slot_3} smoke, {slot_4} CS gas, {slot_5} flashbang, then {fire} throws at the dot. {throw} throws the picked one straight away. {weapon_1} back to the pistol.",
+	"bar": "The bar at the bottom is your kit: {weapon_1} pistol, {weapon_2} charge, {slot_3}-{slot_5} grenades, {slot_6} first aid, {slot_7} grapple. Pick one and {fire} uses it. Dim slots are empty.",
 }
 
 static var _seen := {}
@@ -167,6 +168,8 @@ func _check() -> void:
 		want("start")
 	if _age > 40.0:
 		want("move")
+	if _age > 70.0:
+		want("bar")
 	if o.state == Officer.S.DOWNED:
 		want("down")
 		return
