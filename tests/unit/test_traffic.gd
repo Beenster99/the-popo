@@ -190,13 +190,12 @@ func test_car_thief_and_chase() -> void:
 	for i in 30:
 		await get_tree().physics_frame
 	t.check(th.state in [Suspect.S.FLEE, Suspect.S.HIDE, Suspect.S.LOITER, Suspect.S.SHOOT, Suspect.S.SURRENDER] and th.visible, "smashed up: the driver bails and runs (%s)" % Suspect.S.keys()[th.state])
-	# Settle the first thief so his gunfire can't startle the next one
-	# (armed suspects hear shots up to HEAR_SHOTS away).
+	# He gives up, so an armed runner's gunfire doesn't scare off the next
+	# thief (who may be just down the street), and the wreck, if it caught
+	# fire, has gone up before the theft starts (the bang scares thieves).
 	th.set_state(Suspect.S.SURRENDER)
-	# ...and put the smashed car well out of the way: if it catches fire and
-	# goes up, the blast would rightly send the next thief running.
-	car.freeze = true
-	car.global_position += Vector3(0, -300, 0)
+	for i in 60 * int(CarSync.BURN_TIME + 1.0):
+		await get_tree().physics_frame
 	# A theft: left alone, the thief is in and away.
 	var id2 := d.start_call(Dispatcher.Kind.THEFT)
 	t.check(id2 > 0, "a car theft call: %s" % (d.calls[id2].text if id2 > 0 else "none"))

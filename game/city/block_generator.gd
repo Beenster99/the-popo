@@ -99,6 +99,8 @@ func _build() -> void:
 		b.origin += offset
 		b.start += offset
 		b.door += offset
+		if b.has("roof_door"):
+			b.roof_door += offset
 		b.bounds.position += offset
 
 

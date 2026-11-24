@@ -104,6 +104,11 @@ var _backup := []            # host: [{call, t, at}]
 var city: CityGenerator
 var area_block := -1
 var _hide_by_block := {}     # block index -> Array of spots
+## v0.24.0: the walkable spots on the area's roofs (a subset of hide_spots).
+var roof_spots: Array = []
+var _roofs_by_block := {}    # block index -> Array of roof spots
+const ROOF_GANG_CHANCE := 0.35    # a gang call is up on a roof
+const WINDOW_ARMED_CHANCE := 0.35 # an armed call is upstairs at a window
 var lap: Array = LAP
 
 
@@ -246,9 +251,14 @@ func start_call(kind: Kind, opts := {}) -> int:
 				var p: Vector3 = inside + b.u * (1.4 * (i * 2 - 1))
 				c.suspects.append(spawn_suspect(p, Suspect.S.ROB, _rng.randf() < 0.25, c.id).net_id)
 		Kind.ARMED:
-			var p := _street_spot()
+			var up := _upstairs_spot() if _rng.randf() < WINDOW_ARMED_CHANCE or opts.get("upstairs", false) else Vector3.INF
+			var p := up if up != Vector3.INF else _street_spot()
 			c.pos = p
 			c.text = "Armed suspect seen on the street, %s. Approach with care." % _side_name(p)
+			if up != Vector3.INF:
+				var ub := Rooftops.building_at(p, 0.2)
+				var f := clampi(roundi((p.y - (ub.origin as Vector3).y) / BlockGenerator.STOREY), 1, Missions.FLOOR_NAMES.size() - 1)
+				c.text = "Armed suspect seen at a window, %s of the %s %s. Approach with care." % [String(Missions.FLOOR_NAMES[f]).to_lower(), ub.type, _side_name(p)]
 			var a := spawn_suspect(p, Suspect.S.LOITER, true, c.id)
 			a.fighter = true
 			if _rng.randf() < 0.3:
@@ -256,12 +266,18 @@ func start_call(kind: Kind, opts := {}) -> int:
 				a.mag = EnemyGuns.MAG[a.weapon]
 			c.suspects.append(a.net_id)
 		Kind.GANG:
-			var p := _gang_spot()
+			var roof := _roof_spot() if _rng.randf() < ROOF_GANG_CHANCE or opts.get("roof", false) else Vector3.INF
+			var p := roof if roof != Vector3.INF else _gang_spot()
 			c.pos = p
 			var n := 3 + (1 if _rng.randf() < 0.4 else 0)
 			c.text = "Shots fired, %s. %d armed, they're dug in. Use cover." % [_side_name(p), n]
+			if roof != Vector3.INF:
+				var rb := Rooftops.building_at(p, 0.5)
+				c.text = "Shots fired from the roof of the %s %s. %d armed up there. Stairs, lift or grapple." % [rb.get("type", "building"), _side_name(p), n]
 			for i in n:
 				var q := nav.closest(p + Vector3(cos(i * 2.1) * 2.0, 0, sin(i * 2.1) * 2.0))
+				if absf(q.y - p.y) > 1.0:
+					q = p    # stay up on the roof
 				var g := spawn_suspect(q, Suspect.S.LOITER, i < 3, c.id)
 				g.fighter = true
 				g.role = Suspect.ROLE_PIN if i == 0 else (Suspect.ROLE_FLANK if i == 1 else _rng.randi_range(0, 1))
@@ -368,6 +384,41 @@ func _gang_spot() -> Vector3:
 			best_d = d
 			best = p
 	return best if best != Vector3.INF else _street_spot()
+
+
+## v0.24.0: a spot on one of the area's roofs, away from the officers, or
+## INF if no roof here can be walked on.
+func _roof_spot() -> Vector3:
+	return _far_spot(roof_spots)
+
+
+## v0.24.0: a spot on an upper floor of one of the area's buildings, or INF.
+func _upstairs_spot() -> Vector3:
+	var up: Array = []
+	for sp in hide_spots:
+		var p: Vector3 = sp
+		if p.y > BlockGenerator.BASE_Y + BlockGenerator.STOREY * 0.8 and not roof_spots.has(p) \
+				and not Rooftops.building_at(p, 0.2).is_empty():
+			up.append(p)
+	return _far_spot(up)
+
+
+## The one of these furthest from the officers, give or take; INF if none.
+func _far_spot(spots: Array) -> Vector3:
+	var best := Vector3.INF
+	var best_d := -1.0
+	for sp in spots:
+		var p: Vector3 = sp
+		var d := INF
+		for o in get_tree().get_nodes_in_group("officers"):
+			d = minf(d, (o as Node3D).global_position.distance_to(p))
+		if d == INF:
+			d = 0.0
+		d += _rng.randf() * 12.0
+		if d > best_d:
+			best_d = d
+			best = p
+	return best
 
 
 ## Host: a fighter has started shooting; friends turn up a little later
@@ -536,9 +587,16 @@ func _use_area(k: int) -> void:
 	area_block = k
 	if not _hide_by_block.has(area_block):
 		hide_spots = []
+		roof_spots = []
 		_find_hide_spots()
-		_hide_by_block[area_block] = hide_spots
-	hide_spots = _hide_by_block[area_block]
+		# Not kept when the walking routes weren't there yet: look again
+		# next time.
+		if not hide_spots.is_empty():
+			_hide_by_block[area_block] = hide_spots
+			_roofs_by_block[area_block] = roof_spots
+	else:
+		hide_spots = _hide_by_block[area_block]
+		roof_spots = _roofs_by_block.get(area_block, [])
 	var o := _area_offset()
 	lap = LAP.map(func(q): return o + q)
 
@@ -580,6 +638,19 @@ func _find_hide_spots() -> void:
 					var q := nav.closest(p)
 					if q.distance_to(p) < 0.8:
 						hide_spots.append(q)
+	# v0.24.0: the roofs with a hut over the stairs (every cell but the hut's).
+	for b in _area_buildings():
+		if not b.get("roof_access", false):
+			continue
+		for i in b.w:
+			for j in b.d:
+				if i == b.w - 1 and j == b.d - 1:
+					continue
+				var p: Vector3 = b.origin + b.u * ((i + 0.5) * M) + b.v * ((j + 0.5) * M) + Vector3(0, b.storeys * BlockGenerator.STOREY + 0.05, 0)
+				var q := nav.closest(p)
+				if q.distance_to(p) < 0.8:
+					hide_spots.append(q)
+					roof_spots.append(q)
 	var sz := _area_size()
 	for i in 6:
 		for j in 6:
