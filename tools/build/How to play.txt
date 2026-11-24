@@ -12,6 +12,13 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
+PRISONERS IN THE CAR (0.14.0)
+Walk your prisoners to a police car and press F at a door: the back door
+swings open and every prisoner walking with you climbs in (back seats
+first, then the front passenger seat). Drive them to the custody bay at the
+station to book them. Prisoners following you on foot now walk in single
+file behind you instead of bunching up.
+
 DRIVING AND ON-FOOT FEEL (0.12.1)
 On foot you walk by default now. Hold Shift to sprint (controller: hold L3).
 Alt switches to a steady run and back (controller: tap L3); the corner
