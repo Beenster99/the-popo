@@ -1,9 +1,9 @@
 class_name DispatchHud
 extends CanvasLayer
 ## Phase 1.4 HUD (no crime meter since v0.2.11): the open calls (top
-## left), radio chatter (top centre for a few seconds), and arrows at
-## the screen edge pointing to each call and, while anyone has a prisoner,
-## to the custody bay.
+## left, with distance and street), radio chatter (top centre for a few
+## seconds), and markers for each call and, while anyone has a prisoner,
+## the custody bay: a pin over it on screen, an arrow at the edge off it.
 
 var dispatcher: Dispatcher
 var armoury: Armoury
@@ -71,8 +71,9 @@ func _process(delta: float) -> void:
 	for call in dispatcher.active_calls():
 		var d := ""
 		if o:
-			d = "   %d m" % int(Vector2(call.marker.x - o.global_position.x, call.marker.z - o.global_position.z).length())
-		lines.append("%s%s" % [Dispatcher.KIND_NAMES[call.kind].to_upper(), d])
+			var me := MiniMap._pos_of(o)
+			d = "   %d m" % int(Vector2(call.marker.x - me.x, call.marker.z - me.z).length())
+		lines.append("%s%s   %s" % [Dispatcher.KIND_NAMES[call.kind].to_upper(), d, CityGenerator.street_at(call.marker)])
 	if _has_prisoner():
 		lines.append("PRISONER: take them to the custody bay")
 	# Phase 3.5/3.6: the armoury counter and the range mark.
@@ -121,41 +122,84 @@ func _has_prisoner() -> bool:
 	return false
 
 
-## Off-screen targets get an arrow at the edge with the distance.
+## v0.15.0: every job, the custody bay (while anyone has a prisoner) and a
+## cuffed runner get a marker. On screen: a pin over the spot with what it
+## is and how far, seen through walls. Off screen: a big arrow at the screen
+## edge that points the way to go round you (from the camera's heading, so it
+## doesn't flip when the spot is behind you), with the distance.
 func _draw_arrows() -> void:
 	var cam := _arrows.get_viewport().get_camera_3d()
-	if cam == null or dispatcher == null:
+	if cam == null or dispatcher == null or not Settings.values.get("job_markers", true):
 		return
-	var targets := []
+	var targets := []   # [position, colour, label]
 	for call in dispatcher.active_calls():
-		targets.append([call.marker, Color("ff5050") if call.kind not in [Dispatcher.Kind.TRAFFIC, Dispatcher.Kind.THEFT, Dispatcher.Kind.PURSUIT] else Color("ffb030")])
+		targets.append([call.marker, MiniMap.job_colour(call.kind), Dispatcher.KIND_NAMES[call.kind].to_upper()])
 	if _has_prisoner():
-		targets.append([dispatcher.bay_position(), Color("4a8cff")])
-	# A prisoner doing a runner in cuffs.
+		targets.append([dispatcher.bay_position(), Color("4a8cff"), "CUSTODY BAY"])
 	for s in dispatcher.suspects.values():
 		if (s as Suspect).state == Suspect.S.CUFF_RUN:
-			targets.append([(s as Suspect).global_position, Color("ff8030")])
+			targets.append([(s as Suspect).global_position, Color("ff8030"), "RUNNER"])
+	if targets.is_empty():
+		return
 	var rect := _arrows.get_rect()
 	var centre := rect.size * 0.5
 	var o: Node3D = pawn_getter.call() if pawn_getter.is_valid() else null
 	var font := ThemeDB.fallback_font
+	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.006)
+	var fwd := -cam.global_transform.basis.z
+	var right := cam.global_transform.basis.x
+	var f2 := Vector2(fwd.x, fwd.z).normalized()
+	var mm := get_parent().get_node_or_null("MiniMap") as MiniMap
+	var keep_out := mm.screen_rect() if mm else Rect2()
+	var r2 := Vector2(right.x, right.z).normalized()
 	for t in targets:
 		var p: Vector3 = t[0]
-		var sp := cam.unproject_position(p + Vector3(0, 1.0, 0))
-		var inside := Rect2(Vector2.ZERO, rect.size).grow(-40.0).has_point(sp) and not cam.is_position_behind(p)
-		if inside:
-			continue
-		var dir := (sp - centre).normalized()
-		if dir == Vector2.ZERO:
-			continue
-		var edge := centre + dir * minf(absf((centre.x - 50.0) / dir.x) if dir.x != 0.0 else INF, absf((centre.y - 50.0) / dir.y) if dir.y != 0.0 else INF)
 		var col: Color = t[1]
+		var label: String = t[2]
+		var from: Vector3 = MiniMap._pos_of(o) if o else cam.global_position
+		var dist := int(Vector2(p.x - from.x, p.z - from.z).length())
+		var head := p + Vector3(0, 2.4, 0)
+		var sp := cam.unproject_position(head)
+		var on_screen := not cam.is_position_behind(head) and Rect2(Vector2.ZERO, rect.size).grow(-60.0).has_point(sp)
+		if on_screen:
+			# A pin over the spot: a ring, a point down and the words over it.
+			var r := 13.0 + 3.0 * pulse
+			_arrows.draw_circle(sp, r + 4.0, Color(0, 0, 0, 0.55))
+			_arrows.draw_circle(sp, r, col)
+			_arrows.draw_circle(sp, r * 0.45, Color.WHITE)
+			_arrows.draw_colored_polygon(PackedVector2Array([sp + Vector2(-8, r - 2), sp + Vector2(8, r - 2), sp + Vector2(0, r + 14)]), col)
+			_text(font, sp + Vector2(0, -r - 22), label, 15, col)
+			_text(font, sp + Vector2(0, -r - 6), "%d m" % dist, 15, Color.WHITE)
+			continue
+		# Off screen: which way round you, from the camera's heading.
+		var to := Vector2(p.x - cam.global_position.x, p.z - cam.global_position.z)
+		var dir := Vector2(to.dot(r2), -to.dot(f2)).normalized()
+		if dir == Vector2.ZERO:
+			dir = Vector2(0, 1)
+		var hx := centre.x - 70.0
+		var hy := centre.y - 70.0
+		var edge := centre + dir * minf(hx / absf(dir.x) if absf(dir.x) > 0.0001 else INF, hy / absf(dir.y) if absf(dir.y) > 0.0001 else INF)
+		# Keep clear of the mini map in the bottom left corner.
+		if keep_out.size != Vector2.ZERO and keep_out.grow(30.0).has_point(edge):
+			edge.y = keep_out.position.y - 40.0
 		var side := Vector2(-dir.y, dir.x)
-		_arrows.draw_colored_polygon(PackedVector2Array([edge + dir * 18.0, edge - dir * 6.0 + side * 12.0, edge - dir * 6.0 - side * 12.0]), col)
-		if o:
-			var dist := int(Vector2(p.x - o.global_position.x, p.z - o.global_position.z).length())
-			_arrows.draw_string_outline(font, edge - dir * 34.0 + Vector2(-16, 6), "%dm" % dist, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, 4, Color(0, 0, 0, 0.9))
-			_arrows.draw_string(font, edge - dir * 34.0 + Vector2(-16, 6), "%dm" % dist, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, col)
+		var sc := 1.0 + 0.15 * pulse
+		var tri := PackedVector2Array([edge + dir * 30.0 * sc, edge - dir * 10.0 + side * 22.0 * sc, edge - dir * 2.0, edge - dir * 10.0 - side * 22.0 * sc])
+		_arrows.draw_colored_polygon(tri, Color(0, 0, 0, 0.6))
+		var inner := PackedVector2Array()
+		for q in tri:
+			inner.append(edge + (q - edge) * 0.8)
+		_arrows.draw_colored_polygon(inner, col)
+		var tp := edge - dir * (44.0 + 38.0 * absf(dir.x))
+		_text(font, tp + Vector2(0, -2), label, 14, col)
+		_text(font, tp + Vector2(0, 16), "%d m" % dist, 16, Color.WHITE)
+
+
+func _text(font: Font, centre_at: Vector2, text: String, size: int, col: Color) -> void:
+	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+	var at := centre_at - Vector2(w * 0.5, 0)
+	_arrows.draw_string_outline(font, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 5, Color(0, 0, 0, 0.9))
+	_arrows.draw_string(font, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, col)
 
 
 static func _money(n: int) -> String:
