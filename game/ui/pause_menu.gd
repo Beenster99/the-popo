@@ -1,6 +1,7 @@
 class_name PauseMenu
 extends CanvasLayer
-## Esc (Start on a controller) in a game: Resume, Settings, Controls, Leave.
+## Esc (Start on a controller) in a game: Resume, Help, Settings, Key binds,
+## Leave.
 ## Playing alone, the game pauses underneath; online it keeps running and
 ## your officer just stands still.
 
@@ -45,14 +46,32 @@ func _ready() -> void:
 	_box.add_theme_constant_override("separation", 12)
 	panel.add_child(_box)
 	_box.add_child(UiTheme.title("PAUSED" if not Net.is_online() else "MENU (the game carries on)", 30, UiTheme.ACCENT))
-	_box.add_child(UiTheme.big_button("Resume", resume))
-	_box.add_child(UiTheme.big_button("Settings", func():
-		var s := SettingsScreen.new()
-		s.closed.connect(func(): _box.visible = true; (_box.get_child(2) as Button).grab_focus())
-		_box.visible = false
-		root.add_child(s)))
-	_box.add_child(UiTheme.big_button("Leave to main menu", leave))
+	var resume_b := UiTheme.big_button("Resume", resume)
+	resume_b.tooltip_text = "Back to the game (Esc)."
+	_box.add_child(resume_b)
+	var help := UiTheme.big_button("Help", func(): _open_sub(root, HelpScreen.new(), 2))
+	help.tooltip_text = "How to play: controls, fighting, arrests, driving, jobs, kit and playing online."
+	_box.add_child(help)
+	var settings := UiTheme.big_button("Settings", func(): _open_sub(root, SettingsScreen.new(), 3))
+	settings.tooltip_text = "Graphics, sound, gameplay and key binds. Changes apply straight away."
+	_box.add_child(settings)
+	var keys := UiTheme.big_button("Key binds", func(): _open_sub(root, KeyBindsScreen.new(), 4))
+	keys.tooltip_text = "Change any key, mouse button or controller button."
+	_box.add_child(keys)
+	var leave_b := UiTheme.big_button("Leave to main menu", leave)
+	leave_b.tooltip_text = "Back to the title screen. The city is saved as you go. Online, the host leaving ends the game for everyone."
+	_box.add_child(leave_b)
 	(_box.get_child(1) as Button).grab_focus.call_deferred()
+
+
+## Opens Help, Settings or Key binds over the menu; focus comes back to
+## the button at index when it closes.
+func _open_sub(root: Control, screen: Control, index: int) -> void:
+	screen.connect("closed", func():
+		_box.visible = true
+		(_box.get_child(index) as Button).grab_focus())
+	_box.visible = false
+	root.add_child(screen)
 
 
 func resume() -> void:

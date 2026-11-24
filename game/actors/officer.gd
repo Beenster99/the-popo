@@ -1203,7 +1203,7 @@ func _health_tag() -> void:
 		add_child(_tag)
 	_tag.visible = true
 	if state == S.DOWNED:
-		_tag.text = "DOWN - hold %s to revive, %s to drag" % [Controls.describe(Controls.pc_event("interact")), Controls.describe(Controls.pc_event("drag"))]
+		_tag.text = "DOWN - hold %s to revive, %s to drag" % [Controls.key_name("interact"), Controls.key_name("drag")]
 		_tag.modulate = Color(1.0, 0.35, 0.3)
 	else:
 		var w := injury_names(injuries)

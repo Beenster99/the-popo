@@ -115,9 +115,9 @@ func _add_row(grid: GridContainer, e: Array) -> void:
 	l.custom_minimum_size.x = 420
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	l.mouse_filter = Control.MOUSE_FILTER_PASS
-	if e.size() > 6 and e[6] != null:
-		l.tooltip_text = e[6]
-		l.text += "  (?)"
+	var tip := _tip(e)
+	if tip != "":
+		l.tooltip_text = tip
 	grid.add_child(l)
 	var key: String = e[1]
 	var c: Control
@@ -162,10 +162,19 @@ func _add_row(grid: GridContainer, e: Array) -> void:
 			var method: String = e[5]
 			b.pressed.connect(func(): call(method, b))
 			c = b
-	if e.size() > 6 and e[6] != null:
-		c.tooltip_text = e[6]
+	if tip != "":
+		c.tooltip_text = tip
 	grid.add_child(c)
 	_rows[key] = c
+
+
+## A row's tooltip: its help in SCHEMA, or Settings.TIPS.
+static func _tip(e: Array) -> String:
+	# Help sits at index 6, or 7 on rows with both options and a spare null.
+	for i in range(6, e.size()):
+		if e[i] is String:
+			return e[i]
+	return String(Settings.TIPS.get(e[1], ""))
 
 
 static func _fmt(x: float, r: Array) -> String:
@@ -202,10 +211,15 @@ func show_presets(b: Button) -> void:
 	pm.popup(Rect2i(Vector2i(b.global_position + Vector2(0, b.size.y)), Vector2i(200, 0)))
 
 
-func open_controls(_b: Button) -> void:
-	var cs: Control = load("res://prototypes/launcher/controls_screen.gd").new()
-	cs.process_mode = Node.PROCESS_MODE_ALWAYS
-	add_child(cs)
+func open_controls(b: Button) -> void:
+	var ks := KeyBindsScreen.new()
+	ks.closed.connect(func(): if is_instance_valid(b): b.grab_focus())
+	add_child(ks)
+
+
+func reset_tips(_b: Button) -> void:
+	GameTips.reset()
+	_note.text = "Every tip will show again (if Tips while playing is on)."
 
 
 func show_tests(b: Button) -> void:

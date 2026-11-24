@@ -76,7 +76,7 @@ func _process(delta: float) -> void:
 	if _has_prisoner():
 		lines.append("PRISONER: take them to the custody bay")
 	# Phase 3.5/3.6: the armoury counter and the range mark.
-	var use := Controls.describe(Controls.pc_event("interact"))
+	var use := Controls.key_name("interact")
 	if o and armoury and not ArmouryScreen.is_open() and not PauseMenu.is_open():
 		var rng := armoury.get_parent().get_node_or_null("Range") as FiringRange
 		if armoury.near_counter(o.global_position):
