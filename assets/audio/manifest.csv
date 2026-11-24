@@ -310,3 +310,5 @@ sfx/step_metal_1.wav,Sonniss GDC bundle / Levan Nadashvili - Soldier Footsteps /
 sfx/step_metal_2.wav,Sonniss GDC bundle / Levan Nadashvili - Soldier Footsteps / FS Metal Soldier Walk N05.flac (https://archive.org/details/gameaudiogdc-part1through7),"Sonniss GDC Game Audio Bundle licence (royalty-free, games allowed, no attribution)","footstep, boots"
 sfx/step_metal_3.wav,Sonniss GDC bundle / Levan Nadashvili - Soldier Footsteps / FS Metal Soldier Walk N01.flac (https://archive.org/details/gameaudiogdc-part1through7),"Sonniss GDC Game Audio Bundle licence (royalty-free, games allowed, no attribution)","footstep, boots, pitch x0.95 tone -0.2"
 sfx/step_metal_4.wav,Sonniss GDC bundle / Levan Nadashvili - Soldier Footsteps / FS Metal Soldier Walk N05.flac (https://archive.org/details/gameaudiogdc-part1through7),"Sonniss GDC Game Audio Bundle licence (royalty-free, games allowed, no attribution)","footstep, boots, pitch x1.04 tone +0.0"
+sfx/ambulance_wail_1.wav,synthesised by tools/audio/make_ambulance.py,none (made here),ambulance wail
+sfx/ambulance_hilo_1.wav,synthesised by tools/audio/make_ambulance.py,none (made here),ambulance two-tone

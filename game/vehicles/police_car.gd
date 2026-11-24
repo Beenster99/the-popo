@@ -31,6 +31,10 @@ var doors: Array = DOORS
 var seat_windows: Array = SEAT_WINDOW
 var boot := BOOT
 var is_police := true
+## The colours the roof lights flash (left, right) and the siren sounds
+## (wail, yelp): the ambulance has blue both sides and its own two-tone.
+var flash_cols: Array = [Color("ff2a36"), Color("3a78ff")]
+var siren_stems: Array = ["siren_wail", "siren_yelp"]
 
 var lights := false
 var siren := 0                  # 0 off, 1 wail, 2 yelp
@@ -94,13 +98,13 @@ func _build_body() -> void:
 	# Roof lights: their own materials so they can flash.
 	_lens_red = _mesh(model, "lens_red")
 	_lens_blue = _mesh(model, "lens_blue")
-	_mat_red = Cel.unique_material(Color("5a0a0c"))
-	_mat_blue = Cel.unique_material(Color("0a1a5a"))
+	_mat_red = Cel.unique_material((flash_cols[0] as Color).darkened(0.75))
+	_mat_blue = Cel.unique_material((flash_cols[1] as Color).darkened(0.75))
 	if _lens_red:
 		_lens_red.set_surface_override_material(0, _mat_red)
 	if _lens_blue:
 		_lens_blue.set_surface_override_material(0, _mat_blue)
-	for side in [[-1.0, Color("ff2030")], [1.0, Color("2060ff")]]:
+	for side in [[-1.0, flash_cols[0]], [1.0, flash_cols[1]]]:
 		var l := OmniLight3D.new()
 		l.light_color = side[1]
 		l.omni_range = 9.0
@@ -173,9 +177,9 @@ func _process(delta: float) -> void:
 	var red := lights and k < 0.5 and fmod(k * 4.0, 1.0) < 0.6
 	var blue := lights and k >= 0.5 and fmod(k * 4.0, 1.0) < 0.6
 	if _mat_red:
-		_mat_red.set_shader_parameter("albedo", Color("ff2a36") * 1.6 if red else Color("5a0a0c"))
+		_mat_red.set_shader_parameter("albedo", (flash_cols[0] as Color) * 1.6 if red else (flash_cols[0] as Color).darkened(0.75))
 	if _mat_blue:
-		_mat_blue.set_shader_parameter("albedo", Color("3a78ff") * 1.6 if blue else Color("0a1a5a"))
+		_mat_blue.set_shader_parameter("albedo", (flash_cols[1] as Color) * 1.6 if blue else (flash_cols[1] as Color).darkened(0.75))
 	if _light_red:
 		_light_red.light_energy = 3.0 if red else 0.0
 		_light_blue.light_energy = 3.0 if blue else 0.0
@@ -185,7 +189,7 @@ func _process(delta: float) -> void:
 		if want == 0:
 			_siren_player.stop()
 		else:
-			var st: AudioStreamWAV = Sfx.stream("siren_wail" if want == 1 else "siren_yelp", 1)
+			var st: AudioStreamWAV = Sfx.stream(siren_stems[0] if want == 1 else siren_stems[1], 1)
 			st.loop_mode = AudioStreamWAV.LOOP_FORWARD
 			st.loop_begin = 0
 			st.loop_end = st.data.size() / 2

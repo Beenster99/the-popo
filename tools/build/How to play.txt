@@ -12,6 +12,17 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
+AMBULANCES
+Nobody lies dead in the street for long now. About half a minute after
+someone is killed, an ambulance comes for them: blue lights and a two-tone
+siren (traffic pulls over and it goes through red lights). It turns the
+siren off as it gets close, pulls up at the kerb, and two paramedics in
+green get out the back with a trolley stretcher. They wheel it over, put
+the body in a bag on the stretcher, wheel it back, load it and drive off.
+Bodies lying close together go in the same trip. The blood stays.
+Shoot near the paramedics and they run and hide until it's quiet; if both
+go down, a fresh pair gets out a little later.
+
 DRIVING AND ON-FOOT FEEL (0.12.1)
 On foot you walk by default now. Hold Shift to sprint (controller: hold L3).
 Alt switches to a steady run and back (controller: tap L3); the corner
