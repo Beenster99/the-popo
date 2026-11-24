@@ -54,6 +54,8 @@ const CELL := 8.0
 ## lift) only the floors near the line to the camera are looked at, not
 ## every piece from the basement to the roof.
 const CELL_Y := 6.0
+## v0.25.1: longest officer-to-camera line looked along (m).
+const MAX_LINE := 14.0
 var _grid := {}   # Vector3i -> Array of MeshInstance3D
 
 
@@ -130,6 +132,11 @@ func _process(delta: float) -> void:
 		candidates = []
 		var a := probes[2] as Vector3
 		var c := cam.global_position
+		# v0.25.1: only a camera close behind the officer can have walls in
+		# the way. A camera far off (the benchmark's, a spectator's) would
+		# make this walk a line of grid cells across the whole city.
+		if a.distance_squared_to(c) > MAX_LINE * MAX_LINE:
+			c = a
 		var c0 := Vector3i(floori((minf(a.x, c.x) - 2.0) / CELL), floori((minf(a.y, c.y) - 2.0) / CELL_Y), floori((minf(a.z, c.z) - 2.0) / CELL))
 		var c1 := Vector3i(floori((maxf(a.x, c.x) + 2.0) / CELL), floori((maxf(a.y, c.y) + 2.0) / CELL_Y), floori((maxf(a.z, c.z) + 2.0) / CELL))
 		for cx in range(c0.x, c1.x + 1):

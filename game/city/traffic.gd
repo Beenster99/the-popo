@@ -552,8 +552,22 @@ func _physics_process(delta: float) -> void:
 	for s in get_tree().get_nodes_in_group("suspects"):
 		if (s as Suspect).state not in [Suspect.S.IN_CAR, Suspect.S.DRIVE, Suspect.S.BOOKED]:
 			_people.append(s)
-	for dr in drivers:
-		_drive(dr, delta)
+	# v0.25.1: drivers far from every officer (and the camera) think every
+	# third tick; their car keeps the last inputs in between. Near ones
+	# still drive every tick.
+	_tick_n += 1
+	var eyes: Array = []
+	for o in get_tree().get_nodes_in_group("officers"):
+		eyes.append((o as Node3D).global_position)
+	var cam := get_viewport().get_camera_3d()
+	if cam:
+		eyes.append(cam.global_position)
+	for i in drivers.size():
+		var dr: Dictionary = drivers[i]
+		var far := _far_from(dr, eyes)
+		if far and (_tick_n + i) % 3 != 0:
+			continue
+		_drive(dr, delta * 3.0 if far else delta)
 	_run_over_step()
 	_sync_t -= delta
 	if _sync_t <= 0.0:
@@ -561,6 +575,21 @@ func _physics_process(delta: float) -> void:
 		_recycle()
 		if Net.is_online():
 			Net.broadcast(MSG_TRAFFIC, _encode(), Net.UNRELIABLE)
+
+
+var _tick_n := 0
+const FAR_DRIVE := 100.0
+
+
+func _far_from(dr: Dictionary, eyes: Array) -> bool:
+	var car = dr.get("car")
+	if not is_instance_valid(car) or dr.get("mode", "") == "getaway":
+		return false
+	var p: Vector3 = (car as Node3D).global_position
+	for e in eyes:
+		if p.distance_squared_to(e) < FAR_DRIVE * FAR_DRIVE:
+			return false
+	return true
 
 
 func _drive(dr: Dictionary, delta: float) -> void:

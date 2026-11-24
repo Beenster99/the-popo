@@ -150,7 +150,11 @@ const STEPS_HEARD := 45.0
 const CARS_HEARD := 130.0
 
 
+var _snd_n := 0
+
+
 func _physics_process(delta: float) -> void:
+	_snd_n += 1
 	_clock += delta
 	_budget = minf(IMPACT_BUDGET, _budget + IMPACT_BUDGET * delta)
 	# v0.19.0: only what is within earshot is worked out each tick.
@@ -168,9 +172,16 @@ func _physics_process(delta: float) -> void:
 				var a: Dictionary = _car_audio.get(car.get_instance_id(), {})
 				if not a.is_empty():
 					a.last = car.global_position
+					a.t = _clock
 					a.away = true   # coming back in range is not a "crash"
 				continue
-			_car(car, delta)
+			# v0.25.1: past 40 m, every other tick is plenty for an engine note.
+			if car.global_position.distance_squared_to(ear) > 1600.0:
+				if (_snd_n + car.get_instance_id()) % 2 != 0:
+					continue
+				_car(car, delta * 2.0)
+			else:
+				_car(car, delta)
 	_physics_impacts(delta)
 
 
@@ -573,8 +584,12 @@ func _car(c: Car, delta: float) -> void:
 		idle.max_distance = 45.0
 		idle.volume_db = -80.0
 		c.add_child(idle)
-		_car_audio[id] = {"engine": eng, "skid": skid, "idle": idle, "last": p, "v": Vector3.ZERO, "on": false, "load": 0.0, "squeal": 0.0, "v8": v8}
+		_car_audio[id] = {"engine": eng, "skid": skid, "idle": idle, "last": p, "v": Vector3.ZERO, "on": false, "load": 0.0, "squeal": 0.0, "v8": v8, "t": _clock}
 		return
+	# (Far cars are looked at every other tick: the real time since the
+	# last look, so speeds stay right across the switch.)
+	delta = maxf(_clock - float(a.get("t", _clock - delta)), 0.001)
+	a.t = _clock
 	var v := (p - (a.last as Vector3)) / delta
 	var dv := (v - (a.v as Vector3)).length()
 	var back: bool = a.get("away", false)
@@ -738,7 +753,9 @@ func _on_world_fx(kind: int, at: Vector3, _n: Vector3) -> void:
 ## Loose chunks and objects landing hard play their material's impact.
 const HEAR_IMPACTS := 75.0
 var _near: Array = []
-var _near_t := 0.0
+var _near_next: Array = []
+var _scan: Array = []
+var _scan_i := 0
 
 
 ## Where we listen from: our officer, or the camera.
@@ -756,21 +773,28 @@ func _physics_impacts(delta: float) -> void:
 	var seen := {}
 	# Wave 2: a city has thousands of loose things. Twice a second, list the
 	# ones within earshot; each frame only those that are awake are checked.
-	_near_t -= delta
-	if _near_t <= 0.0:
-		_near_t = 0.5
-		_near.clear()
-		var ear := _ear()
-		var all: Array = world.bodies.values()
+	# v0.25.1: the list is built a slice a tick (all of it every half a
+	# second or so) instead of all at once, which stalled one frame in
+	# thirty for several milliseconds in a furnished city.
+	if _scan_i >= _scan.size():
+		_near = _near_next
+		_near_next = []
+		_scan = world.bodies.values()
 		for d in world._debris:
-			all.append(d[0])
-		all.append_array(get_tree().get_nodes_in_group("props"))
-		for b in all:
-			if not is_instance_valid(b):
-				continue
-			var n := b as Node3D
-			if n and n.is_inside_tree() and n.global_position.distance_squared_to(ear) < HEAR_IMPACTS * HEAR_IMPACTS:
-				_near.append(n)
+			_scan.append(d[0])
+		_scan.append_array(get_tree().get_nodes_in_group("props"))
+		_scan_i = 0
+	var ear := _ear()
+	var step := maxi(64, ceili(_scan.size() / 30.0))
+	var end := mini(_scan_i + step, _scan.size())
+	for k in range(_scan_i, end):
+		var b = _scan[k]
+		if not is_instance_valid(b):
+			continue
+		var n := b as Node3D
+		if n and n.is_inside_tree() and n.global_position.distance_squared_to(ear) < HEAR_IMPACTS * HEAR_IMPACTS:
+			_near_next.append(n)
+	_scan_i = end
 	for b in _near:
 		if not is_instance_valid(b):
 			continue

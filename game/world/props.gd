@@ -954,8 +954,9 @@ static func _kind_mesh(kind: String) -> ArrayMesh:
 			var col := (src as BaseMaterial3D).albedo_color if src is BaseMaterial3D else Color(0.7, 0.7, 0.7)
 			out.surface_set_material(i, Cel.material(col, true, 0.012))
 			fs.append(src != null and src.resource_name.begins_with("paint_"))
-		_kind_meshes[kind] = out
 		_kind_first[kind] = fs
+		out = _one_surface(kind, out)
+		_kind_meshes[kind] = out
 		return out
 	var by_colour := {}    # colour -> SurfaceTool
 	var order: Array = []
@@ -992,9 +993,56 @@ static func _kind_mesh(kind: String) -> ArrayMesh:
 		st.commit(am)
 		am.surface_set_material(am.get_surface_count() - 1, Cel.material(Color(col), true, 0.012))
 		firsts.append(col == first_col)
-	_kind_meshes[kind] = am
 	_kind_first[kind] = firsts
+	am = _one_surface(kind, am)
+	_kind_meshes[kind] = am
 	return am
+
+
+## v0.25.1: a prop's colours become vertex colours on one surface, so each
+## prop is a single draw (plus its outline) instead of one per colour. The
+## v0.25 furniture averaged five colours a piece, which put the benchmark's
+## draw calls up by half. Containers keep theirs: they are repainted per
+## surface.
+static func _one_surface(kind: String, src: ArrayMesh) -> ArrayMesh:
+	if kind == "container" or src.get_surface_count() < 2:
+		return src
+	var verts := PackedVector3Array()
+	var norms := PackedVector3Array()
+	var uvs := PackedVector2Array()
+	var cols := PackedColorArray()
+	var idx := PackedInt32Array()
+	for i in src.get_surface_count():
+		var a := src.surface_get_arrays(i)
+		var v: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
+		var n = a[Mesh.ARRAY_NORMAL]
+		var uv = a[Mesh.ARRAY_TEX_UV]
+		var ix = a[Mesh.ARRAY_INDEX]
+		var mat := src.surface_get_material(i) as ShaderMaterial
+		var c: Color = mat.get_shader_parameter("albedo") if mat else Color(0.7, 0.7, 0.7)
+		var base := verts.size()
+		verts.append_array(v)
+		for k in v.size():
+			norms.append(n[k] if n is PackedVector3Array and k < n.size() else Vector3.UP)
+			uvs.append(uv[k] if uv is PackedVector2Array and k < uv.size() else Vector2.ZERO)
+			cols.append(c)
+		if ix is PackedInt32Array and ix.size() > 0:
+			for k in ix:
+				idx.append(base + k)
+		else:
+			for k in v.size():
+				idx.append(base + k)
+	var arr := []
+	arr.resize(Mesh.ARRAY_MAX)
+	arr[Mesh.ARRAY_VERTEX] = verts
+	arr[Mesh.ARRAY_NORMAL] = norms
+	arr[Mesh.ARRAY_TEX_UV] = uvs
+	arr[Mesh.ARRAY_COLOR] = cols
+	arr[Mesh.ARRAY_INDEX] = idx
+	var out := ArrayMesh.new()
+	out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+	out.surface_set_material(0, Cel.material(Color.WHITE, true, 0.012, null, 1.0, false, true))
+	return out
 
 
 static func _part_mesh(size: Vector3, at: Vector3, color: Color) -> MeshInstance3D:

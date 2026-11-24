@@ -29,8 +29,8 @@ const KIT_TILE := {"brick": 1.0, "stone": 2.0, "concrete": 4.0, "plaster": 2.0, 
 
 ## flat: no specular pop or rim, for big ground surfaces (roads, pavements)
 ## where the pop would show as a bright patch.
-static func material(color: Color, outline := true, thickness := 0.025, tex: Texture2D = null, opacity := 1.0, flat := false) -> ShaderMaterial:
-	var key := "%s|%s|%s|%s|%s|%s" % [color.to_html(), outline, thickness, tex.resource_path if tex else "", opacity, flat]
+static func material(color: Color, outline := true, thickness := 0.025, tex: Texture2D = null, opacity := 1.0, flat := false, vcol := false) -> ShaderMaterial:
+	var key := "%s|%s|%s|%s|%s|%s|%s" % [color.to_html(), outline, thickness, tex.resource_path if tex else "", opacity, flat, vcol]
 	if _cache.has(key):
 		return _cache[key]
 	var m := ShaderMaterial.new()
@@ -38,6 +38,8 @@ static func material(color: Color, outline := true, thickness := 0.025, tex: Tex
 	m.set_shader_parameter("albedo", color)
 	if opacity < 1.0:
 		m.set_shader_parameter("opacity", opacity)
+	if vcol:
+		m.set_shader_parameter("use_vertex_color", true)
 	if flat:
 		m.set_shader_parameter("specular_size", 0.0)
 		m.set_shader_parameter("rim_amount", 0.0)

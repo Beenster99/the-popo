@@ -159,7 +159,6 @@ func _summary() -> String:
 	for s in _samples:
 		ms.append(s[0]); gpu.append(s[1]); rcpu.append(s[2]); draws.append(s[3]); objs.append(s[4]); game.append(s[5]); phys.append(s[6])
 	var vp := get_viewport()
-	var size := Vector2(vp.get_visible_rect().size)
 	var v: Dictionary = Settings.values
 	var lines := PackedStringArray()
 	lines.append("The Popo v%s benchmark   (%d frames over %.0f s)" % [
@@ -176,7 +175,10 @@ func _summary() -> String:
 		DisplayServer.screen_get_size(scr).x, DisplayServer.screen_get_size(scr).y,
 		DisplayServer.screen_get_refresh_rate(scr),
 		["windowed", "borderless fullscreen", "exclusive fullscreen", "maximised"][v.window_mode]])
-	lines.append("Screen %dx%d, 3D scale %.2f (%s)   %s   %s" % [size.x, size.y, vp.scaling_3d_scale,
+	# (The window's real size: with stretch mode canvas_items the viewport's
+	# visible rect is the 1600x900 UI layout, not what 3D draws at.)
+	var win := DisplayServer.window_get_size()
+	lines.append("3D drawn at %dx%d (window %dx%d, 3D scale %.2f, %s)   %s   %s" % [win.x * vp.scaling_3d_scale, win.y * vp.scaling_3d_scale, win.x, win.y, vp.scaling_3d_scale,
 		["bilinear", "FSR 1", "FSR 2"][v.scaling_mode], RenderingServer.get_video_adapter_name(), OS.get_processor_name()])
 	lines.append("MSAA %s  TAA %s  SSAO %s  SSIL %s  SSR %s  SDFGI %s  glow %s  fog %s  sun shadow %s/%dm/%s splits  lamp shadows %s  your vsync %s  cap %s" % [
 		["off", "2x", "4x", "8x"][v.msaa], v.taa, v.ssao, v.ssil, v.ssr, v.sdfgi, v.glow, v.vol_fog,
