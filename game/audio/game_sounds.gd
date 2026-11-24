@@ -146,14 +146,31 @@ func _process(delta: float) -> void:
 
 
 ## Movement sounds work from how far things moved each physics step.
+const STEPS_HEARD := 45.0
+const CARS_HEARD := 130.0
+
+
 func _physics_process(delta: float) -> void:
 	_clock += delta
 	_budget = minf(IMPACT_BUDGET, _budget + IMPACT_BUDGET * delta)
+	# v0.19.0: only what is within earshot is worked out each tick.
+	var ear := _ear()
 	for n in get_tree().get_nodes_in_group("officers") + get_tree().get_nodes_in_group("suspects"):
-		_footsteps(n as Node3D, delta)
+		var nn := n as Node3D
+		if nn and nn.global_position.distance_squared_to(ear) < STEPS_HEARD * STEPS_HEARD:
+			_footsteps(nn, delta)
 	if cars:
 		for c in cars.cars:
-			_car(c as Car, delta)
+			var car := c as Car
+			if car == null or not is_instance_valid(car):
+				continue
+			if car.global_position.distance_squared_to(ear) > CARS_HEARD * CARS_HEARD:
+				var a: Dictionary = _car_audio.get(car.get_instance_id(), {})
+				if not a.is_empty():
+					a.last = car.global_position
+					a.away = true   # coming back in range is not a "crash"
+				continue
+			_car(car, delta)
 	_physics_impacts(delta)
 
 
@@ -402,7 +419,7 @@ func _officer_foley(o: Officer, _delta: float) -> void:
 		var weight: float = float(Armoury.pistol_of(int(kt)).weight) if gun == 0 and kt != null else 1.0
 		Sfx.shot(parent, muzzle, maxi(gun, 0), own, weight)
 		eject_casing(o, Vector3.INF, Vector3.ZERO, gun == Sfx.SHOTGUN)
-		Feel.muzzle(parent, muzzle, gun == Sfx.SHOTGUN)
+		MuzzleFx.fire(parent, muzzle, o.shot_direction(muzzle), MuzzleFx.size_for(gun, weight))
 		if own:
 			Feel.shake(get_tree(), 0.22 if gun == Sfx.SHOTGUN else 0.07)
 	# Dry: the trigger pulled on an empty gun.
@@ -533,7 +550,9 @@ func _car(c: Car, delta: float) -> void:
 	var p := c.global_position
 	if a.is_empty():
 		var eng := AudioStreamPlayer3D.new()
-		eng.stream = Sfx.loop_stream("car_engine")
+		# v0.13.1: police cars have a real V8 (beenster: "beefy V8 sound").
+		var v8 := c is PoliceCar
+		eng.stream = Sfx.loop_stream("v8_drive" if v8 else "car_engine")
 		eng.bus = Sfx.BUS_VEHICLES
 		eng.unit_size = 5.0
 		eng.max_distance = 110.0 if _engine_tone(c).y > 3.0 else 70.0
@@ -548,18 +567,22 @@ func _car(c: Car, delta: float) -> void:
 		c.add_child(skid)
 		# v0.13.0: the engine ticking over, under the engine note at a standstill.
 		var idle := AudioStreamPlayer3D.new()
-		idle.stream = Sfx.loop_stream("car_idle")
+		idle.stream = Sfx.loop_stream("v8_idle" if v8 else "car_idle")
 		idle.bus = Sfx.BUS_VEHICLES
 		idle.unit_size = 4.0
 		idle.max_distance = 45.0
 		idle.volume_db = -80.0
 		c.add_child(idle)
-		_car_audio[id] = {"engine": eng, "skid": skid, "idle": idle, "last": p, "v": Vector3.ZERO, "on": false, "load": 0.0, "squeal": 0.0}
+		_car_audio[id] = {"engine": eng, "skid": skid, "idle": idle, "last": p, "v": Vector3.ZERO, "on": false, "load": 0.0, "squeal": 0.0, "v8": v8}
 		return
 	var v := (p - (a.last as Vector3)) / delta
 	var dv := (v - (a.v as Vector3)).length()
+	var back: bool = a.get("away", false)
+	if back:
+		a.away = false
+		dv = 0.0
 	a.last = p
-	var prev_v: Vector3 = a.v
+	var prev_v: Vector3 = v if back else a.v
 	a.v = v
 	var speed := Vector2(v.x, v.z).length()
 	var eng := a.engine as AudioStreamPlayer3D
@@ -584,13 +607,18 @@ func _car(c: Car, delta: float) -> void:
 		var gear_k := fmod(k * 3.0, 1.0) if k < 0.99 else 1.0
 		var tone := _engine_tone(c)
 		var dop := _doppler(p, v)
-		eng.pitch_scale = (0.75 + k * 0.5 + gear_k * 0.45 + a.load * 0.08) * tone.x * dop
+		if a.v8:
+			# The V8 loop is held at about 1,250 rpm: from there up to about
+			# 3,500 through the gears, and it digs in harder under load.
+			eng.pitch_scale = (0.85 + k * 0.75 + gear_k * 0.75 + a.load * 0.15) * dop
+		else:
+			eng.pitch_scale = (0.75 + k * 0.5 + gear_k * 0.45 + a.load * 0.08) * tone.x * dop
 		# At a standstill the engine ticks over; the note takes over as it pulls away.
 		var still: float = clampf(1.0 - speed / 4.0, 0.0, 1.0) * (1.0 - float(a.load))
-		eng.volume_db = -14.0 + a.load * 6.0 + k * 4.0 + tone.y - still * 7.0
+		eng.volume_db = -14.0 + a.load * (9.0 if a.v8 else 6.0) + k * 4.0 + tone.y - still * 7.0 + (3.0 if a.v8 else 0.0)
 		var idle := a.idle as AudioStreamPlayer3D
-		idle.volume_db = -9.0 + tone.y + linear_to_db(maxf(still, 0.02))
-		idle.pitch_scale = tone.x * (1.0 + a.load * 0.15)
+		idle.volume_db = -9.0 + tone.y + linear_to_db(maxf(still, 0.02)) + (2.0 if a.v8 else 0.0)
+		idle.pitch_scale = tone.x * (1.0 + a.load * (0.35 if a.v8 else 0.15))
 		var right := c.global_transform.basis.x
 		var slip := absf(v.dot(right))
 		var on_ground := p.y < 3.0

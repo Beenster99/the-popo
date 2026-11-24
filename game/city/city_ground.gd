@@ -83,9 +83,11 @@ func build(g: CityGenerator) -> void:
 	road.set_meta("surface", "concrete")
 	var cs := CollisionShape3D.new()
 	var box := BoxShape3D.new()
-	box.size = Vector3(ex, 0.5, ez)
+	# v0.16.0: 2 m deep (was 0.5) so heavy things pressed into it can't
+	# be pushed out of the bottom.
+	box.size = Vector3(ex, 2.0, ez)
 	cs.shape = box
-	cs.position = Vector3(ex * 0.5, -0.25, ez * 0.5)
+	cs.position = Vector3(ex * 0.5, -1.0, ez * 0.5)
 	road.add_child(cs)
 	add_child(road)
 	for b in g.blocks:
@@ -96,9 +98,11 @@ func build(g: CityGenerator) -> void:
 		var lcs := CollisionShape3D.new()
 		var lb := BoxShape3D.new()
 		var sz2: Vector2 = (b.rect as Rect2).size
-		lb.size = Vector3(sz2.x, 0.15, sz2.y)
+		# The slab's top is the pavement (0.15 m); it goes 1 m down into the
+		# road block below so a heavy prop can't sink through it.
+		lb.size = Vector3(sz2.x, 1.15, sz2.y)
 		lcs.shape = lb
-		lcs.position = o + Vector3(sz2.x * 0.5, 0.075, sz2.y * 0.5)
+		lcs.position = o + Vector3(sz2.x * 0.5, 0.15 - 0.575, sz2.y * 0.5)
 		lot.add_child(lcs)
 		add_child(lot)
 	# Grass round the city, and the dock water to the south.

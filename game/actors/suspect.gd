@@ -938,12 +938,25 @@ func _threat() -> Dictionary:
 			bd = d
 			best = o
 	var los := false
-	if best:
-		var a := global_position + Vector3(0, 1.5, 0)
-		var b := best.global_position + Vector3(0, 1.4, 0)
-		var q := PhysicsRayQueryParameters3D.create(a, b, 1, [get_rid()])
-		los = get_world_3d().direct_space_state.intersect_ray(q).is_empty() and not Grenades.blocks_sight(a, b)
+	# v0.19.0: nobody sees past SIGHT_MAX, and the sight line is checked
+	# about ten times a second (not every tick for every crook in the city).
+	if best and bd < SIGHT_MAX:
+		_los_t -= get_physics_process_delta_time()
+		if _los_t <= 0.0 or best != _los_who:
+			_los_t = 0.1 + randf() * 0.04
+			_los_who = best
+			var a := global_position + Vector3(0, 1.5, 0)
+			var b := best.global_position + Vector3(0, 1.4, 0)
+			var q := PhysicsRayQueryParameters3D.create(a, b, 1, [get_rid()])
+			_los = get_world_3d().direct_space_state.intersect_ray(q).is_empty() and not Grenades.blocks_sight(a, b)
+		los = _los
 	return {"o": best, "d": bd, "los": los}
+
+
+const SIGHT_MAX := 120.0
+var _los := false
+var _los_t := 0.0
+var _los_who: Officer
 
 
 func _notices(t: Dictionary) -> bool:
