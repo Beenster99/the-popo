@@ -152,6 +152,8 @@ const SCHEMA := [
 		null, "On: up on the small map is the way you're looking. Off: north is always up."],
 	["Gameplay", "job_markers", "Job markers on screen", "bool", true,
 		null, "A marker over each job with its distance, seen through walls, and an arrow at the screen edge when it's off screen."],
+	["Gameplay", "hotbar", "Shortcut bar", "bool", true,
+		null, "The bar along the bottom: pistol, charge, grenades, first aid and grapple with their keys and counts. The keys work with it hidden too."],
 	["Gameplay", "tips", "Tips while playing", "bool", true,
 		null, "A short tip the first time something comes up: your first car, first job, first wound and so on. Each shows once."],
 	["Gameplay", "tips_reset", "Show every tip again", "button", null, "reset_tips",

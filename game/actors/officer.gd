@@ -421,7 +421,9 @@ func sim_step(cmd: Dictionary, delta: float) -> void:
 			velocity.z = f.z * BARGE_SPEED
 	if is_reviving():
 		wish = Vector3.ZERO
-	if state in [S.MOVE, S.CROUCH] and _pressed(PlayerInput.INTERACT) and not is_reviving() and cuff_target() == null and (_try_grapple() or _try_abseil()):
+	if state in [S.MOVE, S.CROUCH] and _pressed(PlayerInput.GRAPPLE) and (_try_grapple(true) or _try_abseil()):
+		return
+	elif state in [S.MOVE, S.CROUCH] and _pressed(PlayerInput.INTERACT) and not is_reviving() and cuff_target() == null and (_try_grapple() or _try_abseil()):
 		return
 	if state in [S.MOVE, S.CROUCH] and _pressed(PlayerInput.INTERACT) and not is_reviving() and _try_seat_prisoner():
 		pass
@@ -831,14 +833,16 @@ static func injury_names(bits: int) -> PackedStringArray:
 ## Holding interact: at a police car's boot, restock ammo and first aid; next
 ## to a wounded teammate, treat them; else treat yourself (pouch permitting).
 func _boot_and_treat(delta: float) -> void:
-	var held := (buttons & PlayerInput.INTERACT) != 0 and state in [S.MOVE, S.CROUCH] and not is_reviving()
+	# The shortcut bar's first aid (AID) only treats: no cuffs, no boot.
+	var aid_only := (buttons & PlayerInput.AID) != 0 and (buttons & PlayerInput.INTERACT) == 0
+	var held := ((buttons & PlayerInput.INTERACT) != 0 or aid_only) and state in [S.MOVE, S.CROUCH] and not is_reviving()
 	if not held:
 		_boot_t = 0.0
 		treat_t = 0.0
 		cuff_t = 0.0
 		return
 	# A suspect on their knees close by: cuffs first.
-	var cs := cuff_target()
+	var cs := cuff_target() if not aid_only else null
 	if cs:
 		_boot_t = 0.0
 		treat_t = 0.0
@@ -850,7 +854,7 @@ func _boot_and_treat(delta: float) -> void:
 		return
 	cuff_t = 0.0
 	var at_boot := false
-	for c in get_tree().get_nodes_in_group("police_cars"):
+	for c in ([] if aid_only else get_tree().get_nodes_in_group("police_cars")):
 		var bp: Vector3 = (c as PoliceCar).boot_point()
 		if Vector2(bp.x - global_position.x, bp.z - global_position.z).length() < BOOT_RANGE:
 			at_boot = true
@@ -2025,8 +2029,8 @@ const SWING_TIME := 0.9
 
 
 ## Aiming at a building from outside it: fire the grapple at its roof edge.
-func _try_grapple() -> bool:
-	if (buttons & PlayerInput.AIM) == 0:
+func _try_grapple(any_aim := false) -> bool:
+	if (buttons & PlayerInput.AIM) == 0 and not any_aim:
 		return false
 	var plan := grapple_plan(aim_point)
 	if plan.is_empty():

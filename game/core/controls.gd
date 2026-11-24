@@ -28,7 +28,14 @@ const KEYS := {
 	"horn": [KEY_H],
 	"weapon_1": [KEY_1],
 	"weapon_2": [KEY_2],
-	"grenade_next": [KEY_3],      # smoke, CS gas, flashbang
+	"slot_3": [KEY_3],            # shortcut bar: smoke
+	"slot_4": [KEY_4],            # CS gas
+	"slot_5": [KEY_5],            # flashbang
+	"slot_6": [KEY_6],            # first aid
+	"slot_7": [KEY_7],            # grapple hook
+	"hotbar_next": [],
+	"hotbar_prev": [],
+	"grenade_next": [],           # smoke, CS gas, flashbang (3-5 pick them straight off)
 	"throw": [KEY_Q],             # throw the picked grenade at the crosshair
 	"minimap": [KEY_M],           # mini map: small, large, off
 	"cam_rotate_left": [],
@@ -61,8 +68,8 @@ const PAD_BUTTONS := {
 	"sprint": [JOY_BUTTON_LEFT_STICK],      # L3
 	"interact": [JOY_BUTTON_BACK],          # View (Share)
 	"ping": [JOY_BUTTON_TOUCHPAD],          # (touchpad)
-	"grenade_next": [JOY_BUTTON_DPAD_LEFT],
-	"throw": [JOY_BUTTON_DPAD_RIGHT],
+	"hotbar_prev": [JOY_BUTTON_DPAD_LEFT],  # shortcut bar: previous slot (RT uses it)
+	"hotbar_next": [JOY_BUTTON_DPAD_RIGHT],
 	"shout": [JOY_BUTTON_DPAD_UP],
 	"cam_zoom_out": [JOY_BUTTON_MISC1],
 	"back_to_launcher": [JOY_BUTTON_START],
@@ -90,14 +97,18 @@ const REBINDABLE := [
 	["holster", "Holster / draw"], ["torch", "Torch on / off"], ["punch", "Punch"], ["kick", "Kick"], ["shout", "Shout orders (hold: prisoner stay / follow)"], ["interact", "Use / revive (hold)"], ["drag", "Drag a downed teammate (hold)"],
 	["aim", "Aim / peek from cover"], ["fire", "Fire"], ["ping", "Ping a spot for everyone"], ["horn", "Car horn"], ["handbrake", "Handbrake"],
 	["throw", "Throw grenade"], ["grenade_next", "Pick grenade: smoke, CS gas, flashbang"],
-	["weapon_1", "Pistol"], ["weapon_2", "Charge / second gear slot"],
+	["weapon_1", "Bar 1: pistol"], ["weapon_2", "Bar 2: charge / gear"],
+	["slot_3", "Bar 3: smoke grenade"], ["slot_4", "Bar 4: CS gas"], ["slot_5", "Bar 5: flashbang"],
+	["slot_6", "Bar 6: first aid"], ["slot_7", "Bar 7: grapple hook"],
+	["hotbar_next", "Next slot on the bar"], ["hotbar_prev", "Previous slot on the bar"],
 	["cam_zoom_in", "Camera closer"], ["cam_zoom_out", "Camera further out"],
 	["minimap", "Mini map: small, large (whole city), off"],
 ]
 ## The Key binds and Help screens list the actions in these groups.
 const GROUPS := [
 	["On foot", ["move_forward", "move_back", "move_left", "move_right", "sprint", "walk", "jump", "stance", "crouch", "prone", "dive", "cover"]],
-	["Guns and fighting", ["aim", "fire", "reload", "holster", "weapon_1", "weapon_2", "throw", "grenade_next", "punch", "kick"]],
+	["Guns and fighting", ["aim", "fire", "reload", "holster", "throw", "grenade_next", "punch", "kick"]],
+	["Shortcut bar", ["weapon_1", "weapon_2", "slot_3", "slot_4", "slot_5", "slot_6", "slot_7", "hotbar_next", "hotbar_prev"]],
 	["Police work", ["shout", "interact", "drag", "torch", "ping"]],
 	["In a car", ["horn", "handbrake"]],
 	["Camera and map", ["cam_zoom_in", "cam_zoom_out", "minimap"]],
@@ -129,10 +140,17 @@ const TIPS := {
 	"ping": "Puts a marker on a spot for every officer to see.",
 	"horn": "Car horn (the driver).",
 	"handbrake": "Handbrake: swings the tail out.",
-	"throw": "Throw the picked grenade at the dot in the middle of the screen.",
+	"throw": "Throws the picked grenade at the dot straight away, whatever is in your hand.",
 	"grenade_next": "Picks which grenade you throw: smoke, CS gas or flashbang.",
-	"weapon_1": "Back to your pistol.",
-	"weapon_2": "Your second gear slot: breach charge or C4 when your loadout has them (aim and fire to stick one on).",
+	"weapon_1": "Pistol in hand: fire shoots.",
+	"weapon_2": "Breach charge or C4 in hand, when your loadout has them: aim and fire to stick one on.",
+	"slot_3": "Smoke grenade in hand: fire throws it at the dot.",
+	"slot_4": "CS gas grenade in hand: fire throws it at the dot.",
+	"slot_5": "Flashbang in hand: fire throws it at the dot.",
+	"slot_6": "First aid in hand: hold fire to patch up a hurt teammate close by, or yourself.",
+	"slot_7": "Grapple hook in hand (once the station has one): fire at a building from outside to be hauled onto the roof; at a roof edge, fire to go over on the rope.",
+	"hotbar_next": "Picks the next thing on the shortcut bar that you have.",
+	"hotbar_prev": "Picks the previous thing on the shortcut bar that you have.",
 	"cam_zoom_in": "Moves the camera in closer behind you.",
 	"cam_zoom_out": "Moves the camera further out.",
 	"minimap": "Switches the mini map (bottom left) between small, large (the whole city) and off.",
@@ -145,7 +163,8 @@ const SAVE_PATH := "user://controls.cfg"
 ## Bumped when the defaults change in a way that clashes with old saved
 ## changes (v0.1.2 moved roll off Ctrl, v0.2.1 moved cover to C for reload
 ## on R), so old files are ignored.
-const SAVE_VERSION := 3
+## v0.23: the shortcut bar took 3-7 and the D-pad left / right.
+const SAVE_VERSION := 4
 
 
 func _enter_tree() -> void:

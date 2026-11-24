@@ -477,7 +477,7 @@ func _send_crew(s: Dictionary) -> void:
 		var w := dispatch.spawn_suspect(from, Suspect.S.WANDER, false)
 		w.civilian = true
 		w.part = "worker"
-		w.look = SuspectLook.WORKER + _rng.randi_range(0, 15)
+		w.look = SuspectLook.WORKER + _rng.randi_range(0, SuspectLook.PARAMEDIC - SuspectLook.WORKER - 1)
 		SuspectLook.apply(w.rig.model if w.rig else null, w.look)
 		w.route = route.duplicate()
 		w._route_i = i

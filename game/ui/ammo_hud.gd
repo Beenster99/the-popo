@@ -121,7 +121,9 @@ func _process(_delta: float) -> void:
 	_health.text = "%s\nFIRST AID %d" % ["  ".join(wounds), o.pouch] if not wounds.is_empty() else "FIRST AID %d" % o.pouch
 	_health.add_theme_color_override("font_color", Color(1.0, 0.45, 0.4) if not wounds.is_empty() else Color(0.7, 0.75, 0.8))
 	_hint.text = _prompt(o)
-	_nades.text = _nade_line(o)
+	_hint.offset_bottom = -30.0 - (HotBar.height() if not o.in_car() else 0.0)
+	# The shortcut bar shows the grenades when it's on.
+	_nades.text = _nade_line(o) if not bool(Settings.values.get("hotbar", true)) else ""
 	_nades.visible = _nades.text != ""
 
 
@@ -139,7 +141,7 @@ func _nade_line(o: Officer) -> String:
 			continue
 		var t := "%s %d" % [Grenades.SHORT[k], Grenades.count(o.nades, k)]
 		parts.append("[%s]" % t if k == PlayerInput.nade_kind else t)
-	var keys := "%s throw  %s pick" % [Controls.key_name("throw"), Controls.key_name("grenade_next")]
+	var keys := "%s throw  %s-%s pick" % [Controls.key_name("throw"), Controls.key_name("slot_3"), Controls.key_name("slot_5")]
 	return "%s\n%s" % ["  ".join(parts), keys]
 
 

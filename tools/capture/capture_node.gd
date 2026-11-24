@@ -82,6 +82,27 @@ func _run() -> void:
 			cam.current = true
 			await _frames(80)
 			await _save()
+		"hotbar":
+			# The shortcut bar in the street, with the kit bought and CS gas in hand.
+			City.next_seed = 4242
+			Armoury.owned = Armoury.owned | (1 << Armoury.SMOKE_ITEM) | (1 << Armoury.GAS_ITEM) | (1 << Armoury.FLASH_ITEM) | (1 << Armoury.GRAPPLE)
+			Settings.values["tips"] = false
+			var s := await _scene("res://game/city/city.tscn")
+			await _frames(10)
+			s.find_children("*", "NetOverlay", false, false)[0].queue_free()
+			(s.dispatch as Dispatcher).enabled = false
+			s.dispatch.missions.minute = 14 * 60.0
+			var o: Officer = s.sync.my_pawn()
+			o.global_position = CityGenerator.junction(2, 4) + Vector3(-6, 0.1, -4)
+			await _frames(30)
+			Armoury.owned = Armoury.owned | (1 << Armoury.SMOKE_ITEM) | (1 << Armoury.GAS_ITEM) | (1 << Armoury.FLASH_ITEM) | (1 << Armoury.GRAPPLE)
+			o.nades = Grenades.full_pouch()
+			o.pouch = 2
+			PlayerInput.pick_slot(PlayerInput.Slot.GAS, o)
+			PlayerInput.slot_refused = PlayerInput.Slot.GEAR
+			PlayerInput.slot_refused_at = Time.get_ticks_msec() / 1000.0 + 5.0
+			await _frames(60)
+			await _save()
 		"smoke_stage", "gas_stage":
 			# A smoke or gas grenade on an empty lit floor (quick to render).
 			var root := _plain_stage(Vector3(-8, 2.4, -6), Vector3(0, 1.6, 0))
