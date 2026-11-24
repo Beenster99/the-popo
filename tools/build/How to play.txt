@@ -12,6 +12,21 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
+TRAFFIC THAT KEEPS MOVING (0.16.0)
+Drivers no longer sit for ever behind a car stopped in their lane (a crash,
+an abandoned car, one of yours left in the road): they edge round it, or
+pull out and overtake it when the other side of the road is clear, and
+duck back in for oncoming traffic.
+Vans and lorries no longer stop dead beside cars parked at the kerb.
+Two drivers waiting on each other in a junction sort it out: one goes.
+A car wedged on something it can't see (rubble, a post) backs off turned
+away from it, tries again, then goes round it on the other side.
+As a last resort, a car that has gone nowhere for 25 seconds, with none of
+you within 70 m, is quietly put back into the traffic somewhere else.
+Pulling over for a siren no longer drives them into the parked cars.
+Shipping containers on the docks no longer drop through the ground: two
+were being placed inside each other and the shove pushed one under.
+
 DRIVING AND ON-FOOT FEEL (0.12.1)
 On foot you walk by default now. Hold Shift to sprint (controller: hold L3).
 Alt switches to a steady run and back (controller: tap L3); the corner

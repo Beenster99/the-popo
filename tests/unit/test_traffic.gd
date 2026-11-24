@@ -68,6 +68,48 @@ func test_traffic_drives_the_lanes() -> void:
 	await get_tree().process_frame
 
 
+func test_cars_get_round_a_car_stopped_in_the_lane() -> void:
+	# v0.13.x: a car left in the road (crash, abandoned, a friend's car) used
+	# to hold up everything behind it for good. Drivers now pull out and
+	# overtake it when the other side of the road is clear.
+	var s := await _city()
+	var tr := s.traffic
+	var dr: Dictionary = {}
+	for d in tr.drivers:
+		if (d.car as CivilianVehicle).kind in ["sedan", "hatchback", "taxi"] and d.mode == "drive":
+			dr = d
+			break
+	t.check(not dr.is_empty(), "a car in the traffic to test with")
+	if dr.is_empty():
+		s.queue_free()
+		return
+	var car: Car = dr.car
+	# Clear its lane ahead, then drop a parked car in the middle of it.
+	var lane := TrafficSystem._lane(dr.a, dr.b)
+	var dir: Vector3 = ((lane[1] as Vector3) - (lane[0] as Vector3)).normalized()
+	var start: Vector3 = (lane[0] as Vector3).lerp(lane[1], 0.05)
+	for c in tr.cars.cars:
+		if c != car and (c as Node3D).global_position.distance_to(start + dir * 20.0) < 30.0:
+			(c as Node3D).global_position += Vector3(0, 0, 400)
+	car.global_transform = Transform3D(Basis(Vector3.UP, atan2(dir.x, dir.z)), start + Vector3(0, 1.2, 0))
+	car.linear_velocity = Vector3.ZERO
+	tr._reroute(dr, start)
+	var block: Car = tr.parked[0]
+	block.global_transform = Transform3D(Basis(Vector3.UP, atan2(dir.x, dir.z)), start + dir * 22.0 + Vector3(0, 1.2, 0))
+	block.linear_velocity = Vector3.ZERO
+	var passed := false
+	for i in 60 * 22:
+		await get_tree().physics_frame
+		if dr.mode == "drive" and (car.global_transform.affine_inverse() * block.global_position).z < -4.0:
+			passed = true
+			break
+	print("    %s behind a parked car in its lane: %s, %.0f m on" % [(car as CivilianVehicle).kind, "got past" if passed else "still stuck", car.global_position.distance_to(start)])
+	t.check(passed, "it pulls out and goes round")
+	t.check(car.global_transform.basis.y.dot(Vector3.UP) > 0.8, "and stays on its wheels")
+	s.queue_free()
+	await get_tree().process_frame
+
+
 func test_people_walk_and_scatter() -> void:
 	var s := await _city()
 	# Walk routes bake in the background; people appear once they're ready.
