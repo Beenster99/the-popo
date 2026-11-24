@@ -85,6 +85,86 @@ static func _load() -> void:
 			"surfaces": surface_names(mi.mesh),
 		})
 	root.free()
+	_thin_stairs()
+
+
+## v0.24.0: a flight of stairs is thin treads, not solid blocks down to the
+## floor. The kit's steps were columns standing on the floor, so in a building
+## of three or more storeys the flight above sat on the flight below and left
+## no headroom: nobody (officers or suspects) could get past the first floor.
+const STAIR_THICK := 0.45
+const STAIR_RUN := 0.22
+
+
+static func _thin_stairs() -> void:
+	if not _pieces.has("stairs"):
+		return
+	var p: Dictionary = _pieces.stairs
+	p.mesh = _thin(p.mesh, (p.aabb as AABB).position.z)
+	p.aabb = (p.mesh as Mesh).get_aabb()
+	for ch: Dictionary in p.solid:
+		var m := _thin(ch.mesh, INF)
+		ch.mesh = m
+		ch.shape = m.create_convex_shape(true, false)
+		ch.volume = _hull_volume(m)
+		ch.radius = m.get_aabb().size.length() * 0.5
+
+
+## Raises every step's underside to STAIR_THICK below its tread. run0 is the
+## low end of the flight along z for the whole piece (steps STAIR_RUN apart),
+## or INF for one step on its own.
+static func _thin(src: ArrayMesh, run0: float) -> ArrayMesh:
+	var surf: Array = []
+	var tops := {}
+	for si in src.get_surface_count():
+		var arr := src.surface_get_arrays(si)
+		var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+		var norms: PackedVector3Array = arr[Mesh.ARRAY_NORMAL] if arr[Mesh.ARRAY_NORMAL] != null else PackedVector3Array()
+		var idx: PackedInt32Array = arr[Mesh.ARRAY_INDEX] if arr[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
+		if idx.is_empty():
+			idx.resize(verts.size())
+			for k in verts.size():
+				idx[k] = k
+		var uvs: PackedVector2Array = arr[Mesh.ARRAY_TEX_UV] if arr[Mesh.ARRAY_TEX_UV] != null else PackedVector2Array()
+		var tu := PackedVector2Array()
+		var tv := PackedVector3Array()
+		var tn := PackedVector3Array()
+		var step := PackedInt32Array()
+		for k in range(0, idx.size(), 3):
+			var a := verts[idx[k]]
+			var b := verts[idx[k + 1]]
+			var c := verts[idx[k + 2]]
+			var n := (b - a).cross(c - a).normalized()
+			var i := 0
+			if run0 != INF:
+				# Nudge the centre inwards so a riser between two steps counts
+				# for the step it belongs to.
+				var cz := (a.z + b.z + c.z) / 3.0 - n.z * 0.01
+				i = floori((cz - run0) / STAIR_RUN)
+			tops[i] = maxf(tops.get(i, -INF), maxf(a.y, maxf(b.y, c.y)))
+			for v in [idx[k], idx[k + 1], idx[k + 2]]:
+				tv.append(verts[v])
+				tn.append(norms[v] if not norms.is_empty() else n)
+				if not uvs.is_empty():
+					tu.append(uvs[v])
+				step.append(i)
+		surf.append([tv, tn, step, src.surface_get_material(si), tu])
+	var out := ArrayMesh.new()
+	for s in surf:
+		var tv: PackedVector3Array = s[0]
+		for k in tv.size():
+			var floor_y: float = float(tops[s[2][k]]) - STAIR_THICK
+			if tv[k].y < floor_y:
+				tv[k].y = floor_y
+		var arr := []
+		arr.resize(Mesh.ARRAY_MAX)
+		arr[Mesh.ARRAY_VERTEX] = tv
+		arr[Mesh.ARRAY_NORMAL] = s[1]
+		if not (s[4] as PackedVector2Array).is_empty():
+			arr[Mesh.ARRAY_TEX_UV] = s[4]
+		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+		out.surface_set_material(out.get_surface_count() - 1, s[3])
+	return out
 
 
 ## Copy of the mesh with each surface's glTF material swapped for cel shading,
