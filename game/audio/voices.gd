@@ -44,6 +44,8 @@ const LINES := [
 	["lawyer", "I want my lawyer!", Kind.PRISONER],
 	["brutality", "This is police brutality!", Kind.PRISONER],
 	["stopping", "Alright! Alright! I'm stopping!", Kind.STOPPING],
+	# v0.13.0, from beenster's Sound Pack 1 (two takes so far).
+	["stand_down", "STAND DOWN! PUT THE GUN ON THE FLOOR AND WE CAN ALL WALK OUT OF HERE HAPPY.", Kind.ARMED],
 ]
 
 static var current: Voices
@@ -135,6 +137,9 @@ static func stream(line: int, voice: int) -> AudioStream:
 	var path := "%s%s_%d.ogg" % [VOICE_DIR, LINES[line][0], voice]
 	if not _cache.has(path):
 		_cache[path] = load(path) if ResourceLoader.exists(path) else null
+	# A line with fewer takes than voices: the nearest take there is.
+	if _cache[path] == null and voice > 1:
+		return stream(line, voice - 1)
 	return _cache[path]
 
 

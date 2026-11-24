@@ -31,6 +31,25 @@ they're already fixing damage nearby). Blood under a body still lying there
 is left alone. All of it follows Settings > Gameplay > Gore.
 Fixed: the blood pool no longer follows you around after you're revived.
 
+POLICE V8 (0.14.1)
+Police cars now sound like a big V8: a lumpy burble ticking over, a deep
+growl pulling away that climbs through the gears, louder when you floor it.
+
+SOUND PACK 1 (0.14.1)
+beenster's own sounds are in: every gun has its own recording (9 mm
+pistols, the heavy .45 and .357, the machine pistol, the sawn-off with its
+pump racked after each shot), and gunshots are louder and denser.
+Gunshots now sound like where they are fired: small rooms ring hard, big
+halls boom, alleys flutter between the walls, streets slap back off the
+buildings, rooftops are dry with the city answering from below, and from
+far off the bang arrives late and dull. Walls between you and a shot
+still muffle it.
+Also new: bullet whizzes, ricochets, hits on wood and concrete, grenade
+blasts, flashbangs, gas canisters popping and bouncing, window glass,
+bricks and rubble, a rumble when a building gives way, car start-ups,
+engines ticking over, tyre squeals, red shotgun shells on the floor, radio
+clicks and static, and a new order: "Stand down, put the gun on the floor
+and we can all walk out of here happy."
 PRISONERS IN THE CAR (0.14.0)
 Walk your prisoners to a police car and press F at a door: the back door
 swings open and every prisoner walking with you climbs in (back seats
