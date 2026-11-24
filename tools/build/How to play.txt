@@ -12,6 +12,15 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
+MUZZLE FLASH AND GUN SMOKE (0.21.0)
+Every shot now throws a flash of flame from the barrel, sized by the gun:
+the compact 9mm is a snap of fire, the .45 and the .357 bigger, and the
+sawn-off a long tongue of flame. The flash lights up the walls, the floor
+and the faces round the gun for an instant (no extra shadows, so no fps
+cost). Burnt powder smoke and embers blast out in front, and a grey puff
+hangs at the muzzle and curls away for a couple of seconds. At night the
+smoke is darker so it doesn't glow. Criminals' guns do the same.
+
 DRIVING AND ON-FOOT FEEL (0.12.1)
 On foot you walk by default now. Hold Shift to sprint (controller: hold L3).
 Alt switches to a steady run and back (controller: tap L3); the corner

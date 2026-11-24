@@ -655,20 +655,13 @@ func _shot_fx(a: Vector3, e: Vector3, surface := "concrete", what := 0, gk := 1)
 	var parent := get_parent()
 	if parent == null:
 		return
-	var tree := get_tree()
 	if gk > 0:
 		Sfx.shot(parent, a, gk)
 		if GameSounds.current:
 			var d := (e - a)
 			d.y = 0.0
 			GameSounds.current.eject_casing(null, a, Vector3(-d.z, 0, d.x).normalized() if d.length() > 0.01 else Vector3.RIGHT)
-		var flash := OmniLight3D.new()
-		flash.light_color = Color("ffcf7a")
-		flash.light_energy = 4.0
-		flash.omni_range = 5.0
-		parent.add_child(flash)
-		flash.global_position = a
-		tree.create_timer(0.06).timeout.connect(flash.queue_free)
+		MuzzleFx.fire(parent, a, e - a, MuzzleFx.SIZE_SHOTGUN if gk == Sfx.SHOTGUN else 1.0)
 	Sfx.bullet(parent, a, e, surface, what)
 	_tracer(parent, a, e)
 
