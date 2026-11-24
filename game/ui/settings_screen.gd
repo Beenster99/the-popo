@@ -222,6 +222,20 @@ func reset_tips(_b: Button) -> void:
 	_note.text = "Every tip will show again (if Tips while playing is on)."
 
 
+## Debug cheat: the station's pay to the top. Pay belongs to the host and is
+## shared with everyone 10 times a second, so a client can't set it.
+func max_money(_b: Button) -> void:
+	var city := get_tree().current_scene as City
+	if city == null or city.dispatch == null:
+		_note.text = "Start or join a game first, then use Max money from the Esc menu."
+		return
+	if not Net.is_host():
+		_note.text = "Only the host can set the station's pay (it's shared by everyone)."
+		return
+	city.dispatch.set_pay(Dispatcher.MAX_PAY)
+	_note.text = "The station's pay is now £%s." % DispatchHud._money(Dispatcher.MAX_PAY)
+
+
 func show_tests(b: Button) -> void:
 	var pm := PopupMenu.new()
 	for sc in Scenes.TESTS:
