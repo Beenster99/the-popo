@@ -221,7 +221,9 @@ func is_free() -> bool:
 ## coming down). Civilians in reach run from it or cower.
 func on_alarm(at: Vector3, radius: float) -> void:
 	if not civilian:
-		if global_position.distance_to(at) < minf(radius, HEAR_SHOTS) and _idle() and is_host_side():
+		# Shots and blasts (40 m and up), not things breaking (30 m): crooks
+		# at work make plenty of that noise themselves.
+		if radius >= 40.0 and global_position.distance_to(at) < minf(radius, HEAR_SHOTS) and _idle() and is_host_side():
 			_startled(at)
 		return
 	if state not in [S.WANDER, S.PANIC, S.COWER]:

@@ -10,6 +10,12 @@ var armoury: Armoury
 var pawn_getter: Callable   # () -> Officer, or null
 
 var _calls: Label
+## 2026-11-24 (beenster: "we need a little more information as well as the
+## radio call"): a job card under the clock for each open job: what it is,
+## the pay, the street, how far and which way, the full dispatch text, how
+## many crooks (armed, shotguns, dealt with) and what to do.
+var _card: RichTextLabel
+var _card_box: PanelContainer
 var _radio: Label
 var _radio_t := 0.0
 var _arrows: Control
@@ -30,9 +36,33 @@ func _ready() -> void:
 	_radio.custom_minimum_size.x = 900
 	_radio.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	top.add_child(_radio)
+	var left := VBoxContainer.new()
+	left.position = Vector2(20, 16)
+	left.add_theme_constant_override("separation", 8)
+	add_child(left)
 	_calls = _label(15, Color(1, 0.96, 0.9))
-	_calls.position = Vector2(20, 16)
-	add_child(_calls)
+	left.add_child(_calls)
+	_card_box = PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.03, 0.05, 0.09, 0.72)
+	sb.border_color = Color(1, 1, 1, 0.18)
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(6)
+	sb.set_content_margin_all(10)
+	_card_box.add_theme_stylebox_override("panel", sb)
+	_card_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_card_box.visible = false
+	left.add_child(_card_box)
+	_card = RichTextLabel.new()
+	_card.bbcode_enabled = true
+	_card.fit_content = true
+	_card.scroll_active = false
+	_card.custom_minimum_size.x = 440
+	_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_card.add_theme_font_size_override("normal_font_size", 14)
+	_card.add_theme_font_size_override("bold_font_size", 17)
+	_card.add_theme_font_size_override("italics_font_size", 14)
+	_card_box.add_child(_card)
 	_arrows = Control.new()
 	_arrows.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_arrows.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -68,12 +98,13 @@ func _process(delta: float) -> void:
 	var lines := PackedStringArray()
 	if dispatcher.missions and dispatcher.city:
 		lines.append("%s     £%s" % [dispatcher.missions.clock_text(), _money(dispatcher.pay)])
+	var cards := PackedStringArray()
 	for call in dispatcher.active_calls():
-		var d := ""
-		if o:
-			var me := MiniMap._pos_of(o)
-			d = "   %d m" % int(Vector2(call.marker.x - me.x, call.marker.z - me.z).length())
-		lines.append("%s%s   %s" % [Dispatcher.KIND_NAMES[call.kind].to_upper(), d, CityGenerator.street_at(call.marker)])
+		cards.append(card_text(call, MiniMap._pos_of(o) if o else Vector3.INF))
+	var bb := "\n\n".join(cards)
+	if _card.text != bb:
+		_card.text = bb
+	_card_box.visible = not cards.is_empty()
 	if _has_prisoner():
 		lines.append("PRISONER: take them to the custody bay")
 	# Phase 3.5/3.6: the armoury counter and the range mark.
@@ -113,6 +144,83 @@ func _process(delta: float) -> void:
 		lines.append("%s: %d left (1 for the pistol)" % [Armoury.GEAR_NAMES[Armoury.gear_of((o as Officer).kit)].to_upper(), (o as Officer).charges])
 	_calls.text = "\n".join(lines)
 	_arrows.queue_redraw()
+
+
+## What to do on each kind of job, in a line.
+const TODO := {
+	Dispatcher.Kind.ROBBERY: "Get inside, make them give up or take them down. Cuff and bring them in.",
+	Dispatcher.Kind.ARMED: "Approach from cover. Order them to drop it, or take them down.",
+	Dispatcher.Kind.TRAFFIC: "Get behind it with lights on (siren key) and pull it over, then talk to the driver.",
+	Dispatcher.Kind.GANG: "They're dug in. Use cover, flank them, smoke or flash them. Don't rush.",
+	Dispatcher.Kind.THEFT: "Get there before they drive off. Cuff the thief at the car.",
+	Dispatcher.Kind.PURSUIT: "Chase it down. Box it in or ram it until it stops.",
+	Dispatcher.Kind.MUGGING: "Talk to the victim for a description, then find the mugger.",
+	Dispatcher.Kind.SHOPLIFT: "The shopkeeper has the door. Go in and cuff the shoplifter.",
+	Dispatcher.Kind.FIGHT: "Split them up: shout orders, punch if you must. Cuff them both.",
+	Dispatcher.Kind.DOMESTIC: "Go in carefully, calm it down, and cuff whoever's kicking off.",
+	Dispatcher.Kind.DEAL: "One's armed. Close in quietly and take them both.",
+	Dispatcher.Kind.VANDAL: "Catch them before they smash the whole street.",
+	Dispatcher.Kind.DRUNK: "He won't run. Talk him down or wrestle him, then cuff him.",
+	Dispatcher.Kind.BURGLARY: "They're still inside. Clear the building room by room.",
+	Dispatcher.Kind.RAID: "Breach the door, then clear every floor. Expect guns.",
+	Dispatcher.Kind.HOSTAGE: "Get the hostages out alive. Flashbangs help; watch your fire.",
+	Dispatcher.Kind.SEARCH: "Search every floor until you find him.",
+	Dispatcher.Kind.GANGWAR: "Two crews fighting. Let them thin out, or go in hard.",
+	Dispatcher.Kind.BANK: "Box the getaway car in first, then go in for the robbers.",
+	Dispatcher.Kind.BAITCAR: "Stay out of sight in plain clothes. Let him take the car.",
+	Dispatcher.Kind.BUY: "Plain clothes only. Walk up, make the buy, then take him.",
+	Dispatcher.Kind.CRASH: "Secure the scene and sort out the drivers.",
+	Dispatcher.Kind.FIRE: "Keep people back until the brigade arrives.",
+	Dispatcher.Kind.ALARM: "Have a look round. Stay a while and it's dealt with.",
+}
+const COMPASS := ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"]
+
+
+## The job card text (BBCode) for one open call, seen from `from` (INF: no
+## officer, so no distance).
+func card_text(call: Dictionary, from: Vector3) -> String:
+	var col := MiniMap.job_colour(call.kind).to_html(false)
+	var lines := PackedStringArray()
+	var pay: int = Dispatcher.PAY_JOB.get(call.kind, 0)
+	lines.append("[b][color=#%s]%s[/color][/b]   [color=#9fe39f]£%s[/color]" % [col, Dispatcher.KIND_NAMES[call.kind].to_upper(), _money(pay)])
+	# The street, unless the dispatch text already names where it is (the
+	# marker can sit on the corner street of the building it's in).
+	var where := CityGenerator.street_at(call.marker)
+	var text := String(call.get("text", ""))
+	var first := where.get_slice(" near ", 0)
+	if text.contains(" on ") and not text.contains(first):
+		where = ""
+	elif text.contains(first):
+		where = ""
+	if from != Vector3.INF:
+		var v := Vector2(call.marker.x - from.x, call.marker.z - from.z)
+		var dist := int(v.length())
+		var sep := "  ·  " if where != "" else ""
+		if dist < 25:
+			where += sep + "[b]you're here[/b]"
+		else:
+			# North is -Z (up on the mini map).
+			var a := fposmod(atan2(v.x, -v.y), TAU)
+			where += sep + "%d m %s" % [dist, COMPASS[int(round(a / (TAU / 8.0))) % 8]]
+	if where != "":
+		lines.append(where)
+	if String(call.get("text", "")) != "":
+		lines.append("[color=#c9d6e3]%s[/color]" % String(call.text))
+	var br := dispatcher.brief(call)
+	if br.total > 0:
+		var who := "%d suspect%s" % [br.total, "" if br.total == 1 else "s"]
+		var left: int = br.total - br.done
+		if br.armed > 0:
+			var guns := "%d armed" % br.armed
+			if br.shotguns > 0:
+				guns += " (%d shotgun%s)" % [br.shotguns, "" if br.shotguns == 1 else "s"]
+			who += ", [color=#ff7a6a]%s[/color]" % guns
+		if br.done > 0:
+			who += "  ·  %d dealt with, %d to go" % [br.done, left]
+		lines.append(who)
+	if TODO.has(call.kind):
+		lines.append("[i]%s[/i]" % TODO[call.kind])
+	return "\n".join(lines)
 
 
 func _has_prisoner() -> bool:
