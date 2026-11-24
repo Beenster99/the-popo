@@ -41,6 +41,20 @@ const ANTI_ROLL := 14.0
 const ANTI_ROLL_DAMP := 2.5
 const STEER_MAX := 0.6      # rad at low speed
 const STEER_MIN := 0.12     # rad at top speed
+## v0.20.0 (beenster: "shoot out tyres"): a shot tyre goes flat. It sits
+## lower (smaller rolling radius), grips much less and drags, so the car
+## pulls towards that corner and slides out under braking.
+const FLAT_RADIUS := 0.62       # share of the wheel radius left (down on the rim)
+const FLAT_GRIP := 0.45
+const FLAT_DRAG := 0.09         # extra rolling resistance, share of wheel load
+## v0.20.0 wheelspin: a driven tyre asked for more than the road gives
+## (past WHEELSPIN_AT of its grip) spins up: it smokes, lays rubber and
+## loses side grip, so flooring it out of a bend kicks the tail out.
+const WHEELSPIN_AT := 1.0
+## How deep a bullet dents the panel (CarSync); a dent this small is a
+## bullet, so it also leaves a hole (see apply_dent).
+const BULLET_DENT := 0.015
+const MAX_HOLES := 40           # per car; the oldest go first
 
 @export var color := Color("ecebe6")
 ## Wave 2 (Phase 2.4): every vehicle type sets its own size and handling
@@ -82,6 +96,11 @@ var _wheels: Array = []     # [{pos: local mount, front: bool, rear: bool, node:
 var _skid_prev := Transform3D()
 var _skid_prev_v := Vector3.ZERO
 var _skid_ok := false
+## Rear wheelspin 0..1 (the simulating machine works it out; friends get it
+## in the car's snapshot). Drives the tyre smoke and the screech.
+var spin_k := 0.0
+var _smoke: Array = []          # per wheel: CPUParticles3D or null
+var _holes: Array = []          # Decal, oldest first
 var _steer_smooth := 0.0
 var _body_mesh: ArrayMesh
 var _body_mi: MeshInstance3D
@@ -144,11 +163,14 @@ func _ready() -> void:
 		front_z = maxf(front_z, (m as Vector3).z)
 	for m in wheel_mounts:
 		var holder := Node3D.new()
-		holder.add_child(_make_wheel())
+		var wheel_mesh := _make_wheel()
+		holder.add_child(wheel_mesh)
 		add_child(holder)
 		var front: bool = absf((m as Vector3).z - front_z) < 0.3
 		_wheels.append({"pos": m, "front": front, "node": holder, "compress": 0.0, "spin": 0.0,
-			"ground": Vector3.ZERO, "normal": Vector3.UP, "slide": -1.0})
+			"ground": Vector3.ZERO, "normal": Vector3.UP, "slide": -1.0, "flat": false, "wspin": 0.0,
+			"mesh": wheel_mesh, "base": wheel_mesh.basis})
+		_smoke.append(null)
 
 
 ## The car's look: the Phase 0.4 box car. PoliceCar replaces it.
@@ -290,6 +312,8 @@ func _build_body_mesh() -> void:
 func apply_dent(local_point: Vector3, local_dir: Vector3, amount: float) -> void:
 	if dent_log.size() < DENT_LOG_MAX:
 		dent_log.append([local_point, local_dir, amount])
+	if is_equal_approx(amount, BULLET_DENT):
+		add_bullet_hole(local_point, local_dir)
 	var radius := 0.5 + amount * 1.2
 	for e in _deform:
 		var mi: MeshInstance3D = e.mi
@@ -498,9 +522,12 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		if hit.is_empty():
 			w.compress = 0.0
 			w.slide = -1.0
+			w.wspin = 0.0
 			continue
 		grounded += 1
-		var dist: float = (hit.position as Vector3).distance_to(mount) - wheel_radius
+		var flat: bool = w.flat
+		var radius := wheel_radius * (FLAT_RADIUS if flat else 1.0)
+		var dist: float = (hit.position as Vector3).distance_to(mount) - radius
 		var compress := rest - dist
 		var comp_speed: float = (compress - w.compress) / dt
 		w.compress = compress
@@ -522,6 +549,8 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 			grip *= REAR_GRIP
 			if handbrake:
 				grip *= HANDBRAKE_REAR_GRIP
+		if flat:
+			grip *= FLAT_GRIP
 		var lat_f := -lat_v * grip * load / 9.81 * 0.5
 		var lon_f := 0.0
 		if not w.front:
@@ -536,17 +565,24 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		# has a little rolling resistance, so a coasting car comes to rest
 		# instead of creeping for half a minute. Clamped so it never pushes
 		# the car backwards.
-		var drag := load * ROLLING
+		var drag := load * (ROLLING + (FLAT_DRAG if flat else 0.0))
 		if not w.front and absf(throttle) < 0.01:
 			drag += ENGINE_BRAKE
 		lon_f -= sign(lon_v) * minf(drag, absf(lon_v) * mass * 0.5)
 		lon_f -= lon_v * 25.0  # air and bearing drag
 		# Friction circle.
-		var limit: float = MU * grip_k * load * (0.5 if handbrake and not w.front else 1.0)
+		var limit: float = MU * grip_k * load * (0.5 if handbrake and not w.front else 1.0) * (0.6 if flat else 1.0)
 		var f := Vector2(lat_f, lon_f)
 		w.ground = hit.position
 		w.normal = hit.normal
-		w.slide = tyre_slide(f.length() / maxf(limit, 1.0), lat_v, lon_v, brake, handbrake and not w.front)
+		var ws := 0.0
+		if not w.front and throttle > 0.3 and not handbrake:
+			ws = wheelspin(f.length() / maxf(limit, 1.0), fwd_speed, top_speed)
+			if ws > 0.0:
+				# A spinning tyre holds the road sideways much less.
+				f.x *= 1.0 - 0.45 * ws
+		w.wspin = ws
+		w.slide = maxf(tyre_slide(f.length() / maxf(limit, 1.0), lat_v, lon_v, brake, handbrake and not w.front), ws)
 		if f.length() > limit:
 			f = f.normalized() * limit
 		# Tyre forces act up near the centre height (ROLL_CENTRE) so they
@@ -554,7 +590,12 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		var at := rel - up * rel.dot(up) * ROLL_CENTRE
 		state.apply_force(wright * f.x, at)
 		state.apply_force(wfwd * f.y, rel)
-		w.spin += lon_v * dt / wheel_radius
+		w.spin += (lon_v + ws * 16.0) * dt / radius
+	var rear_spin := 0.0
+	for w in _wheels:
+		if not w.front:
+			rear_spin = maxf(rear_spin, w.wspin)
+	spin_k = rear_spin
 	if grounded >= 2:
 		# Assists: a little downforce and yaw damping so it reads well from above.
 		state.apply_central_force(-up * vel.length_squared() * 2.5)
@@ -588,6 +629,13 @@ static func tyre_slide(over: float, lat_v: float, lon_v: float, brake_in: float,
 	if locked_rear and absf(lon_v) > 2.0:
 		k = maxf(k, 0.8)
 	return k
+
+
+## How hard a driven tyre is spinning, 0 to 1. over: wanted force over what
+## the road gives; it spins from a standstill and up to about half speed.
+static func wheelspin(over: float, fwd_speed: float, top: float) -> float:
+	var k := clampf((over - WHEELSPIN_AT) / 0.5, 0.0, 1.0)
+	return k * clampf(1.0 - fwd_speed / (top * 0.55), 0.0, 1.0)
 
 
 func _lay_skids() -> void:
@@ -630,6 +678,9 @@ func _estimate_skids(delta: float) -> void:
 		var mount: Vector3 = xf * (w.pos as Vector3)
 		var pv := v + w_rate.cross(mount - xf.origin)
 		var slide := tyre_slide(0.0, pv.dot(xf.basis.x), pv.dot(xf.basis.z), 1.0 if decel > 7.0 else 0.0, false)
+		if not w.front:
+			slide = maxf(slide, spin_k)
+			w.slide = slide
 		if slide < 0.05:
 			marks.lift(base + i)
 			continue
@@ -660,9 +711,215 @@ func _detect_impacts(state: PhysicsDirectBodyState3D) -> void:
 func _update_wheel_visuals(dt: float, simulated: bool, steer_angle := 0.0) -> void:
 	for w in _wheels:
 		var node: Node3D = w.node
-		var drop: float = rest - w.compress if simulated else rest * 0.5
+		var drop: float = rest - w.compress if simulated else rest * 0.5 + (wheel_radius * (1.0 - FLAT_RADIUS) if w.flat else 0.0)
 		node.position = (w.pos as Vector3) + Vector3(0, -drop, 0)
-		node.rotation = Vector3(w.spin, steer_angle if w.front else 0.0, 0)
+		if not simulated and not w.front:
+			w.spin += spin_k * 16.0 * dt / wheel_radius
+		# The holder steers (and squashes a flat, which stays squashed at
+		# the bottom as it rolls); the wheel inside it spins.
+		node.rotation = Vector3(0, steer_angle if w.front else 0.0, 0)
+		node.scale = Vector3(1.0, FLAT_RADIUS, 1.12) if w.flat else Vector3.ONE
+		var wm: Node3D = w.mesh
+		wm.basis = Basis(Vector3.RIGHT, w.spin) * (w.base as Basis)
+	_update_smoke()
+
+
+# --- v0.20.0: shot tyres, bullet holes and tyre smoke ---------------------------
+
+## The tyre a bullet along this line (car space) hits, or -1. The tyres
+## have no collider of their own: the shot stops on the body box, so look
+## along the bullet's path for the first wheel it passes through.
+func tyre_at(local_point: Vector3, local_dir: Vector3) -> int:
+	var d := local_dir.normalized()
+	return tyre_on_segment(local_point - d * 0.6, local_point + d * 1.2)[0]
+
+
+## The first tyre (not already flat) a segment in car space passes through:
+## [wheel index or -1, the point where it meets it (car space)]. The wheels
+## hang below the body box, so a shot at a tyre's middle can miss the car's
+## colliders altogether: CarSync.tyre_on_path checks every shot this way.
+func tyre_on_segment(a: Vector3, b: Vector3) -> Array:
+	var best := -1
+	var best_t := INF
+	var best_p := Vector3.ZERO
+	for i in _wheels.size():
+		var w: Dictionary = _wheels[i]
+		if w.flat:
+			continue
+		var node: Node3D = w.node
+		var c := node.position if node else (w.pos as Vector3) - Vector3(0, rest * 0.5, 0)
+		var p := Geometry3D.get_closest_point_to_segment(c, a, b)
+		if p.distance_to(c) < wheel_radius + 0.04:
+			var t := a.distance_to(p)
+			if t < best_t:
+				best_t = t
+				best = i
+				best_p = p
+	return [best, best_p]
+
+
+func tyre_flat(i: int) -> bool:
+	return i >= 0 and i < _wheels.size() and _wheels[i].flat
+
+
+func flat_tyres() -> int:
+	var c := 0
+	for w in _wheels:
+		if w.flat:
+			c += 1
+	return c
+
+
+## A tyre goes down with a bang and a hiss. Same on every machine.
+func flatten_tyre(i: int, quiet := false) -> void:
+	if i < 0 or i >= _wheels.size() or _wheels[i].flat:
+		return
+	_wheels[i].flat = true
+	sleeping = false
+	if quiet or not is_inside_tree() or get_parent() == null:
+		return
+	var at := global_transform * ((_wheels[i].node as Node3D).position if _wheels[i].node else (_wheels[i].pos as Vector3))
+	Sfx.play(get_parent(), "smoke_pop", at, 6.0, 70.0, 0.08)
+	Sfx.play(get_parent(), "gas_hiss", at, -4.0, 30.0, 0.1)
+	_puff(at)
+
+
+## A little burst of rubber dust where the tyre blew.
+func _puff(at: Vector3) -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	var p := _make_smoke(10, 0.7)
+	p.one_shot = true
+	p.explosiveness = 0.9
+	p.initial_velocity_min = 1.0
+	p.initial_velocity_max = 2.5
+	p.spread = 70.0
+	get_parent().add_child(p)
+	p.global_position = at
+	p.emitting = true
+	get_tree().create_timer(2.0).timeout.connect(p.queue_free)
+
+
+static var _smoke_mesh: QuadMesh
+
+
+## Tyre smoke: soft grey puffs that stay where they were made.
+func _make_smoke(amount: int, lifetime: float) -> CPUParticles3D:
+	var s := CPUParticles3D.new()
+	s.amount = amount
+	s.lifetime = lifetime
+	s.local_coords = false
+	s.direction = Vector3.UP
+	s.spread = 35.0
+	s.gravity = Vector3(0, 0.6, 0)
+	s.initial_velocity_min = 0.3
+	s.initial_velocity_max = 1.0
+	s.damping_min = 0.6
+	s.damping_max = 1.2
+	s.scale_amount_min = 0.7
+	s.scale_amount_max = 1.3
+	var curve := Curve.new()
+	curve.add_point(Vector2(0, 0.4))
+	curve.add_point(Vector2(1, 2.6))
+	s.scale_amount_curve = curve
+	var grad := Gradient.new()
+	grad.set_color(0, Color(0.8, 0.8, 0.82, 0.45))
+	grad.set_color(1, Color(0.88, 0.88, 0.9, 0.0))
+	s.color_ramp = grad
+	if _smoke_mesh == null:
+		_smoke_mesh = QuadMesh.new()
+		_smoke_mesh.size = Vector2(1.1, 1.1)
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		m.vertex_color_use_as_albedo = true
+		m.albedo_texture = FireSystem.soft_texture()
+		_smoke_mesh.material = m
+	s.mesh = _smoke_mesh
+	s.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return s
+
+
+## Rear tyres spinning or sliding hard pour smoke. Emitters are made the
+## first time a tyre needs one, so parked traffic costs nothing.
+func _update_smoke() -> void:
+	if DisplayServer.get_name() == "headless" or not is_inside_tree():
+		return
+	for i in _wheels.size():
+		var w: Dictionary = _wheels[i]
+		if w.front:
+			continue
+		var on: bool = spin_k > 0.2 or (w.slide >= 0.6 and linear_velocity.length() > 5.0)
+		var s: CPUParticles3D = _smoke[i]
+		if s == null:
+			if not on:
+				continue
+			s = _make_smoke(28, 1.6)
+			add_child(s)
+			_smoke[i] = s
+		s.emitting = on
+		if on:
+			var node: Node3D = w.node
+			s.position = node.position + Vector3(signf((w.pos as Vector3).x) * 0.1, -wheel_radius * 0.7, -0.2)
+
+
+static var _hole_tex: ImageTexture
+
+
+## A small bullet hole: dark centre, a ring of bare bright metal.
+static func hole_texture() -> ImageTexture:
+	if _hole_tex:
+		return _hole_tex
+	var n := 32
+	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+	var c := (n - 1) * 0.5
+	for y in n:
+		for x in n:
+			var r := Vector2(x - c, y - c).length() / c
+			var col := Color(0, 0, 0, 0)
+			if r < 0.38:
+				col = Color(0.03, 0.03, 0.035, 1.0)
+			elif r < 0.55:
+				col = Color(0.72, 0.72, 0.74, 1.0)        # bare metal round the hole
+			elif r < 1.0:
+				var k := (r - 0.55) / 0.45
+				col = Color(0.18, 0.18, 0.2, (1.0 - k) * 0.55)  # scorched paint
+			img.set_pixel(x, y, col)
+	img.generate_mipmaps()
+	_hole_tex = ImageTexture.create_from_image(img)
+	return _hole_tex
+
+
+## A bullet hole on the panel the shot hit, stuck to the car. local_dir is
+## the bullet's way into the car. Holes never go on people (their layer).
+func add_bullet_hole(local_point: Vector3, local_dir: Vector3) -> void:
+	if DisplayServer.get_name() == "headless" or local_dir.length_squared() < 0.0001:
+		return
+	var d := local_dir.normalized()
+	var hole := Decal.new()
+	hole.texture_albedo = hole_texture()
+	hole.size = Vector3(0.09, 0.5, 0.09)
+	hole.normal_fade = 0.3
+	hole.cull_mask = 1   # the car (world layer), not people next to it
+	hole.upper_fade = 0.1
+	hole.lower_fade = 0.6
+	hole.distance_fade_enabled = true
+	hole.distance_fade_begin = 35.0
+	hole.distance_fade_length = 10.0
+	# A decal projects down its own -Y: point that along the bullet, and
+	# start it a little outside the body box (the panels sit inside it).
+	var y := -d
+	var x := y.cross(Vector3.UP if absf(y.y) < 0.95 else Vector3.RIGHT).normalized()
+	var z := x.cross(y).normalized()
+	var spin := Basis(y, randf() * TAU)
+	hole.transform = Transform3D(spin * Basis(x, y, z), local_point - d * 0.05)
+	add_child(hole)
+	_holes.append(hole)
+	while _holes.size() > MAX_HOLES:
+		var old = _holes.pop_front()
+		if is_instance_valid(old):
+			old.queue_free()
 
 
 ## Network state ---------------------------------------------------------------
@@ -680,6 +937,7 @@ func encode_state(b: StreamPeerBuffer) -> void:
 	b.put_float(q.w)
 	b.put_half(steer)
 	b.put_u8(1 if horn else 0)
+	b.put_u8(int(clampf(spin_k, 0.0, 1.0) * 255.0))
 
 
 static func decode_state(b: StreamPeerBuffer) -> Dictionary:
@@ -687,4 +945,4 @@ static func decode_state(b: StreamPeerBuffer) -> Dictionary:
 	var lv := Vector3(b.get_float(), b.get_float(), b.get_float())
 	var av := Vector3(b.get_float(), b.get_float(), b.get_float())
 	var q := Quaternion(b.get_float(), b.get_float(), b.get_float(), b.get_float())
-	return {"pos": o, "lv": lv, "av": av, "rot": q, "steer": b.get_half(), "horn": b.get_u8() == 1}
+	return {"pos": o, "lv": lv, "av": av, "rot": q, "steer": b.get_half(), "horn": b.get_u8() == 1, "spin": b.get_u8() / 255.0}

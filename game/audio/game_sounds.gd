@@ -625,6 +625,8 @@ func _car(c: Car, delta: float) -> void:
 		var squeal := clampf((slip - 3.0) / 6.0, 0.0, 1.0) if on_ground and speed > 4.0 else 0.0
 		if c.handbrake and speed > 5.0:
 			squeal = maxf(squeal, 0.7)
+		# v0.20.0: rear wheelspin screams too.
+		squeal = maxf(squeal, clampf(c.spin_k * 1.3, 0.0, 1.0))
 		skid.volume_db = lerpf(-60.0, -6.0, squeal) if squeal > 0.02 else -80.0
 		# v0.13.0: the tyres bite with a squeal as a skid starts.
 		if squeal > 0.45 and float(a.squeal) <= 0.45:
