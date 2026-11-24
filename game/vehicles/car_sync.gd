@@ -429,12 +429,12 @@ func bullet_hit(car: Car, point: Vector3, dir: Vector3) -> String:
 
 ## v0.20.0: the first tyre a shot from a to b passes through, before it
 ## reaches b: {car, wheel, point}, or empty. Only cars near the line count.
-func tyre_on_path(a: Vector3, b: Vector3) -> Dictionary:
+func tyre_on_path(a: Vector3, b: Vector3, skip: Object = null) -> Dictionary:
 	var best := {}
 	var best_d := INF
 	for car in cars:
 		var c := car as Car
-		if c == null or not is_instance_valid(c) or not c.is_inside_tree():
+		if c == null or c == skip or not is_instance_valid(c) or not c.is_inside_tree():
 			continue
 		var cp := c.global_position
 		if Geometry3D.get_closest_point_to_segment(cp, a, b).distance_squared_to(cp) > 16.0:

@@ -608,7 +608,7 @@ func suspect_shot(s: Suspect, origin: Vector3, dir: Vector3, damage := SHOT_DAMA
 		get_tree().call_group("alarm_listeners", "on_alarm", origin, 45.0)
 	var end: Vector3 = hit.position if hit else origin + dir * 60.0
 	# v0.20.0: a tyre in the way bursts (they sit below the car's collider).
-	var tyre := cars.tyre_on_path(origin, end) if cars else {}
+	var tyre := cars.tyre_on_path(origin, end, s.get("car")) if cars else {}
 	if not tyre.is_empty():
 		cars.burst_tyre(tyre.car, tyre.wheel)
 		end = tyre.point

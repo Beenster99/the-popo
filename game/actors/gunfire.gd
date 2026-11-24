@@ -15,7 +15,7 @@ static func resolve(world: DestructionWorld, cars: CarSync, origin: Vector3, dir
 	# v0.20.0: tyres hang below the car's collision box, so a shot can
 	# pass right through one without touching a collider: check the path.
 	if not alt and cars and Net.is_host():
-		var ty := cars.tyre_on_path(origin, hit.position if hit else origin + dir * 60.0)
+		var ty := cars.tyre_on_path(origin, hit.position if hit else origin + dir * 60.0, shooter.car)
 		if not ty.is_empty():
 			cars.burst_tyre(ty.car, ty.wheel)
 			_sound(origin, ty.point, "metal", 0, shooter)
