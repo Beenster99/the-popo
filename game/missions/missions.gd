@@ -173,6 +173,10 @@ func setup_call(c: Dictionary, at := Vector3.INF) -> bool:
 			var v := _bystander(street + _side(1.1), "victim", c)
 			_bystander(street + _side(7.0), "witness", c)
 			s._face(v.global_position)
+			# Going through the victim's bag, looking round now and then.
+			s.job = "mug"
+			s.work = [{"p": s.global_position, "at": v.global_position, "act": Suspect.ACT.RUMMAGE},
+				{"p": s.global_position, "at": s.global_position + (s.global_position - v.global_position) * 4.0, "act": Suspect.ACT.LOOKOUT}]
 			c.pos = street
 			c.text = "Mugging %s. Victim's still there. Suspect may be armed." % d._side_name(street)
 		Dispatcher.Kind.SHOPLIFT:
@@ -181,6 +185,7 @@ func setup_call(c: Dictionary, at := Vector3.INF) -> bool:
 				return false
 			var inside: Vector3 = b.origin + b.u * (b.w * BlockGenerator.M * 0.5) + b.v * (BlockGenerator.M * 0.9) + Vector3(0, 0.05, 0)
 			var s := d.spawn_suspect(inside + b.u * 1.5, Suspect.S.ROB, false, c.id)
+			d.give_work(s, "loot", inside, 3.0, 4)
 			c.suspects.append(s.net_id)
 			_bystander(inside - b.u * 1.5, "victim", c)
 			c.pos = inside
@@ -202,16 +207,27 @@ func setup_call(c: Dictionary, at := Vector3.INF) -> bool:
 			var inside: Vector3 = h.origin + h.u * (h.w * BlockGenerator.M * 0.5) + h.v * (BlockGenerator.M * 1.5) + Vector3(0, 0.05, 0)
 			var s := d.spawn_suspect(inside, Suspect.S.LOITER, _rng.randf() < 0.25, c.id)
 			s.fighter = s.armed
+			d.give_work(s, "smash", inside, 3.0, 4)   # things breaking
 			c.suspects.append(s.net_id)
 			_bystander(inside + h.u * 1.6, "victim", c)
 			c.pos = inside
 			c.text = "Domestic disturbance at a %s on %s. Shouting, things breaking. Go in carefully." % [h.type, CityGenerator.street_at(h.door)]
 		Dispatcher.Kind.DEAL:
 			var p := at if at != Vector3.INF else d._gang_spot()
+			var pair := []
 			for i in 2:
 				var s := d.spawn_suspect(d.nav.closest(p + Vector3(i * 1.4, 0, 0.6)), Suspect.S.LOITER, i == 0, c.id)
 				s.fighter = i == 0
 				c.suspects.append(s.net_id)
+				pair.append(s)
+			# The hand-off, then a look up and down the street, and again.
+			for i in 2:
+				var s: Suspect = pair[i]
+				var o: Suspect = pair[1 - i]
+				var away := s.global_position - o.global_position
+				s.job = "deal"
+				s.work = [{"p": s.global_position, "at": o.global_position, "act": Suspect.ACT.DEAL},
+					{"p": s.global_position, "at": s.global_position + away * 6.0, "act": Suspect.ACT.LOOKOUT}]
 			c.pos = p
 			c.text = "Drug deal going down %s. One of them is carrying." % d._side_name(p)
 		Dispatcher.Kind.VANDAL:
@@ -235,10 +251,14 @@ func setup_call(c: Dictionary, at := Vector3.INF) -> bool:
 			if b.is_empty():
 				return false
 			for i in (1 if _rng.randf() < 0.5 else 2):
-				var p := _room_spot(b, _pick_room(b, -1))
+				var room := _pick_room(b, -1)
+				var p := _room_spot(b, room)
 				var s := d.spawn_suspect(p, Suspect.S.ROB, _rng.randf() < 0.25, c.id)
 				c.suspects.append(s.net_id)
 				_note_floor(c, s, b)
+				# Going through the drawers and cupboards round the room.
+				var rr: Rect2 = room.rect
+				d.give_work(s, "loot", p, clampf(minf(rr.size.x, rr.size.y) * 0.4, 1.5, 4.0), 4)
 			c.pos = b.door
 			c.text = "Burglary at a %s on %s. Neighbours heard glass go; they're still inside." % [b.type, CityGenerator.street_at(b.door)]
 		Dispatcher.Kind.RAID:
@@ -251,6 +271,7 @@ func setup_call(c: Dictionary, at := Vector3.INF) -> bool:
 				var s := d.spawn_suspect(p, Suspect.S.LOITER, _rng.randf() < 0.8, c.id)
 				s.fighter = true
 				s.role = Suspect.ROLE_PIN if i % 2 == 0 else Suspect.ROLE_FLANK
+				d.give_work(s, "loot" if i % 3 == 2 else "guard", p, 2.5, 3)
 				c.suspects.append(s.net_id)
 				_note_floor(c, s, b)
 			c.pos = b.door
@@ -269,6 +290,7 @@ func setup_call(c: Dictionary, at := Vector3.INF) -> bool:
 			for i in 2:
 				var s := d.spawn_suspect(_room_spot(b, room if i == 0 else _pick_room(b, -1)), Suspect.S.LOITER, true, c.id)
 				s.fighter = true
+				d.give_work(s, "guard", s.global_position, 2.5, 3)
 				c.suspects.append(s.net_id)
 				_note_floor(c, s, b)
 			c.pos = b.door
@@ -329,6 +351,8 @@ func setup_call(c: Dictionary, at := Vector3.INF) -> bool:
 				if i == 1:
 					s.weapon = EnemyGuns.SHOTGUN
 					s.mag = EnemyGuns.MAG[s.weapon]
+				# Two bag the cash, the rest watch the doors.
+				d.give_work(s, "loot" if i >= 2 else "guard", s.global_position, 2.5, 3)
 				c.suspects.append(s.net_id)
 				_note_floor(c, s, b)
 			# The getaway driver, waiting at the kerb with the engine running.
@@ -344,6 +368,9 @@ func setup_call(c: Dictionary, at := Vector3.INF) -> bool:
 							door = q
 					var drv := d.spawn_suspect(door, Suspect.S.LOITER, _rng.randf() < 0.5, c.id)
 					drv.home = door
+					drv.job = "lookout"
+					drv.work = [{"p": door, "at": b.door, "act": Suspect.ACT.LOOKOUT},
+						{"p": door, "at": door + (door - b.door) * 3.0, "act": Suspect.ACT.LOOKOUT}]
 					c.suspects.append(drv.net_id)
 					people[c.id].getaway = {"dr": dr, "s": drv}
 			c.pos = b.door
@@ -375,6 +402,7 @@ func setup_call(c: Dictionary, at := Vector3.INF) -> bool:
 				people[c.id] = {"victim": null, "witness": null, "said": {}}
 			people[c.id].dealer = s
 			s.set_meta("stay", true)   # holds his corner, waiting for buyers
+			s.work = [{"p": p, "at": p + _side(5.0), "act": Suspect.ACT.LOOKOUT}, {"p": p, "at": p - _side(5.0), "act": Suspect.ACT.LOOKOUT}]
 			people[c.id].buy_t = 0.0
 			c.pos = p
 			c.text = "Sting: a dealer's selling %s. Go in plain clothes, walk up and buy (hold %s next to him), then take him. Uniforms will scare him off." % [d._side_name(p), "F"]

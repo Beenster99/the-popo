@@ -15,7 +15,7 @@ const COP := 0
 const CROOK := 1
 
 ## What an order is for (Officer.shout picks one line of the kind).
-enum Kind { ARMED, HANDS, STOP, GENERIC, STAY, FOLLOW, COMPLY, DEFY, PRISONER, STOPPING }
+enum Kind { ARMED, HANDS, STOP, GENERIC, STAY, FOLLOW, COMPLY, DEFY, PRISONER, STOPPING, WARN }
 
 ## [file stem, words, kind] in the order of tools/audio/make_voices.py.
 const LINES := [
@@ -46,6 +46,10 @@ const LINES := [
 	["stopping", "Alright! Alright! I'm stopping!", Kind.STOPPING],
 	# v0.13.0, from beenster's Sound Pack 1 (two takes so far).
 	["stand_down", "STAND DOWN! PUT THE GUN ON THE FLOOR AND WE CAN ALL WALK OUT OF HERE HAPPY.", Kind.ARMED],
+	# v0.24: a lookout warning the rest of the crew.
+	["warn_police", "Police! Leg it!", Kind.WARN],
+	["warn_feds", "Feds! Feds are here!", Kind.WARN],
+	["warn_bill", "Old Bill! Move, move!", Kind.WARN],
 ]
 
 static var current: Voices

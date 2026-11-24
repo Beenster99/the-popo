@@ -12,6 +12,11 @@ JOB CARD: when a call comes in, a card under the clock (top left) tells you
 what it is, the pay, how far and which way it is, the full dispatch
 message, how many suspects and how many are armed (and with what), how many
 you've dealt with, and what to do.
+CROOKS AT WORK: suspects are busy at the job when you arrive: going through
+shelves and drawers, smashing things up, working a car door, dealing. Heads
+down, they notice you later. Watch for the lookout by the door: if they see
+you first they shout a warning and the rest duck behind something or creep
+off before you're close. Once they see you close, they run.
 You start with the gun holstered: H, or holding right mouse, draws it.
 Inside a building the floors above fade out, so nothing hangs over you.
 The opening menu has Single Player (straight into the city), Online (host or

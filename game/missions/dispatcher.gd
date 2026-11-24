@@ -247,9 +247,18 @@ func start_call(kind: Kind, opts := {}) -> int:
 			c.pos = inside
 			c.text = "Robbery in progress at the %s on the %s side. Two suspects." % [b.type, b.side] if city == null else \
 				"Robbery in progress at the %s on %s. Two suspects." % [b.type, CityGenerator.street_at(b.door)]
+			# One turns the place over; the other keeps watch at the door
+			# (the armed one, if either is).
+			var crew := []
 			for i in 2:
 				var p: Vector3 = inside + b.u * (1.4 * (i * 2 - 1))
-				c.suspects.append(spawn_suspect(p, Suspect.S.ROB, _rng.randf() < 0.25, c.id).net_id)
+				var r := spawn_suspect(p, Suspect.S.ROB, _rng.randf() < 0.25, c.id)
+				crew.append(r)
+				c.suspects.append(r.net_id)
+			if (crew[0] as Suspect).armed and not (crew[1] as Suspect).armed:
+				crew.reverse()
+			give_work(crew[0], "loot", inside, 3.0, 4)
+			give_work(crew[1], "lookout", inside, 3.0, 2, b.door)
 		Kind.ARMED:
 			var up := _upstairs_spot() if _rng.randf() < WINDOW_ARMED_CHANCE or opts.get("upstairs", false) else Vector3.INF
 			var p := up if up != Vector3.INF else _street_spot()
@@ -261,6 +270,7 @@ func start_call(kind: Kind, opts := {}) -> int:
 				c.text = "Armed suspect seen at a window, %s of the %s %s. Approach with care." % [String(Missions.FLOOR_NAMES[f]).to_lower(), ub.type, _side_name(p)]
 			var a := spawn_suspect(p, Suspect.S.LOITER, true, c.id)
 			a.fighter = true
+			give_work(a, "guard", p, 6.0, 3)
 			if _rng.randf() < 0.3:
 				a.weapon = EnemyGuns.SHOTGUN
 				a.mag = EnemyGuns.MAG[a.weapon]
@@ -284,6 +294,7 @@ func start_call(kind: Kind, opts := {}) -> int:
 				if i == 2:
 					g.weapon = EnemyGuns.SHOTGUN
 					g.mag = EnemyGuns.MAG[g.weapon]
+				give_work(g, "guard", q, 4.0, 3)
 				c.suspects.append(g.net_id)
 		Kind.TRAFFIC:
 			if civ_car == null or not _traffic.is_empty():
@@ -316,6 +327,8 @@ func start_call(kind: Kind, opts := {}) -> int:
 					door = q
 			var th := spawn_suspect(door, Suspect.S.LOITER, _rng.randf() < 0.2, c.id)
 			th.home = door
+			th.job = "jimmy"
+			th.work = [{"p": door, "at": car.global_position, "act": Suspect.ACT.JIMMY}]
 			c.suspects.append(th.net_id)
 			c.pos = car.global_position
 			c.text = "Someone breaking into a %s %s on %s. Get there before they're away in it." % [_colour_name(car.paint), _kind_name(car.kind), CityGenerator.street_at(c.pos)] \
@@ -342,6 +355,53 @@ func start_call(kind: Kind, opts := {}) -> int:
 	else:
 		say("DISPATCH: %s" % c.text)
 	return c.id
+
+
+## v0.24: something for them to be doing at the scene (Suspect.work).
+## job: "loot" (going through shelves and drawers), "smash", "guard" (pacing
+## and watching), "lookout" (by the door, watching the street; door given).
+## Spots are within r of center, each facing away from it (shelves, walls,
+## the street).
+func give_work(s: Suspect, job: String, center: Vector3, r := 3.5, n := 3, door := Vector3.INF) -> void:
+	s.job = job
+	var spots := []
+	if job == "lookout" and door != Vector3.INF:
+		var out := door - center
+		out.y = 0.0
+		out = out.normalized() if out.length() > 0.1 else Vector3.FORWARD
+		var p := _snap(door - out * 1.5, door.y)
+		spots.append({"p": p, "at": p + out * 8.0, "act": Suspect.ACT.LOOKOUT})
+		var side := Vector3(-out.z, 0, out.x) * (1.0 if _rng.randf() < 0.5 else -1.0)
+		var p2 := _snap(door - out * 2.2 + side * 1.6, door.y)
+		spots.append({"p": p2, "at": p2 + (out + side * 0.5).normalized() * 8.0, "act": Suspect.ACT.LOOKOUT})
+	else:
+		var a0 := _rng.randf() * TAU
+		for i in n:
+			var a := a0 + TAU * i / n + _rng.randf_range(-0.4, 0.4)
+			var dir := Vector3(cos(a), 0, sin(a))
+			var p := _snap(center + dir * r * _rng.randf_range(0.55, 1.0), center.y)
+			var out := p - center
+			out.y = 0.0
+			out = out.normalized() if out.length() > 0.2 else dir
+			var act := Suspect.ACT.LOOKOUT
+			match job:
+				"loot":
+					act = Suspect.ACT.RUMMAGE_LOW if _rng.randf() < 0.35 else Suspect.ACT.RUMMAGE
+				"smash":
+					act = Suspect.ACT.SMASH if i % 2 == 0 else Suspect.ACT.RUMMAGE
+			spots.append({"p": p, "at": p + out * 2.0, "act": act})
+	s.work = spots
+	s._work_i = _rng.randi_range(0, maxi(spots.size() - 1, 0))
+
+
+## A spot on the walking routes near p, on the same floor (else p itself).
+func _snap(p: Vector3, floor_y: float) -> Vector3:
+	p.y = floor_y
+	if nav and nav.ready_to_use:
+		var q := nav.closest(p)
+		if q.distance_to(p) < 2.5 and absf(q.y - floor_y) < 1.0:
+			return q
+	return p
 
 
 func spawn_suspect(p: Vector3, st: Suspect.S, armed: bool, call_id := -1) -> Suspect:

@@ -599,6 +599,113 @@ def kneel(rig, A):
     return (1, 61)
 
 
+# --- v0.24: suspects busy at the crime (upper-body loops) ---------------------------
+
+def _work_lean(A, f, pitch, yaw=0.0, head=10.0, head_yaw=0.0):
+    A.loc('hips', f, 0, 0.02, -0.03)
+    A.rot('hips', f, 3, 0, 0)
+    A.rot('spine', f, pitch * 0.5, 0, yaw * 0.4)
+    A.rot('chest', f, pitch * 0.5, 0, yaw * 0.6)
+    A.rot('neck', f, head * 0.5, 0, head_yaw * 0.4)
+    A.rot('head', f, head * 0.5, 0, head_yaw * 0.6)
+    K.stance_feet(A, f)
+
+
+def rummage(rig, A):
+    """Upper body: going through shelves, a till or drawers. Leaning in,
+    hands reaching and grabbing in turn, a glance over the shoulder."""
+    K.gun_visible(rig, False)
+    for s in 'LR':
+        A.ik('arm.' + s, 1, 1)
+    # (t, left reach, right reach, head yaw)
+    keys = [(0.0, 0.0, 1.0, 0), (0.45, 1.0, 0.2, 0), (0.9, 0.2, 1.0, -6), (1.35, 1.0, 0.0, 4),
+            (1.8, 0.3, 0.8, 0), (2.1, 0.1, 0.4, 35), (2.5, 0.1, 0.4, 35), (2.8, 0.4, 0.9, 0), (3.2, 0.0, 1.0, 0)]
+    for t, l, r, hy in keys:
+        f = _fr(t)
+        _work_lean(A, f, 22 - abs(hy) * 0.3, yaw=hy * 0.3, head=16 - abs(hy) * 0.3, head_yaw=hy)
+        A.pos('hand_ik.L', f, 0.14 + 0.03 * l, -0.32 - 0.16 * l, 1.02 - 0.06 * l)
+        A.rot('hand_ik.L', f, -100, 0, -20 + 10 * l)
+        A.pos('hand_ik.R', f, -0.14 - 0.03 * r, -0.32 - 0.16 * r, 1.02 - 0.06 * r)
+        A.rot('hand_ik.R', f, -100, 0, 20 - 10 * r)
+    return (1, _fr(3.2))
+
+
+def smash(rig, A):
+    """Upper body: both hands over the head and down hard (a bar, a brick,
+    a fist on the glass). 1.1 s loop."""
+    K.gun_visible(rig, False)
+    for s in 'LR':
+        A.ik('arm.' + s, 1, 1)
+    # (t, raise 0..1 (1 = overhead), body pitch)
+    keys = [(0.0, 0.0, 22), (0.35, 0.7, -2), (0.55, 1.0, -8), (0.68, 0.4, 12), (0.76, 0.0, 26), (0.95, 0.05, 24), (1.1, 0.0, 22)]
+    for t, up, pitch in keys:
+        f = _fr(t)
+        _work_lean(A, f, pitch, head=pitch * 0.4)
+        y = -0.50 + 0.36 * up
+        z = 0.98 + 0.90 * up
+        A.pos('hand_ik.L', f, 0.05, y, z)
+        A.rot('hand_ik.L', f, -90 + 120 * up, 0, -60)
+        A.pos('hand_ik.R', f, -0.05, y, z)
+        A.rot('hand_ik.R', f, -90 + 120 * up, 0, 60)
+    return (1, _fr(1.1))
+
+
+def jimmy(rig, A):
+    """Upper body: working a car door or a lock: both hands on a tool at
+    waist height, levering in jerks, a look round now and then."""
+    K.gun_visible(rig, False)
+    for s in 'LR':
+        A.ik('arm.' + s, 1, 1)
+    keys = [(0.0, 0.0, 0), (0.3, 1.0, 0), (0.45, 0.2, 0), (0.75, 1.0, 0), (0.9, 0.0, 0), (1.2, 0.8, 0),
+            (1.4, 0.1, -40), (1.9, 0.1, -40), (2.1, 0.1, 30), (2.5, 0.1, 30), (2.7, 0.0, 0), (3.0, 1.0, 0), (3.3, 0.0, 0)]
+    for t, lev, hy in keys:
+        f = _fr(t)
+        _work_lean(A, f, 16 + 4 * lev, yaw=hy * 0.25 + 3 * lev, head=14 - abs(hy) * 0.25, head_yaw=hy)
+        A.pos('hand_ik.L', f, 0.05, -0.36, 1.06 + 0.05 * lev)
+        A.rot('hand_ik.L', f, -95 - 15 * lev, 0, -50)
+        A.pos('hand_ik.R', f, -0.06, -0.38, 1.00 - 0.03 * lev)
+        A.rot('hand_ik.R', f, -95 + 15 * lev, 0, 50)
+    return (1, _fr(3.3))
+
+
+def deal(rig, A):
+    """Upper body: a hand-off. Right hand out, palm up, back to the pocket;
+    left hand low; head on a swivel."""
+    K.gun_visible(rig, False)
+    for s in 'LR':
+        A.ik('arm.' + s, 1, 1)
+    keys = [(0.0, 0.0, 0), (0.5, 1.0, 0), (1.1, 1.0, 0), (1.5, 0.0, 0), (1.9, 0.0, -45), (2.4, 0.0, -45),
+            (2.8, 0.0, 40), (3.3, 0.0, 40), (3.7, 0.0, 0), (4.0, 0.0, 0)]
+    for t, out, hy in keys:
+        f = _fr(t)
+        _work_lean(A, f, 4 + 4 * out, yaw=hy * 0.3, head=4 + 6 * out, head_yaw=hy)
+        A.pos('hand_ik.R', f, -0.18 + 0.06 * out, -0.10 - 0.32 * out, 0.98 + 0.12 * out)
+        A.rot('hand_ik.R', f, -60 - 30 * out, 0, 60 - 30 * out)
+        A.pos('hand_ik.L', f, 0.20, -0.06, 0.92)
+        A.rot('hand_ik.L', f, -30, 0, -40)
+    return (1, _fr(4.0))
+
+
+def lookout(rig, A):
+    """Upper body: keeping watch. Arms loose, weight shifting, the head and
+    shoulders sweeping one way, holding, then the other."""
+    K.gun_visible(rig, False)
+    for s in 'LR':
+        A.ik('arm.' + s, 1, 0)
+    keys = [(0.0, 0), (0.6, -50), (1.6, -50), (2.2, 10), (2.8, 10), (3.4, 55), (4.4, 55), (5.0, 0)]
+    for t, hy in keys:
+        f = _fr(t)
+        A.loc('hips', f, 0, 0.0, -0.02)
+        A.rot('hips', f, 1, 0, hy * 0.1)
+        A.rot('spine', f, 0, 0, hy * 0.15)
+        A.rot('chest', f, -2, 0, hy * 0.2)
+        A.rot('neck', f, -1, 0, hy * 0.25)
+        A.rot('head', f, -2, 0, hy * 0.4)
+        _arms_relaxed(A, f, 2.0)
+        K.stance_feet(A, f)
+    return (1, _fr(5.0))
+
+
 EXTRA = {
     'idle': idle, 'walk': walk, 'crouch_idle': crouch_idle, 'crouch_walk': crouch_walk,
     'prone_idle': prone_idle, 'crawl': crawl, 'slide': slide, 'jump': jump, 'fall': fall,
@@ -607,4 +714,5 @@ EXTRA = {
     'limp': limp, 'sit': sit, 'drive': drive,
     'ready_hold': ready_hold, 'climb': climb,
     'hands_up': hands_up, 'cuffed': cuffed, 'kneel': kneel,
+    'rummage': rummage, 'smash': smash, 'jimmy': jimmy, 'deal': deal, 'lookout': lookout,
 }
