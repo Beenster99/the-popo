@@ -16,7 +16,6 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
-<<<<<<< HEAD
 SHORTCUT BAR
 A bar along the bottom of the screen holds your kit: 1 pistol, 2 charge
 (breach or C4 loadout), 3 smoke, 4 CS gas, 5 flashbang, 6 first aid,
@@ -28,7 +27,18 @@ still throws the picked grenade straight away.
 Controller: D-pad left / right steps along the bar, RT uses it.
 Settings > Gameplay > Shortcut bar hides it (the keys still work). Your
 saved key changes were reset once, because 3-7 and the D-pad moved.
-=======
+
+AMBULANCES
+Nobody lies dead in the street for long now. About half a minute after
+someone is killed, an ambulance comes for them: blue lights and a two-tone
+siren (traffic pulls over and it goes through red lights). It turns the
+siren off as it gets close, pulls up at the kerb, and two paramedics in
+green get out the back with a trolley stretcher. They wheel it over, put
+the body in a bag on the stretcher, wheel it back, load it and drive off.
+Bodies lying close together go in the same trip. The blood stays.
+Shoot near the paramedics and they run and hide until it's quiet; if both
+go down, a fresh pair gets out a little later.
+
 FRAME RATE, LIFTS AND SKID MARKS (0.19.0)
 Your benchmark showed the graphics card was fine (5 ms a frame); the game's
 own code was the slow part. Parked cars now really go to sleep (before,
@@ -58,7 +68,6 @@ Smoke grenades now pour out a thick, billowing cloud: a low jet hissing out
 of the can, then rolling white smoke that spreads, drifts on the air and
 thins away. No more separate white balls, and the black blob in the middle
 is gone. CS gas looks the same way, paler and thinner. It dims at night.
->>>>>>> origin/main
 
 BLOOD (0.18.0)
 A shot now bursts out of the exit wound as a fine red mist and a spray of

@@ -51,6 +51,7 @@ var peds: PedSystem
 ## Wave 4: the light follows the clock; rain and storms.
 var weather: CityWeather
 var repairs: RepairCrews
+var ambulances: AmbulanceService
 ## v0.10.0: the lifts in the downtown towers.
 var lifts: Lifts
 var sun: DirectionalLight3D
@@ -131,6 +132,7 @@ func _ready() -> void:
 			Perf.benchmark_pending = false
 			state.no_save = true
 			dispatch.enabled = false
+			ambulances.enabled = false
 			var bench := BenchmarkRun.new()
 			bench.name = "Benchmark"
 			bench.city = self
@@ -270,10 +272,11 @@ func _build(s: int) -> void:
 		police_cars.append(pc)
 	_build_yard(st)
 	# The traffic stop's car, parked on the far side of the station block.
-	civ_car = Car.new()
-	civ_car.color = Color("2f5f9a")
+	# v0.16.x: an ordinary sedan (it was the old blue test-box car).
+	civ_car = CivilianVehicle.make("sedan", gen.seed_value + 4041)
+	civ_car.name = "TrafficStopCar"
 	var lot: Vector3 = gen.blocks[gen.block_index(CityGenerator.STATION.x, CityGenerator.STATION.y)].offset
-	civ_car.position = lot + Vector3(20, 0.95, CityGenerator.lot_size(CityGenerator.STATION.x, CityGenerator.STATION.y).y + 2.4)
+	civ_car.position = lot + Vector3(20, 1.3, CityGenerator.lot_size(CityGenerator.STATION.x, CityGenerator.STATION.y).y + 2.4)
 	civ_car.rotation_degrees.y = -90.0
 	add_child(civ_car)
 	cars.add_car(civ_car)
@@ -282,6 +285,11 @@ func _build(s: int) -> void:
 	traffic.name = "Traffic"
 	add_child(traffic)
 	traffic.build(gen, cars, dispatch)
+	# The ambulances (after the traffic: the same cars in the same order).
+	ambulances = AmbulanceService.new()
+	ambulances.name = "Ambulances"
+	add_child(ambulances)
+	ambulances.build(gen, cars, traffic, dispatch)
 	add_child(sync)
 	nav = CityNav.new()
 	nav.name = "CityNav"

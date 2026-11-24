@@ -39,6 +39,10 @@ const TYPES := {
 		"wheels": [Vector3(-1.0, -0.4, 2.0), Vector3(1.0, -0.4, 2.0), Vector3(-1.0, -0.4, -1.4), Vector3(1.0, -0.4, -1.4), Vector3(-1.0, -0.4, -2.6), Vector3(1.0, -0.4, -2.6)],
 		"radius": 0.52, "mass": 8500.0, "engine": 34000.0, "top": 27.0,
 		"seats": "cab", "colours": ["c9302c", "1f3a5c", "e8e6e0", "e2c23a", "2b2b2e", "3f6b3a"]},
+	"ambulance": {"size": Vector3(2.12, 0.95, 6.4), "cabin": [Vector3(2.1, 2.2, 3.9), Vector3(0, 1.35, -1.25)],
+		"wheels": [Vector3(-0.9, -0.3, 2.25), Vector3(0.9, -0.3, 2.25), Vector3(-0.9, -0.3, -2.05), Vector3(0.9, -0.3, -2.05)],
+		"radius": 0.38, "mass": 3500.0, "engine": 16500.0, "top": 34.0,
+		"seats": "cab", "colours": ["f4f4f0"]},
 	"motorbike": {"size": Vector3(0.55, 0.6, 2.0), "cabin": [],
 		"wheels": [Vector3(-0.32, -0.15, 0.72), Vector3(0.32, -0.15, 0.72), Vector3(-0.32, -0.15, -0.68), Vector3(0.32, -0.15, -0.68)],
 		"radius": 0.32, "mass": 260.0, "engine": 3600.0, "top": 44.0,
@@ -68,7 +72,7 @@ const LAYOUTS := {
 }
 ## Where the driver sits in a cab (car space z), for trucks: the cab is at
 ## the front, so the seats move forward.
-const CAB_SEAT_Z := {"van_box": 1.25, "trash_truck": 3.0, "hgv_tractor": 2.0}
+const CAB_SEAT_Z := {"van_box": 1.25, "ambulance": 1.4, "trash_truck": 3.0, "hgv_tractor": 2.0}
 
 var kind := "sedan"
 var extras := ""
@@ -107,7 +111,7 @@ func setup(kind_name: String, colour_seed := 0) -> void:
 	engine = t.engine
 	top_speed = t.top
 	brake_force = BRAKE * k
-	if base in ["trash_truck", "hgv_tractor", "van_box"]:
+	if base in ["trash_truck", "hgv_tractor", "van_box", "ambulance"]:
 		steer_max = 0.5
 		yaw_assist = 0.45
 	var lay: Dictionary = LAYOUTS[t.seats]
@@ -120,6 +124,12 @@ func setup(kind_name: String, colour_seed := 0) -> void:
 			seats[i] = Vector3(seats[i].x, seats[i].y, z)
 			doors[i] = Vector3(doors[i].x, 0, z)
 	boot = Vector3(0, 0, -size.z * 0.5 - 0.6)
+	if base == "ambulance":
+		# Blue lights both sides, its own sirens, and lettering.
+		flash_cols = [Color("2f6bff"), Color("4a8cff")]
+		siren_stems = ["ambulance_wail", "ambulance_hilo"]
+		extras = "ambulance"
+		boot = Vector3(0, 0, -size.z * 0.5 - 1.4)
 	var r := RandomNumberGenerator.new()
 	r.seed = colour_seed * 7919 + kind.hash()
 	var cols: Array = VARIANTS[kind].colours if VARIANTS.has(kind) else t.colours
@@ -194,6 +204,27 @@ func _add_extras(model: Node3D) -> void:
 			for side in [-1.0, 1.0]:
 				model.add_child(_box(Vector3(0.02, 0.3, 2.4), Vector3(side * ((cabin_box[0] as Vector3).x * 0.5 + 0.01), (cabin_box[1] as Vector3).y + 0.5, z), Color("7ac8e0")))
 				model.add_child(_box(Vector3(0.02, 0.6, 1.0), Vector3(side * ((cabin_box[0] as Vector3).x * 0.5 + 0.012), (cabin_box[1] as Vector3).y, z + 0.3), Color("3a3a3e")))
+		"ambulance":
+			# AMBULANCE across the front of the box, along both sides and
+			# on the back.
+			var cz := (cabin_box[1] as Vector3).z
+			var half := (cabin_box[0] as Vector3).z * 0.5
+			var hw := size.x * 0.5 + 0.08
+			var words := [["AMBULANCE", Vector3(0, 2.25, cz + half + 0.07), 0.0],
+				["AMBULANCE", Vector3(hw, 2.38, cz), PI * 0.5], ["AMBULANCE", Vector3(-hw, 2.38, cz), -PI * 0.5],
+				["AMBULANCE", Vector3(0, 2.4, cz - half - 0.07), PI]]
+			for w in words:
+				var l := Label3D.new()
+				l.text = w[0]
+				l.font_size = 64
+				l.outline_size = 0
+				var side: bool = absf(w[2]) > 1.0 and absf(w[2]) < 2.0
+				l.pixel_size = 0.006 if side else 0.0042
+				l.modulate = Color("1f9a3a") if side else Color("1d3f9e")
+				l.position = w[1]
+				l.rotation.y = w[2]
+				l.double_sided = false
+				model.add_child(l)
 		"stripe":
 			var z := (cabin_box[1] as Vector3).z
 			for side in [-1.0, 1.0]:
