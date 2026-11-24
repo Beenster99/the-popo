@@ -30,6 +30,7 @@ const KEYS := {
 	"weapon_2": [KEY_2],
 	"grenade_next": [KEY_3],      # smoke, CS gas, flashbang
 	"throw": [KEY_Q],             # throw the picked grenade at the crosshair
+	"minimap": [KEY_M],           # mini map: small, large, off
 	"cam_rotate_left": [],
 	"cam_rotate_right": [KEY_E],
 	"handbrake": [KEY_SPACE],
@@ -91,6 +92,7 @@ const REBINDABLE := [
 	["throw", "Throw grenade"], ["grenade_next", "Pick grenade: smoke, CS gas, flashbang"],
 	["weapon_1", "Pistol"], ["weapon_2", "Charge / second gear slot"],
 	["cam_zoom_in", "Camera closer"], ["cam_zoom_out", "Camera further out"],
+	["minimap", "Mini map: small, large (whole city), off"],
 ]
 ## The Key binds and Help screens list the actions in these groups.
 const GROUPS := [
@@ -98,7 +100,7 @@ const GROUPS := [
 	["Guns and fighting", ["aim", "fire", "reload", "holster", "weapon_1", "weapon_2", "throw", "grenade_next", "punch", "kick"]],
 	["Police work", ["shout", "interact", "drag", "torch", "ping"]],
 	["In a car", ["horn", "handbrake"]],
-	["Camera", ["cam_zoom_in", "cam_zoom_out"]],
+	["Camera and map", ["cam_zoom_in", "cam_zoom_out", "minimap"]],
 ]
 ## A longer word on each action, shown as its tooltip.
 const TIPS := {
@@ -133,6 +135,7 @@ const TIPS := {
 	"weapon_2": "Your second gear slot: breach charge or C4 when your loadout has them (aim and fire to stick one on).",
 	"cam_zoom_in": "Moves the camera in closer behind you.",
 	"cam_zoom_out": "Moves the camera further out.",
+	"minimap": "Switches the mini map (bottom left) between small, large (the whole city) and off.",
 }
 ## Pairs that may share a key: one is a hold and one a tap, or one only
 ## works in a car. Anything else sharing a key is flagged as a clash.

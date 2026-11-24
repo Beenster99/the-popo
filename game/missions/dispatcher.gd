@@ -745,6 +745,20 @@ func book(s: Suspect) -> void:
 
 
 ## Host: money for the station.
+## Settings > Debug > Max money.
+const MAX_PAY := 9999999
+
+
+## Host: set the pay outright (the debug cheat); clients get it in MSG_STATE.
+func set_pay(amount: int) -> void:
+	var was := pay
+	pay = clampi(amount, 0, MAX_PAY)
+	paid.emit(pay - was, pay)
+	var c := get_parent() as City
+	if c and c.state:
+		c.state.dirty = true
+
+
 func earn(amount: int) -> void:
 	pay += amount
 	paid.emit(amount, pay)
@@ -1154,30 +1168,37 @@ func _update_markers() -> void:
 
 func _make_marker(col: Color) -> Node3D:
 	var root := Node3D.new()
-	var beam := MeshInstance3D.new()
-	var cm := CylinderMesh.new()
-	# Starts above head height so it never tints the people at the call.
-	cm.top_radius = 0.25
-	cm.bottom_radius = 0.25
-	cm.height = 27.0
-	beam.mesh = cm
-	beam.position.y = 2.6 + 13.5
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.albedo_color = Color(col.r, col.g, col.b, 0.22)
+	mat.albedo_color = Color(col.r, col.g, col.b, 0.3)
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	beam.material_override = mat
-	beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	root.add_child(beam)
+	# v0.14.0: a wide soft beam with a bright core, tall enough to clear the
+	# towers, so it shows over the rooftops from streets away. Starts above
+	# head height so it never tints the people at the call.
+	for b in [[0.9, 0.22], [0.3, 0.75]]:
+		var beam := MeshInstance3D.new()
+		var cm := CylinderMesh.new()
+		cm.top_radius = b[0]
+		cm.bottom_radius = b[0]
+		cm.height = 70.0
+		cm.radial_segments = 12
+		cm.rings = 1
+		beam.mesh = cm
+		beam.position.y = 2.6 + 35.0
+		var bm := mat.duplicate() as StandardMaterial3D
+		bm.albedo_color = Color(col.r, col.g, col.b, b[1])
+		beam.material_override = bm
+		beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		root.add_child(beam)
 	var ring := MeshInstance3D.new()
 	var tm := TorusMesh.new()
-	tm.inner_radius = 1.6
-	tm.outer_radius = 1.9
+	tm.inner_radius = 2.2
+	tm.outer_radius = 2.6
 	ring.mesh = tm
 	ring.position.y = 0.2
 	var rm := mat.duplicate() as StandardMaterial3D
-	rm.albedo_color = Color(col.r, col.g, col.b, 0.7)
+	rm.albedo_color = Color(col.r, col.g, col.b, 0.85)
 	ring.material_override = rm
 	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	root.add_child(ring)
@@ -1214,22 +1235,19 @@ func _build_bay() -> void:
 	sign.rotation_degrees = Vector3(-90, 90, 0)
 	sign.position = bay + Vector3(0, 0.05, 0)
 	_bay_node.add_child(sign)
-	var post := MeshInstance3D.new()
-	var cm := CylinderMesh.new()
-	cm.top_radius = 0.08
-	cm.bottom_radius = 0.08
-	cm.height = 3.2
-	post.mesh = cm
-	post.material_override = Cel.material(Color("2a2e38"))
-	post.position = bay + Vector3(BAY_RADIUS * 0.75, 1.6, 0)
-	_bay_node.add_child(post)
+	# v0.14.0: the blue lamp hangs on the station wall over the garage door.
+	# (It used to stand on a post in the middle of the road.)
+	var lamp_at := bay + Vector3(BAY_RADIUS * 0.75, 3.3, 0)
+	if city and not city.station().is_empty():
+		var st: Dictionary = city.station()
+		lamp_at = (st.origin as Vector3) + (st.u as Vector3) * (BlockGenerator.M * 0.5) - (st.v as Vector3) * 0.35 + Vector3(0, 3.0, 0)
 	var lamp := MeshInstance3D.new()
 	var sm := SphereMesh.new()
 	sm.radius = 0.22
 	sm.height = 0.44
 	lamp.mesh = sm
 	lamp.material_override = Cel.material(Color("4a8cff") * 1.4, false)
-	lamp.position = bay + Vector3(BAY_RADIUS * 0.75, 3.3, 0)
+	lamp.position = lamp_at
 	_bay_node.add_child(lamp)
 	var light := OmniLight3D.new()
 	light.light_color = Color("4a8cff")

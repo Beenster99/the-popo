@@ -21,7 +21,7 @@ You start at the police station's front door. The patrol cars are parked out fro
 
 [b]Esc[/b] (Menu on a controller) opens the game menu: Resume, Help, Settings, Leave. Playing alone the game pauses; online it carries on and your officer just stands still.
 
-The clock is top left (a game day lasts 48 minutes) with the station's pay next to it. Jobs are listed under it with their distance, and arrows at the screen edge point the way. The line at the bottom of the screen always says what {interact} does where you're standing."""],
+The clock is top left (a game day lasts 48 minutes) with the station's pay next to it. Jobs are listed under it with their distance and street. The mini map is bottom left, and every job has a marker on screen (see Mini map and markers). The line at the bottom of the screen always says what {interact} does where you're standing."""],
 	["Moving", "Walking, sprinting, stances, cover, climbing and ropes.",
 		"""[b]Walking and running.[/b] Walking is your normal pace; hold {sprint} to sprint. {walk} switches between walking and running (on a controller, tap L3; tilting the stick part way also walks). Gun holstered you stroll; gun out it's a tactical walk.
 
@@ -66,6 +66,18 @@ Some armed crooks carry frag grenades. Listen for the clink, look for the red GR
 [b]Booking.[/b] Walk them to a patrol car and press {interact} at a door to put them in the back, then drive to the custody bay at the side of the station and stop there. Or just walk them to the bay.
 
 [b]Undercover[/b] (plain clothes from the armoury): crooks take you for anyone on the street until you draw your gun, shout, turn up in a marked car or hang about too close. Watch the suspicion meter."""],
+	["Mini map and markers", "The map in the corner and finding the job.",
+		"""[b]The mini map[/b] is bottom left. Grey lines are roads, the dark blocks are buildings and the blue one is the police station. You're the white arrow; the other officers are arrows in their ping colours, and the small blue dots are patrol cars.
+
+[b]Up is the way you're looking.[/b] The small map turns with the camera (the N on the rim shows north) and zooms out as you drive faster. Turn that off under Settings > Gameplay to keep north up.
+
+{minimap} switches it between small, large (the whole city, north up) and off.
+
+[b]Finding the job.[/b] Each job is a pulsing red dot (orange for traffic jobs and car thefts), with a line along the roads from you to the nearest one. A job off the map sits on its rim, pointing the way.
+
+[b]On screen[/b] every job has a pin over it with what it is and how far, seen through walls, and a tall beam of light over the spot shows above the rooftops. When it's off screen, a big arrow at the edge points the way to turn, with the distance.
+
+[b]Prisoners.[/b] While anyone has a prisoner, the custody bay shows as a blue square on the map and a blue pin on screen. A cuffed prisoner doing a runner shows in orange."""],
 	["Driving", "Getting in, lights and siren, passengers, pursuits.",
 		"""[b]Getting in.[/b] {interact} at a car door gets you in (the nearest free seat); {interact} again gets you out. {stance} moves you to the next free seat. Three officers fit in one car. {interact} at any civilian car, van, lorry or motorbike takes it: the driver is pulled out.
 
