@@ -74,3 +74,40 @@ func test_gore_off_is_clean() -> void:
 		await get_tree().physics_frame
 	t.check(_decals().is_empty(), "no blood at all with gore off")
 	Settings.values["gore"] = 3
+
+
+func test_a_downed_officers_pool_stays_where_they_fell() -> void:
+	# beenster (2026-11-24): the pool followed them round after a revive.
+	Settings.values["gore"] = 3
+	ProtoWorld.ground(self, 60.0)
+	var o := Officer.new()
+	o.position = Vector3(0, 0.1, 0)
+	add_child(o)
+	for i in 10:
+		await get_tree().physics_frame
+	o.take_damage(1000.0, Vector3(0, 0, 1))
+	for i in 150:
+		await get_tree().physics_frame
+	var pools := _decals().filter(func(d): return (d as Decal).texture_albedo == Gore._splat_tex(Gore.TEX_POOL))
+	t.check(pools.size() >= 1, "a pool under the downed officer")
+	t.check(pools.all(func(d): return not o.is_ancestor_of(d)), "the pool is in the world, not on the officer")
+	var p0: Vector3 = (pools[0] as Decal).global_position if not pools.is_empty() else Vector3.ZERO
+	o.global_position += Vector3(5, 0, 0)
+	await get_tree().physics_frame
+	t.check(pools.is_empty() or (pools[0] as Decal).global_position.distance_to(p0) < 0.01, "and stays put when they move")
+
+
+func test_a_shot_leaves_fine_spatter_round_about() -> void:
+	Settings.values["gore"] = 3
+	await _scene()
+	Gore.hit(self, Vector3(0, 1.2, 4), Vector3(0, 1.2, -1.4))
+	var fans := _decals().filter(func(d): return (d as Decal).texture_albedo == Gore._splat_tex(Gore.TEX_FAN))
+	var speck := _decals().filter(func(d): return (d as Decal).texture_albedo == Gore._splat_tex(Gore.TEX_SPECKLE))
+	fans.append_array(speck)
+	t.check(fans.size() >= 2, "several spatter marks from one shot: %d" % fans.size())
+	t.check(fans.all(func(d): return (d as Node).is_in_group("blood")), "all of it waits for a crew to clean it")
+	Settings.values["gore"] = 1
+	var before := _decals().size()
+	Gore.hit(self, Vector3(0, 1.2, 4), Vector3(0, 1.2, -1.4))
+	t.check(_decals().size() - before <= 3, "less of it on a lower setting: %d" % (_decals().size() - before))
+	Settings.values["gore"] = 3

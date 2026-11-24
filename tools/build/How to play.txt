@@ -12,6 +12,15 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
+BLOOD (0.18.0)
+A shot now bursts out of the exit wound as a fine red mist and a spray of
+tiny droplets, which leave fine spatter on the walls, floor and anything
+nearby. The marks stay until the council clean-up crew comes and scrubs
+them off (they turn up about a minute and a half after a fight, or while
+they're already fixing damage nearby). Blood under a body still lying there
+is left alone. All of it follows Settings > Gameplay > Gore.
+Fixed: the blood pool no longer follows you around after you're revived.
+
 MINI MAP AND JOB MARKERS (0.15.0)
 A mini map sits in the bottom left: roads, buildings, the station in blue,
 you (white arrow), the other officers, patrol cars, and every job as a
