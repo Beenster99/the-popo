@@ -274,7 +274,7 @@ func start_call(kind: Kind, opts := {}) -> int:
 				return -1
 			if city:
 				# Wave 2: the speeder starts on the far side of the call's block.
-				civ_car.global_transform = Transform3D(Basis(Vector3.UP, -PI / 2), (lap[2] as Vector3) + Vector3(-12, 0.95, 0))
+				civ_car.global_transform = Transform3D(Basis(Vector3.UP, -PI / 2), (lap[2] as Vector3) + Vector3(-12, 1.3, 0))
 				civ_car.linear_velocity = Vector3.ZERO
 				civ_car.angular_velocity = Vector3.ZERO
 			var s := spawn_suspect(civ_car.global_position, Suspect.S.DRIVE, _rng.randf() < 0.4, c.id)
