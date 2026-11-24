@@ -51,6 +51,7 @@ var peds: PedSystem
 ## Wave 4: the light follows the clock; rain and storms.
 var weather: CityWeather
 var repairs: RepairCrews
+var ambulances: AmbulanceService
 ## v0.10.0: the lifts in the downtown towers.
 var lifts: Lifts
 var sun: DirectionalLight3D
@@ -131,6 +132,7 @@ func _ready() -> void:
 			Perf.benchmark_pending = false
 			state.no_save = true
 			dispatch.enabled = false
+			ambulances.enabled = false
 			var bench := BenchmarkRun.new()
 			bench.name = "Benchmark"
 			bench.city = self
@@ -279,6 +281,11 @@ func _build(s: int) -> void:
 	traffic.name = "Traffic"
 	add_child(traffic)
 	traffic.build(gen, cars, dispatch)
+	# The ambulances (after the traffic: the same cars in the same order).
+	ambulances = AmbulanceService.new()
+	ambulances.name = "Ambulances"
+	add_child(ambulances)
+	ambulances.build(gen, cars, traffic, dispatch)
 	add_child(sync)
 	nav = CityNav.new()
 	nav.name = "CityNav"
