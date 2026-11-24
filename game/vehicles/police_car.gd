@@ -288,6 +288,51 @@ func seat_free(i: int) -> bool:
 	return not occupants().has(i)
 
 
+## A door swinging open on its front hinge, held while someone climbs in,
+## then shut (prisoners going in the back). Doors knocked off are skipped.
+const DOOR_PARTS := ["door_fl", "door_fr", "door_rl", "door_rr"]
+const DOOR_OPEN := 70.0     # degrees
+var _door_base := {}        # part name -> its transform when shut
+var _door_tween := {}
+
+
+func swing_door(i: int, hold := 1.0) -> void:
+	if i < 0 or i >= DOOR_PARTS.size() or not is_inside_tree():
+		return
+	var n: String = DOOR_PARTS[i]
+	if not parts.has(n) or not is_instance_valid(parts[n].node):
+		return
+	var node: Node3D = parts[n].node
+	if not _door_base.has(n):
+		_door_base[n] = node.transform
+	if _door_tween.has(n) and (_door_tween[n] as Tween).is_valid():
+		(_door_tween[n] as Tween).kill()
+	var box: AABB = parts[n].box
+	var left := box.get_center().x < 0.0
+	var hinge := Vector3(box.position.x if left else box.end.x, 0.0, box.end.z)
+	var side := 1.0 if left else -1.0
+	var tw := create_tween()
+	_door_tween[n] = tw
+	tw.tween_method(_set_door.bind(n, hinge, side), 0.0, 1.0, 0.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(maxf(hold, 0.2))
+	tw.tween_method(_set_door.bind(n, hinge, side), 1.0, 0.0, 0.25).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_callback(func(): Sfx.play(self, "car_door_close", door_point(i), 2.0, 40.0))
+	Sfx.play(self, "car_door_open", door_point(i), 0.0, 35.0)
+
+
+## How far open a door is (0..1), by turning it about its hinge (car space).
+func _set_door(k: float, n: String, hinge: Vector3, side: float) -> void:
+	if not parts.has(n) or not is_instance_valid(parts[n].node):
+		return
+	var node: Node3D = parts[n].node
+	var parent := node.get_parent() as Node3D
+	var P := _local_xf(parent) if parent and parent != self else Transform3D()
+	var shut: Transform3D = P * (_door_base[n] as Transform3D)
+	var h := Transform3D(Basis(), hinge)
+	var r := Transform3D(Basis(Vector3.UP, deg_to_rad(DOOR_OPEN) * k * side), Vector3.ZERO)
+	node.transform = P.affine_inverse() * (h * r * h.affine_inverse() * shut)
+
+
 ## World position of a seat or door.
 func seat_point(i: int) -> Vector3:
 	return global_transform * (seats[i] as Vector3)
