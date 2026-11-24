@@ -29,7 +29,8 @@ func test_clips_merge_mocap_and_hand_keys() -> void:
 	for n in ["idle", "walk", "run", "roll", "mantle", "climb", "slide", "crouch_walk", "crawl", "peek", "aim_hold", "punch", "kick"]:
 		t.check(lib.has_animation(n), "clip " + n)
 	print("    mocap clips: ", OfficerClips.mocap_clips)
-	# Five from the video capture plus five 100STYLE walks.
+	# Five from the video capture plus five 100STYLE walks (the run is
+	# replaced by its knees-fixed copy, so it counts once).
 	t.check(OfficerClips.mocap_clips.size() == 10, "ten mocap clips merged")
 	var roll_end := OfficerClips.root_offset("roll", OfficerClips.clip_length("roll"))
 	print("    roll travel %s, mantle travel %s" % [roll_end, OfficerClips.root_offset("mantle", 99.0)])

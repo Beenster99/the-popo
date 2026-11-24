@@ -34,15 +34,15 @@ func test_tyre_slide() -> void:
 
 func test_strips_follow_the_wheel() -> void:
 	var s := await _marks()
-	var n0 := s.strip_count()
+	var n0 := s.laid
 	for i in 20:
 		s.wheel(12345, Vector3(i * 0.3, 0, 5), Vector3.UP, 1.0)
-	t.check(s.strip_count() - n0 == 19, "one strip per step once the tyre slides (%d)" % (s.strip_count() - n0))
+	t.check(s.laid - n0 == 19, "one strip per step once the tyre slides (%d)" % (s.laid - n0))
 	s.wheel(12345, Vector3(50, 0, 5), Vector3.UP, 1.0)
-	t.check(s.strip_count() - n0 == 19, "a jump starts a new mark, no strip across it")
+	t.check(s.laid - n0 == 19, "a jump starts a new mark, no strip across it")
 	s.wheel(12345, Vector3(50.5, 0, 5), Vector3.UP, 0.0)
 	s.wheel(12345, Vector3(51.0, 0, 5), Vector3.UP, 1.0)
-	t.check(s.strip_count() - n0 == 19, "gripping again ends the mark")
+	t.check(s.laid - n0 == 19, "gripping again ends the mark")
 	var xf := SkidMarks.strip_transform(Vector3(0, 0, 0), Vector3(0, 0, 1), Vector3.UP)
 	t.near(xf.origin.y, SkidMarks.LIFT, 0.001, "lies just above the road")
 	t.near(xf.basis.z.length(), 1.04, 0.01, "as long as the step (plus a little overlap)")
@@ -54,15 +54,15 @@ func test_handbrake_turn_leaves_marks_cruising_does_not() -> void:
 	var c := _car()
 	await _frames(30)
 	c.throttle = 1.0
-	var n0 := s.strip_count()
+	var n0 := s.laid
 	await _frames(120)
 	c.throttle = 0.4
 	await _frames(60)
-	var cruise := s.strip_count() - n0
+	var cruise := s.laid - n0
 	c.steer = 1.0
 	c.handbrake = true
 	await _frames(60)
-	var turn := s.strip_count() - n0 - cruise
+	var turn := s.laid - n0 - cruise
 	print("    strips: %d cruising, %d in a handbrake turn" % [cruise, turn])
 	t.check(turn > 20, "handbrake turn lays rubber")
 	c.queue_free()
@@ -78,10 +78,10 @@ func test_hard_braking_leaves_marks() -> void:
 	c.throttle = 0.0
 	c.brake = 1.0
 	var v0 := c.linear_velocity.length()
-	var n1 := s.strip_count()
+	var n1 := s.laid
 	await _frames(30)
-	print("    strips braking hard from %.0f m/s: %d" % [v0, s.strip_count() - n1])
-	t.check(s.strip_count() - n1 > 20, "a stamp on the brakes lays two black lines per side")
+	print("    strips braking hard from %.0f m/s: %d" % [v0, s.laid - n1])
+	t.check(s.laid - n1 > 20, "a stamp on the brakes lays two black lines per side")
 	c.queue_free()
 	await _frames(2)
 

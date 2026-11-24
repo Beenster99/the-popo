@@ -40,10 +40,18 @@ static func for_tree(tree: SceneTree) -> SkidMarks:
 	var home: Node = tree.current_scene if tree.current_scene else tree.root
 	var s := home.get_node_or_null(NAME) as SkidMarks
 	if s == null:
+		# (Made once even when several cars ask before it enters the tree.)
+		var pending: Variant = _pending.get(home.get_instance_id())
+		if pending != null and is_instance_valid(pending):
+			return pending
 		s = SkidMarks.new()
 		s.name = NAME
+		_pending[home.get_instance_id()] = s
 		home.add_child.call_deferred(s)
 	return s
+
+
+static var _pending := {}
 
 
 func _init() -> void:
@@ -100,6 +108,10 @@ func strip_count() -> int:
 	return _count
 
 
+## Every strip laid since this world started (the ring reuses the oldest).
+var laid := 0
+
+
 ## Transform of one strip from a to b: a flat quad WIDTH wide, lying on the
 ## road (normal up), slightly longer than the gap so strips join up.
 static func strip_transform(a: Vector3, b: Vector3, normal: Vector3) -> Transform3D:
@@ -119,6 +131,7 @@ func _lay(a: Vector3, b: Vector3, normal: Vector3, alpha: float) -> void:
 	mm.set_instance_transform(i, strip_transform(a, b, normal))
 	_alpha[i] = alpha
 	mm.set_instance_color(i, Color(1, 1, 1, alpha))
+	laid += 1
 	_next = (_next + 1) % MAX_STRIPS
 	_count = mini(_count + 1, MAX_STRIPS)
 	mm.visible_instance_count = _count
