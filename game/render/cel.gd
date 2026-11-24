@@ -20,6 +20,13 @@ static func set_outline_strength(v: float) -> void:
 			o.set_shader_parameter("strength", v)
 
 
+## v0.25: building textures; their alpha marks mortar and grout.
+const KIT_TEX_DIR := "res://assets/textures/kit/"
+## How many metres one of each covers (kit meshes carry UVs in metres).
+const KIT_TILE := {"brick": 1.0, "stone": 2.0, "concrete": 4.0, "plaster": 2.0, "floor": 2.0, "roof": 2.0,
+	"pavement": 2.0, "asphalt": 4.0, "wood": 1.0, "metal": 1.0, "rubble": 1.0}
+
+
 ## flat: no specular pop or rim, for big ground surfaces (roads, pavements)
 ## where the pop would show as a bright patch.
 static func material(color: Color, outline := true, thickness := 0.025, tex: Texture2D = null, opacity := 1.0, flat := false) -> ShaderMaterial:
@@ -36,6 +43,9 @@ static func material(color: Color, outline := true, thickness := 0.025, tex: Tex
 		m.set_shader_parameter("rim_amount", 0.0)
 	if tex:
 		m.set_shader_parameter("albedo_tex", tex)
+		if tex.resource_path.begins_with(KIT_TEX_DIR):
+			m.set_shader_parameter("grout_alpha", true)
+			m.set_shader_parameter("uv_scale", 1.0 / float(KIT_TILE.get(tex.resource_path.get_file().get_basename(), 1.0)))
 	if outline:
 		var o := ShaderMaterial.new()
 		o.shader = OUTLINE

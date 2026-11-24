@@ -214,6 +214,18 @@ func _process(delta: float) -> void:
 ## v0.20.0: with the bullet's direction, the first window along its path
 ## (the shot stops on the collision box, which doesn't follow the glass:
 ## a windscreen sits well inside it), so aimed shots at glass break it.
+## v0.25: whether a shot (car space) goes in through a window pane, whole
+## or already broken (an empty frame lets it straight in).
+func window_on_path(local_point: Vector3, local_dir: Vector3) -> bool:
+	var d := local_dir.normalized()
+	var a := local_point - d * 0.4
+	var b := local_point + d * 0.9
+	for n in glass:
+		if (glass[n].box as AABB).grow(0.06).intersects_segment(a, b) != null:
+			return true
+	return false
+
+
 func window_at(local_point: Vector3, local_dir := Vector3.ZERO) -> String:
 	if local_dir != Vector3.ZERO:
 		var d := local_dir.normalized()

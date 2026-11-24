@@ -3,7 +3,13 @@ shader_type spatial;
 // specular pop. Shadows from the sun are respected, so cover reads clearly.
 
 uniform vec4 albedo : source_color = vec4(0.8, 0.8, 0.8, 1.0);
-uniform sampler2D albedo_tex : source_color, hint_default_white, filter_linear_mipmap;
+uniform sampler2D albedo_tex : source_color, hint_default_white, filter_linear_mipmap_anisotropic, repeat_enable;
+// v0.25: a texture's alpha 0 marks mortar or grout, drawn this colour
+// whatever the surface is tinted (a red brick wall keeps grey mortar).
+uniform vec3 grout_color : source_color = vec3(0.68, 0.66, 0.62);
+uniform bool grout_alpha = false;
+// Kit textures are mapped in metres; this is 1 / the metres one tile covers.
+uniform float uv_scale = 1.0;
 uniform float bands : hint_range(1.0, 6.0) = 3.0;
 uniform float rim_amount : hint_range(0.0, 1.0) = 0.25;
 uniform float rim_threshold : hint_range(0.0, 1.0) = 0.72;
@@ -15,7 +21,8 @@ instance uniform float fade = 1.0;
 uniform float opacity : hint_range(0.0, 1.0) = 1.0;
 
 void fragment() {
-	ALBEDO = albedo.rgb * texture(albedo_tex, UV).rgb;
+	vec4 t = texture(albedo_tex, UV * uv_scale);
+	ALBEDO = grout_alpha ? mix(grout_color * t.rgb, albedo.rgb * t.rgb, t.a) : albedo.rgb * t.rgb;
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;
 	if (fade * opacity < 0.999) {
