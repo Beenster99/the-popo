@@ -919,16 +919,20 @@ func prisoner() -> Suspect:
 	return null
 
 
-## Interact at a police car door while walking a prisoner: they go in the
-## back (or the front passenger seat if the back is full).
+## Interact at a police car door while walking prisoners: the door opens
+## and every prisoner walking with you climbs in, the back seats first, then
+## the front passenger seat. Only police cars (not traffic, not ones the
+## station hasn't bought).
+const SEAT_PRISONER_REACH := 10.0
 func _try_seat_prisoner() -> bool:
-	var pr := prisoner()
-	if pr == null:
+	if prisoner() == null:
 		return false
 	var best: PoliceCar = null
-	var best_d := ENTER_RANGE + 0.4
-	for c in get_tree().get_nodes_in_group("vehicles"):
+	var best_d := ENTER_RANGE + 0.6
+	for c in get_tree().get_nodes_in_group("police_cars"):
 		var pc := c as PoliceCar
+		if pc == null or not pc.can_enter():
+			continue
 		for i in pc.doors.size():
 			var dp := pc.door_point(i)
 			var d := Vector2(dp.x - global_position.x, dp.z - global_position.z).length()
@@ -937,15 +941,24 @@ func _try_seat_prisoner() -> bool:
 				best = pc
 	if best == null:
 		return false
+	var mine := []
+	for n in get_tree().get_nodes_in_group("suspects"):
+		var s := n as Suspect
+		if s and s.state == Suspect.S.CUFFED and s.escort_peer == peer_id and s.global_position.distance_to(global_position) < SEAT_PRISONER_REACH:
+			mine.append(s)
+	mine.sort_custom(func(a, b): return a.global_position.distance_to(global_position) < b.global_position.distance_to(global_position))
 	var taken := best.occupants()
+	var seated := 0
 	for s in [2, 3, 1]:
-		if s >= best.seats.size():
+		if mine.is_empty():
+			break
+		if s >= best.seats.size() or taken.has(s):
 			continue
-		if not taken.has(s):
-			if Net.is_host():
-				pr.put_in_car(best, s)
-			return true
-	return false
+		var pr: Suspect = mine.pop_front()
+		seated += 1
+		if Net.is_host():
+			pr.put_in_car(best, s)
+	return seated > 0
 
 
 ## Who holding interact would treat: a wounded teammate close by first.
