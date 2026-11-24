@@ -12,6 +12,22 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
+SOUND PACK 1 (0.13.0)
+beenster's own sounds are in: every gun has its own recording (9 mm
+pistols, the heavy .45 and .357, the machine pistol, the sawn-off with its
+pump racked after each shot), and gunshots are louder and denser.
+Gunshots now sound like where they are fired: small rooms ring hard, big
+halls boom, alleys flutter between the walls, streets slap back off the
+buildings, rooftops are dry with the city answering from below, and from
+far off the bang arrives late and dull. Walls between you and a shot
+still muffle it.
+Also new: bullet whizzes, ricochets, hits on wood and concrete, grenade
+blasts, flashbangs, gas canisters popping and bouncing, window glass,
+bricks and rubble, a rumble when a building gives way, car start-ups,
+engines ticking over, tyre squeals, red shotgun shells on the floor, radio
+clicks and static, and a new order: "Stand down, put the gun on the floor
+and we can all walk out of here happy."
+
 HELP, KEY BINDS AND TIPS (0.12.0)
 HELP is on the Esc menu, the main menu and the Online screen: every
 control (keyboard and controller, as you have them set) and how each part

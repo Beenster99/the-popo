@@ -57,6 +57,9 @@ var _recent := []         # [pos, time] of recent impact sounds (merge close one
 var _casings := []
 var _clock := 0.0
 var _pending := []        # [time, {stem, pos, db, dist, spread, bus, pitch, reload_of}]
+var _calls := []          # [time, Callable]
+var _breaks := []         # [pos, time] of recent big breaks (for a collapse)
+var _last_collapse := -100.0
 
 
 func _enter_tree() -> void:
@@ -159,7 +162,21 @@ func later(t: float, stem: String, pos: Vector3, db := 0.0, dist := 60.0, spread
 		"pitch": pitch, "reload_of": reload_of}])
 
 
+## v0.13.0: runs f after t seconds (a far shot's bang arriving late).
+func later_call(t: float, f: Callable) -> void:
+	_calls.append([_clock + t, f])
+
+
 func _play_pending() -> void:
+	var j := 0
+	while j < _calls.size():
+		if float(_calls[j][0]) > _clock:
+			j += 1
+			continue
+		var f: Callable = _calls[j][1]
+		_calls.remove_at(j)
+		if f.is_valid():
+			f.call()
 	var i := 0
 	while i < _pending.size():
 		var e: Array = _pending[i]
@@ -380,7 +397,7 @@ func _officer_foley(o: Officer, _delta: float) -> void:
 		var kt: Variant = o.get("kit")
 		var weight: float = float(Armoury.pistol_of(int(kt)).weight) if gun == 0 and kt != null else 1.0
 		Sfx.shot(parent, muzzle, maxi(gun, 0), own, weight)
-		eject_casing(o)
+		eject_casing(o, Vector3.INF, Vector3.ZERO, gun == Sfx.SHOTGUN)
 		Feel.muzzle(parent, muzzle, gun == Sfx.SHOTGUN)
 		if own:
 			Feel.shake(get_tree(), 0.22 if gun == Sfx.SHOTGUN else 0.07)
@@ -434,7 +451,7 @@ func _step_surface(s: String) -> String:
 # --- brass ---------------------------------------------------------------------------
 
 ## A spent case flies out of the right of the gun and bounces where it lands.
-func eject_casing(o: Node3D, at := Vector3.INF, right := Vector3.ZERO) -> void:
+func eject_casing(o: Node3D, at := Vector3.INF, right := Vector3.ZERO, shell := false) -> void:
 	if DisplayServer.get_name() == "headless" and not has_meta("casings_in_headless"):
 		return
 	var pos := at
@@ -467,7 +484,11 @@ func eject_casing(o: Node3D, at := Vector3.INF, right := Vector3.ZERO) -> void:
 	cyl.rings = 1
 	mi.mesh = cyl
 	mi.rotation.x = PI * 0.5
-	mi.material_override = Cel.material(Color("c9a040"), false)
+	if shell:   # a red plastic shotgun shell
+		cyl.top_radius = 0.0105
+		cyl.bottom_radius = 0.0105
+		cyl.height = 0.065
+	mi.material_override = Cel.material(Color("a32020") if shell else Color("c9a040"), false)
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	rb.add_child(mi)
 	var parent := o.get_parent() if o else get_parent()
@@ -480,7 +501,10 @@ func eject_casing(o: Node3D, at := Vector3.INF, right := Vector3.ZERO) -> void:
 			return
 		rb.set_meta("rang", true)
 		var surf := surface_under(rb.global_position)
-		Sfx.play(rb.get_parent(), "casing_" + _drop_surface(surf), rb.global_position, -10.0, 12.0, 0.08))
+		if shell:
+			Sfx.play(rb.get_parent(), "shell_shotgun", rb.global_position, -8.0, 14.0, 0.08)
+		else:
+			Sfx.play(rb.get_parent(), "casing_" + _drop_surface(surf), rb.global_position, -10.0, 12.0, 0.08))
 	_casings.append([rb, _clock])
 
 
@@ -518,7 +542,15 @@ func _car(c: Car, delta: float) -> void:
 		skid.max_distance = 80.0
 		skid.volume_db = -80.0
 		c.add_child(skid)
-		_car_audio[id] = {"engine": eng, "skid": skid, "last": p, "v": Vector3.ZERO, "on": false, "load": 0.0}
+		# v0.13.0: the engine ticking over, under the engine note at a standstill.
+		var idle := AudioStreamPlayer3D.new()
+		idle.stream = Sfx.loop_stream("car_idle")
+		idle.bus = Sfx.BUS_VEHICLES
+		idle.unit_size = 4.0
+		idle.max_distance = 45.0
+		idle.volume_db = -80.0
+		c.add_child(idle)
+		_car_audio[id] = {"engine": eng, "skid": skid, "idle": idle, "last": p, "v": Vector3.ZERO, "on": false, "load": 0.0, "squeal": 0.0}
 		return
 	var v := (p - (a.last as Vector3)) / delta
 	var dv := (v - (a.v as Vector3)).length()
@@ -534,10 +566,12 @@ func _car(c: Car, delta: float) -> void:
 		Sfx.play(c.get_parent(), "car_start", p, -6.0, 40.0, 0.03)
 		eng.play()
 		skid.play()
+		(a.idle as AudioStreamPlayer3D).play(randf() * 1.5)
 	elif not driven and a.on and speed < 0.2:
 		a.on = false
 		eng.stop()
 		skid.stop()
+		(a.idle as AudioStreamPlayer3D).stop()
 	if a.on:
 		var accel := (Vector2(v.x, v.z).length() - Vector2(prev_v.x, prev_v.z).length()) / delta
 		a.load = lerpf(a.load, clampf(accel / 6.0 + absf(c.throttle), 0.0, 1.0), 1.0 - exp(-6.0 * delta))
@@ -547,7 +581,12 @@ func _car(c: Car, delta: float) -> void:
 		var tone := _engine_tone(c)
 		var dop := _doppler(p, v)
 		eng.pitch_scale = (0.75 + k * 0.5 + gear_k * 0.45 + a.load * 0.08) * tone.x * dop
-		eng.volume_db = -14.0 + a.load * 6.0 + k * 4.0 + tone.y
+		# At a standstill the engine ticks over; the note takes over as it pulls away.
+		var still: float = clampf(1.0 - speed / 4.0, 0.0, 1.0) * (1.0 - float(a.load))
+		eng.volume_db = -14.0 + a.load * 6.0 + k * 4.0 + tone.y - still * 7.0
+		var idle := a.idle as AudioStreamPlayer3D
+		idle.volume_db = -9.0 + tone.y + linear_to_db(maxf(still, 0.02))
+		idle.pitch_scale = tone.x * (1.0 + a.load * 0.15)
 		var right := c.global_transform.basis.x
 		var slip := absf(v.dot(right))
 		var on_ground := p.y < 3.0
@@ -555,6 +594,10 @@ func _car(c: Car, delta: float) -> void:
 		if c.handbrake and speed > 5.0:
 			squeal = maxf(squeal, 0.7)
 		skid.volume_db = lerpf(-60.0, -6.0, squeal) if squeal > 0.02 else -80.0
+		# v0.13.0: the tyres bite with a squeal as a skid starts.
+		if squeal > 0.45 and float(a.squeal) <= 0.45:
+			Sfx.play(c.get_parent(), "tyre_chirp", p, -2.0 + squeal * 4.0, 70.0, 0.06, Sfx.BUS_VEHICLES)
+		a.squeal = squeal
 		skid.pitch_scale = 0.9 + squeal * 0.2
 	# Wave 2: sirens rise as they come at you and fall away as they pass.
 	if c is PoliceCar and (c as PoliceCar)._siren_player and (c as PoliceCar)._siren_player.playing:
@@ -629,9 +672,28 @@ func _on_piece_broken(id: int) -> void:
 		Sfx.play(parent, "break_concrete", at, 3.0, 80.0, 0.08)
 	else:
 		var size := (p.aabb as AABB).size.length()
+		_collapse_check(parent, at, size)
 		Sfx.play(parent, "break_concrete", at, clampf(1.0 + size, 1.0, 8.0), 110.0, 0.08)
 		Sfx.play(parent, "gun_thump", at, clampf(-6.0 + size, -6.0, 3.0), 60.0, 0.2)
 		later(0.3, "rubble", at, clampf(-8.0 + size, -8.0, 2.0), 70.0, 0.1)
+
+
+## v0.13.0: when a lot of a building gives way at once (six or more big
+## pieces within 12 m in two seconds), the long rumble of it coming down.
+func _collapse_check(parent: Node, at: Vector3, size: float) -> void:
+	if size < 1.5:
+		return
+	_breaks.append([at, _clock])
+	while not _breaks.is_empty() and _clock - float(_breaks[0][1]) > 2.0:
+		_breaks.pop_front()
+	var n := 0
+	for b in _breaks:
+		if (b[0] as Vector3).distance_to(at) < 12.0:
+			n += 1
+	if n >= 6 and _clock - _last_collapse > 9.0:
+		_last_collapse = _clock
+		Sfx.play(parent, "collapse", at, 6.0, 260.0, 0.04, Sfx.space_bus(parent, at))
+		duck(0.6)
 
 
 func _on_world_fx(kind: int, at: Vector3, _n: Vector3) -> void:

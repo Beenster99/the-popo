@@ -575,8 +575,10 @@ func _apply_audio() -> void:
 	Sfx.ensure_buses()
 	_bus_volume("Master", values.vol_master)
 	_bus_volume(Sfx.BUS_SFX, values.vol_sfx)
-	_bus_volume(Sfx.BUS_OUTDOOR, values.vol_outdoor)
-	_bus_volume(Sfx.BUS_INDOOR, values.vol_indoor)
+	for b in Sfx.OUTDOOR_BUSES:
+		_bus_volume(b, values.vol_outdoor)
+	for b in Sfx.INDOOR_BUSES:
+		_bus_volume(b, values.vol_indoor)
 	_bus_volume(Sfx.BUS_AMBIENCE, values.vol_ambience)
 	_bus_volume(Sfx.BUS_VEHICLES, values.vol_vehicles)
 	_bus_volume(Sfx.BUS_MUSIC, values.vol_music)
