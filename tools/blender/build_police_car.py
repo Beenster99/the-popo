@@ -26,6 +26,7 @@ from mathutils import Vector
 
 sys.path.insert(0, os.path.dirname(__file__))
 import common as C  # noqa: E402
+import interiors as I  # noqa: E402
 
 WHITE = (0.93, 0.93, 0.91)
 NAVY = (0.06, 0.12, 0.30)
@@ -75,6 +76,19 @@ def obj_from_bm(name, bm, mats):
 def gbox(name, size, centre, m, bevel=0.0):
     """Box given in Godot axes."""
     return C.box(name, (size[0], size[2], size[1]), g2b(centre), m, bevel=bevel)
+
+
+def cyl(name, r, depth, centre, axis, m, verts=16):
+    bpy.ops.mesh.primitive_cylinder_add(vertices=verts, radius=r, depth=depth)
+    o = bpy.context.object
+    o.name = name
+    o.location = g2b(centre)
+    if axis == "x":
+        o.rotation_euler = (0, math.pi / 2, 0)
+    elif axis == "z":   # Godot z = Blender -y
+        o.rotation_euler = (math.pi / 2, 0, 0)
+    o.data.materials.append(m)
+    return o
 
 
 def quad(name, pts, m, thick=0.02):
@@ -349,21 +363,9 @@ def build_details():
     out.append(gbox("lightbar", (1.10, 0.06, 0.24), (0, CAB_T + 0.075, zl), mat("black", BLACK), 0.01))
     out.append(gbox("lens_red", (0.48, 0.09, 0.22), (-0.27, CAB_T + 0.15, zl), mat("red", RED), 0.02))
     out.append(gbox("lens_blue", (0.48, 0.09, 0.22), (0.27, CAB_T + 0.15, zl), mat("blue", BLUE), 0.02))
-    # Interior: seats, dash, steering wheel, a cage between front and rear.
-    seat = mat("seat", SEAT)
-    for x in (-0.40, 0.40):
-        out.append(gbox("interior_seat", (0.50, 0.12, 0.50), (x, -0.12, 0.05), seat, 0.03))
-        out.append(gbox("interior_seatback", (0.50, 0.62, 0.12), (x, 0.20, -0.22), seat, 0.03))
-    out.append(gbox("interior_bench", (1.40, 0.12, 0.50), (0, -0.12, -0.80), seat, 0.03))
-    out.append(gbox("interior_benchback", (1.40, 0.55, 0.12), (0, 0.18, -1.05), seat, 0.03))
-    out.append(gbox("interior_dash", (1.60, 0.20, 0.30), (0, 0.24, 0.72), mat("black", BLACK)))
-    bpy.ops.mesh.primitive_torus_add(major_radius=0.17, minor_radius=0.02, major_segments=20, minor_segments=6)
-    wh = bpy.context.object
-    wh.name = "interior_wheel"
-    wh.location = g2b((-0.40, 0.32, 0.50))
-    wh.rotation_euler = (math.radians(65), 0, 0)
-    wh.data.materials.append(mat("black", BLACK))
-    out.append(wh)
+    # Interior (tools/blender/interiors.py), and a cage between front and rear.
+    I.fit_out(sys.modules[__name__], out, W, [(0.05, "pair"), (-0.80, "bench")], -0.12, -0.27,
+              (0.22, 0.72, 0.34), (0.32, 0.50), roof_y=CAB_T, screen_z=T_FRONT, doors={sn: bpy.data.objects.get("door_f" + sn) for sn in ("l", "r")}, console=True)
     out.append(gbox("interior_cage", (1.60, 0.55, 0.02), (0, 0.45, -0.42), mat("grey", GREY)))
     return out
 

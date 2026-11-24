@@ -8,7 +8,10 @@ extends Car
 ## first aid kit.
 
 const MODEL := preload("res://assets/models/vehicles/police_car.glb")
-const GLASS_COLOR := Color("1e2a36")
+const GLASS_COLOR := Color("50687c")
+## How much of the glass draws (screen-door dither). beenster 2026-11-24:
+## you must see who's inside to pick out the crook, so it's mostly clear.
+const GLASS_OPACITY := 0.3
 
 ## Seats in car space, where the officer's feet go: driver, front passenger,
 ## rear left, rear right.
@@ -92,7 +95,9 @@ func _build_body() -> void:
 	_part(model, "push_bar", 0.34, 10.0)
 	_part(model, "mirror_l", 0.05, 2.0)
 	_part(model, "mirror_r", 0.05, 2.0)
-	var glass_mat := Cel.material(GLASS_COLOR, true, 0.02, null, 0.55)
+	# No outline on glass: the outline shell is drawn solid behind it and
+	# blacked the windows out.
+	var glass_mat := Cel.material(GLASS_COLOR, false, 0.02, null, GLASS_OPACITY)
 	for n in ["win_front", "win_rear", "win_fl", "win_fr", "win_rl", "win_rr"]:
 		var mi := _mesh(model, n)
 		if mi == null:
