@@ -23,9 +23,18 @@ var _samples: Array = []
 var _orbit_t := 0.0
 const ORBIT_TIME := 12.0
 var _orbit_centre := Vector3.ZERO
+## v0.23.1: the run measures with V-Sync and the frame cap off, so it shows
+## how fast the game can go rather than the screen's refresh rate; the
+## player's own choice comes back afterwards.
+var _vsync_was := DisplayServer.VSYNC_ENABLED
+var _cap_was := 0
 
 
 func _ready() -> void:
+	_vsync_was = DisplayServer.window_get_vsync_mode()
+	_cap_was = Engine.max_fps
+	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+	Engine.max_fps = 0
 	_cam = Camera3D.new()
 	_cam.fov = 70.0
 	_cam.far = 1500.0
@@ -48,6 +57,15 @@ func _ready() -> void:
 	_cam.global_position = _path[0]
 	_cam.look_at(_path[1], Vector3.UP)
 	_cam.make_current()
+
+
+func _exit_tree() -> void:
+	_restore_vsync()
+
+
+func _restore_vsync() -> void:
+	DisplayServer.window_set_vsync_mode(_vsync_was)
+	Engine.max_fps = _cap_was
 
 
 func _process(delta: float) -> void:
@@ -108,6 +126,7 @@ func _orbit(k: float) -> void:
 
 func _finish() -> void:
 	_done = true
+	_restore_vsync()
 	var text := _summary()
 	var where := Perf.save_report(text)
 	print(text)
@@ -147,15 +166,22 @@ func _summary() -> String:
 		ProjectSettings.get_setting("application/config/version", "dev"), ms.size(), _mean(ms) * ms.size() / 1000.0])
 	lines.append("Average %.0f fps   1%% low %.0f fps   worst frame %.1f ms" % [
 		1000.0 / maxf(_mean(ms), 0.01), 1000.0 / maxf(_pct(ms, 0.99), 0.01), _pct(ms, 1.0)])
-	lines.append("GPU %.1f ms avg (%.1f ms at worst 1%%)   render CPU %.1f ms   game code %.1f ms   physics %.1f ms" % [
+	# (Godot's game code and physics timers hold the slowest frame of each
+	# second, so they are worst cases, not averages.)
+	lines.append("GPU %.1f ms avg (%.1f ms at worst 1%%)   render CPU %.1f ms   game code %.1f ms   physics %.1f ms (slowest each second)" % [
 		_mean(gpu), _pct(gpu, 0.99), _mean(rcpu), _mean(game), _mean(phys)])
 	lines.append("Draw calls %.0f avg, %.0f max   objects %.0f avg" % [_mean(draws), _pct(draws, 1.0), _mean(objs)])
+	var scr := DisplayServer.window_get_current_screen()
+	lines.append("Monitor %dx%d at %.0f Hz   window %s   (measured with V-Sync and frame cap off)" % [
+		DisplayServer.screen_get_size(scr).x, DisplayServer.screen_get_size(scr).y,
+		DisplayServer.screen_get_refresh_rate(scr),
+		["windowed", "borderless fullscreen", "exclusive fullscreen", "maximised"][v.window_mode]])
 	lines.append("Screen %dx%d, 3D scale %.2f (%s)   %s   %s" % [size.x, size.y, vp.scaling_3d_scale,
 		["bilinear", "FSR 1", "FSR 2"][v.scaling_mode], RenderingServer.get_video_adapter_name(), OS.get_processor_name()])
-	lines.append("MSAA %s  TAA %s  SSAO %s  SSIL %s  SSR %s  SDFGI %s  glow %s  fog %s  sun shadow %s/%dm/%s splits  lamp shadows %s  vsync %s  cap %s" % [
+	lines.append("MSAA %s  TAA %s  SSAO %s  SSIL %s  SSR %s  SDFGI %s  glow %s  fog %s  sun shadow %s/%dm/%s splits  lamp shadows %s  your vsync %s  cap %s" % [
 		["off", "2x", "4x", "8x"][v.msaa], v.taa, v.ssao, v.ssil, v.ssr, v.sdfgi, v.glow, v.vol_fog,
 		Settings.SHADOW_SIZES[v.sun_shadow_size], int(v.sun_shadow_distance), ["1", "2", "4"][v.sun_shadow_splits],
-		v.lamp_shadows, ["off", "on", "adaptive", "mailbox"][v.vsync], Settings.FPS_CAPS[v.max_fps]])
+		v.lamp_shadows, ["off", "on", "adaptive", "mailbox"][v.vsync], "none" if v.max_fps == 0 else str(Settings.FPS_CAPS[v.max_fps])])
 	return "\n".join(lines)
 
 
