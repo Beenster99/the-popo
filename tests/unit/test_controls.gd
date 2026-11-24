@@ -67,3 +67,55 @@ func test_ping_reaches_everyone() -> void:
 	var m := Pings._make_marker(1)
 	t.check(m.get_child_count() == 3, "beam, ring and name")
 	m.free()
+
+
+## Key binds screen: controller buttons rebind, save and reload too.
+func test_pad_rebinding_saves_and_reloads() -> void:
+	var ev := InputEventJoypadButton.new()
+	ev.button_index = JOY_BUTTON_DPAD_UP
+	Controls.rebind_pad("kick", ev)
+	t.check(Controls.describe_pad(Controls.pad_event("kick"), true) == "D-pad up", "kick on d-pad up")
+	var lt := InputEventJoypadMotion.new()
+	lt.axis = JOY_AXIS_TRIGGER_LEFT
+	lt.axis_value = 0.8
+	Controls.rebind_pad("punch", lt)
+	Controls.register()
+	t.check(Controls.describe_pad(Controls.pad_event("kick"), true) == "D-pad up", "kept after reload")
+	t.check(Controls.describe_pad(Controls.pad_event("punch"), true) == "LT", "trigger kept after reload")
+	t.check("kick" in Controls.clashes("shout", true), "shout and kick both on d-pad up: a clash")
+	Controls.rebind_pad("kick", null)
+	Controls.register()
+	t.check(Controls.pad_event("kick") == null, "cleared stays cleared")
+	Controls.rebind("punch", Controls.key_event(KEY_U))
+	Controls.reset_pad()
+	t.check(Controls.describe_pad(Controls.pad_event("kick"), true) == "R3", "pad defaults back")
+	t.check(Controls.describe(Controls.pc_event("punch")) == "U", "keyboard change kept by a pad reset")
+	Controls.reset_keys()
+	t.check(Controls.describe(Controls.pc_event("punch")) == "V", "keyboard defaults back")
+	Controls.reset_to_defaults()
+
+
+func test_clashes() -> void:
+	Controls.reset_to_defaults()
+	for pair in Controls.REBINDABLE:
+		t.check(Controls.clashes(pair[0]).is_empty(), "no clash by default (keys): " + pair[0])
+		t.check(Controls.clashes(pair[0], true).is_empty(), "no clash by default (pad): " + pair[0])
+	Controls.rebind("kick", Controls.key_event(KEY_R))
+	t.check(Controls.clashes("kick") == ["reload"], "kick on R clashes with reload")
+	Controls.reset_to_defaults()
+
+
+func test_key_names_follow_the_device() -> void:
+	PlayerInput.using_pad = true
+	t.check(Controls.key_name("jump") == "A", "pad: A")
+	PlayerInput.using_pad = false
+	t.check(Controls.key_name("jump") == "Space", "keyboard: Space")
+
+
+func test_every_rebindable_action_has_a_group_and_a_tip() -> void:
+	var grouped := []
+	for g in Controls.GROUPS:
+		grouped.append_array(g[1])
+	for pair in Controls.REBINDABLE:
+		t.check(pair[0] in grouped, "in a group: " + pair[0])
+		t.check(Controls.TIPS.has(pair[0]), "has a tip: " + pair[0])

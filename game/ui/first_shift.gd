@@ -87,8 +87,8 @@ static func fill(text: String) -> String:
 	for pair in Controls.REBINDABLE:
 		var a: String = pair[0]
 		if out.contains("{%s}" % a):
-			var ev := Controls.pc_event(a)
-			out = out.replace("{%s}" % a, "[%s]" % (Controls.describe(ev) if ev else "?"))
+			var k := Controls.key_name(a)
+			out = out.replace("{%s}" % a, "[%s]" % (k if k != "-" else "?"))
 	return out
 
 

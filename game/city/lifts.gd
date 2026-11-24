@@ -272,7 +272,7 @@ func door_near(p: Vector3) -> Array:
 
 ## One line for the HUD about the lift here, or "".
 func prompt_for(p: Vector3) -> String:
-	var use := Controls.describe(Controls.pc_event("interact"))
+	var use := Controls.key_name("interact")
 	var inside := lift_inside(p)
 	if inside >= 0:
 		var L: Dictionary = lifts[inside]

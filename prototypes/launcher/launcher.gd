@@ -43,23 +43,26 @@ func _ready() -> void:
 	left.add_child(_label("Your name"))
 	_name = LineEdit.new()
 	_name.text = cfg.get_value("net", "name", "Officer")
+	_name.tooltip_text = "What your friends see over your officer's head. Your kit is saved under this name too."
 	left.add_child(_name)
 	left.add_child(_label("Host address (to join)"))
 	_addr = LineEdit.new()
 	_addr.text = cfg.get_value("net", "address", "127.0.0.1")
+	_addr.tooltip_text = "Joining: the address the host gave you (the host's Copy address button). Hosting: leave it."
 	left.add_child(_addr)
 	left.add_child(_label("Port"))
 	_port = SpinBox.new()
 	_port.min_value = 1024
 	_port.max_value = 65535
 	_port.value = cfg.get_value("net", "port", Net.DEFAULT_PORT)
+	_port.tooltip_text = "27015 unless you changed it. Host and friends must use the same port."
 	left.add_child(_port)
 	var buttons := HBoxContainer.new()
 	left.add_child(buttons)
-	buttons.add_child(_button("Host", _on_host))
-	buttons.add_child(_button("Join", _on_join))
-	buttons.add_child(_button("Leave", func(): Net.leave(); _refresh()))
-	buttons.add_child(_button("Back to menu", func(): Net.leave(); get_tree().change_scene_to_file("res://game/ui/main_menu.tscn")))
+	buttons.add_child(_button("Host", _on_host, "Start a game here for up to two friends. The game asks your router to open the port and shows the address to give them."))
+	buttons.add_child(_button("Join", _on_join, "Connect to a friend's game at the address and port above."))
+	buttons.add_child(_button("Leave", func(): Net.leave(); _refresh(), "Stop hosting, or leave the game you joined."))
+	buttons.add_child(_button("Back to menu", func(): Net.leave(); get_tree().change_scene_to_file("res://game/ui/main_menu.tscn"), "Back to the main menu (Esc)."))
 	_status = _label("Offline: you can still run every prototype on your own.")
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD
 	left.add_child(_status)
@@ -69,7 +72,7 @@ func _ready() -> void:
 	left.add_child(_internet)
 	_copy = _button("Copy address for friends", func():
 		if Net.port_opener.public_ip != "":
-			DisplayServer.clipboard_set("%s:%d" % [Net.port_opener.public_ip, int(_port.value)]))
+			DisplayServer.clipboard_set("%s:%d" % [Net.port_opener.public_ip, int(_port.value)]), "Copies your internet address and port, ready to paste to your friends.")
 	_copy.visible = false
 	left.add_child(_copy)
 	var po: PortOpener = Net.port_opener
@@ -82,6 +85,7 @@ func _ready() -> void:
 	left.add_child(_label("Players (max 3)"))
 	_lobby = ItemList.new()
 	_lobby.custom_minimum_size.y = 110
+	_lobby.tooltip_text = "Everyone in the game. Three officers at most."
 	left.add_child(_lobby)
 
 	var right := VBoxContainer.new()
@@ -90,7 +94,7 @@ func _ready() -> void:
 	right.add_child(_label("When everyone is in, the host starts the game."))
 	_list = VBoxContainer.new()
 	right.add_child(_list)
-	var start := _button("Start the game", func(): _start(Scenes.GAME))
+	var start := _button("Start the game", func(): _start(Scenes.GAME), "Host only: everyone in the list goes into the city together.")
 	start.custom_minimum_size = Vector2(320, 56)
 	start.add_theme_font_size_override("font_size", 22)
 	_list.add_child(start)
@@ -100,13 +104,17 @@ func _ready() -> void:
 		start.text = "Start in a new city"
 		var cont := _button("Continue the saved city (%d)" % saved.seed, func():
 			City.resume = true
-			_start(Scenes.GAME))
+			_start(Scenes.GAME), "Host only: carry on in your saved city, with the station's pay, armoury and stories.")
 		cont.custom_minimum_size = Vector2(320, 56)
 		cont.add_theme_font_size_override("font_size", 22)
 		_list.add_child(cont)
 		_list.move_child(cont, 0)
-	right.add_child(_label("\nEsc opens the menu (Settings, Leave). F3 toggles the network overlay. Q/E rotate the camera, mouse wheel zooms.\nA game controller works too."))
-	right.add_child(_button("Controls...", func(): add_child(load("res://prototypes/launcher/controls_screen.gd").new())))
+	right.add_child(_label("\nEsc opens the menu (Help, Settings, Leave). F3 toggles the network overlay. Mouse wheel zooms.\nA game controller works too."))
+	var extra := HBoxContainer.new()
+	extra.add_theme_constant_override("separation", 10)
+	right.add_child(extra)
+	extra.add_child(_button("Key binds...", func(): add_child(KeyBindsScreen.new()), "Change any key, mouse button or controller button."))
+	extra.add_child(_button("Help...", func(): add_child(HelpScreen.new()), "How to play, and how playing online works."))
 
 	Net.lobby_changed.connect(_refresh)
 	Net.joined.connect(func(): _status.text = "Joined. Waiting for the host to start the game."; _refresh())
@@ -121,9 +129,10 @@ func _label(t: String) -> Label:
 	return l
 
 
-func _button(t: String, cb: Callable) -> Button:
+func _button(t: String, cb: Callable, tip := "") -> Button:
 	var b := Button.new()
 	b.text = t
+	b.tooltip_text = tip
 	b.pressed.connect(cb)
 	return b
 

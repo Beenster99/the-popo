@@ -92,7 +92,7 @@ func _process(_delta: float) -> void:
 	_name.text = o.weapon_name().to_upper()
 	_mag.text = str(rounds)
 	_mag.add_theme_color_override("font_color", Color(1.0, 0.4, 0.35) if rounds <= 3 else Color.WHITE)
-	_spare.text = ("  no spare   %s drop" % Controls.describe(Controls.pc_event("holster"))) if picked else ("  / %d" % o.reserve)
+	_spare.text = ("  no spare   %s drop" % Controls.key_name("holster")) if picked else ("  / %d" % o.reserve)
 	var s := ""
 	if o.is_reloading():
 		s = "RELOADING"
@@ -139,32 +139,43 @@ func _nade_line(o: Officer) -> String:
 			continue
 		var t := "%s %d" % [Grenades.SHORT[k], Grenades.count(o.nades, k)]
 		parts.append("[%s]" % t if k == PlayerInput.nade_kind else t)
-	var keys := "pad: D-pad right / left" if PlayerInput.using_pad else "%s throw  %s pick" % [
-		Controls.describe(Controls.pc_event("throw")), Controls.describe(Controls.pc_event("grenade_next"))]
+	var keys := "%s throw  %s pick" % [Controls.key_name("throw"), Controls.key_name("grenade_next")]
 	return "%s\n%s" % ["  ".join(parts), keys]
+
+
+## "WASD" (or whatever movement keys are set), "Left stick" on a controller.
+static func _move_keys() -> String:
+	if PlayerInput.using_pad:
+		return "Left stick"
+	var k := ""
+	for a in ["move_forward", "move_left", "move_back", "move_right"]:
+		k += Controls.key_name(a)
+	return k
 
 
 ## One line on what the use key does here.
 func _prompt(o: Officer) -> String:
-	var use := Controls.describe(Controls.pc_event("interact"))
+	var use := Controls.key_name("interact")
 	if o.in_car():
-		var parts: PackedStringArray = ["%s get out" % use, "%s change seat" % Controls.describe(Controls.pc_event("stance"))]
-		parts.insert(0, "DRIVING   WASD drive   Space handbrake" if o.seat == 0 else "PASSENGER (%s to move to the wheel)" % Controls.describe(Controls.pc_event("stance")))
+		var parts: PackedStringArray = ["%s get out" % use, "%s change seat" % Controls.key_name("stance")]
+		parts.insert(0, ("DRIVING   %s drive   %s handbrake" % [_move_keys(), Controls.key_name("handbrake")]) if o.seat == 0 else "PASSENGER (%s to move to the wheel)" % Controls.key_name("stance"))
 		if o.seat == 0:
-			parts.append("%s lights / siren" % Controls.describe(Controls.pc_event("torch")))
-			parts.append("%s horn" % Controls.describe(Controls.pc_event("horn")))
+			parts.append("%s lights / siren" % Controls.key_name("torch"))
+			parts.append("%s horn" % Controls.key_name("horn"))
 		else:
-			parts.append("%s lean out and aim" % Controls.describe(Controls.pc_event("aim")))
+			parts.append("%s lean out and aim" % Controls.key_name("aim"))
 		return "   ".join(parts)
 	if o.state == Officer.S.DOWNED:
-		var r := Controls.describe(Controls.pc_event("reload"))
+		var r := Controls.key_name("reload")
 		var up := maxf(Officer.SELF_REVIVE - o.state_t, 0.0)
 		var w := o.respawn_wait()
 		var first := ("%s respawn in %d" % [r, ceili(w)]) if w > 0.0 else ("%s respawn back at the start" % r)
 		return "DOWN   %s   or a teammate holds %s on you   (you get up here in %d s)" % [first, use, ceili(up)]
 	if o.state == Officer.S.ROPE:
-		return "ON THE ROPE   W climb   S slide   %s drop fast   %s swing in through a window   %s let go" % [
-			Controls.describe(Controls.pc_event("sprint")), Controls.describe(Controls.pc_event("jump")), use]
+		return "ON THE ROPE   %s climb   %s slide   %s drop fast   %s swing in through a window   %s let go" % [
+			"Stick up" if PlayerInput.using_pad else Controls.key_name("move_forward"),
+			"Stick down" if PlayerInput.using_pad else Controls.key_name("move_back"),
+			Controls.key_name("sprint"), Controls.key_name("jump"), use]
 	if o.state not in [Officer.S.MOVE, Officer.S.CROUCH]:
 		return ""
 	# v0.10.0: the grapple and the rope.
@@ -189,7 +200,7 @@ func _prompt(o: Officer) -> String:
 			var dp := pc.door_point(i)
 			if Vector2(dp.x - o.global_position.x, dp.z - o.global_position.z).length() < Officer.ENTER_RANGE + (0.4 if pr else 0.0):
 				return ("%s put the suspect in the car" % use) if pr else ("%s get in" % use)
-	var sh := Controls.describe(Controls.pc_event("shout"))
+	var sh := Controls.key_name("shout")
 	if pr and pr.stay:
 		return "%s tell your prisoner to get up and walk with you" % sh
 	if pr:
