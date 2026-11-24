@@ -27,7 +27,7 @@ def flash_keys(frames, dur=2):
         fl.keyframe_insert('hide_render', frame=f)
         fl.hide_render = True
         fl.keyframe_insert('hide_render', frame=f + dur)
-    for fc in fl.animation_data.action.fcurves:
+    for fc in O.fcurves(fl.animation_data.action):
         for k in fc.keyframe_points:
             k.interpolation = 'CONSTANT'
 
@@ -80,11 +80,11 @@ def run(rig, A):
             A.rot('hand.L', t + 1, -10, 0, 0)
             A.rot('hand.R', t + 1, -10, 0, 0)
     act = rig.animation_data.action
-    for fc in act.fcurves:
+    for fc in O.fcurves(act):
         fc.modifiers.new('CYCLES')
     # contact phases linear on Y
     for s, ph in (('L', 0), ('R', half)):
-        for fc in act.fcurves:
+        for fc in O.fcurves(act):
             if '"foot_ik.%s"' % s in fc.data_path and 'location' in fc.data_path:
                 for k in fc.keyframe_points:
                     t = (k.co.x - 1 - ph) % N
@@ -96,7 +96,7 @@ def run(rig, A):
     g.keyframe_insert('location', index=1, frame=1)
     g.location.y = -9 + v * 200
     g.keyframe_insert('location', index=1, frame=201)
-    for fc in g.animation_data.action.fcurves:
+    for fc in O.fcurves(g.animation_data.action):
         for k in fc.keyframe_points:
             k.interpolation = 'LINEAR'
     return (1, 60)

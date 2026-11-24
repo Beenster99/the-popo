@@ -383,6 +383,24 @@ func _toss_spot() -> Vector3:
 	return Vector3(to.x, global_position.y, to.z)
 
 
+## People going about their day (not police, not crooks): what their arms
+## are doing. Workers dig or hammer when stood still; everyone else is on
+## the phone, texting, hands in pockets, arms folded or hands behind, picked
+## from their look so it's the same on every machine. Running (fleeing) is
+## arms free.
+const DAILY_STILL := ["civ_phone", "civ_texting", "civ_pockets", "civ_arms_folded", "civ_hands_behind", "none"]
+const DAILY_WALK := ["civ_phone", "civ_texting", "civ_pockets", "none", "civ_hands_behind", "none"]
+
+
+static func daily_upper(look_id: int, worker: bool, speed: float) -> String:
+	if speed >= 2.2:
+		return "none"
+	if worker:
+		return ("work_dig" if look_id % 2 == 0 else "work_hammer") if speed < 0.2 else "none"
+	var i := posmod(look_id * 7 + 3, DAILY_STILL.size())
+	return DAILY_STILL[i] if speed < 0.2 else DAILY_WALK[i]
+
+
 func _show_gun() -> void:
 	if rig == null or rig.model == null:
 		return
@@ -1674,6 +1692,8 @@ func _process(delta: float) -> void:
 				upper = "aim_hold"
 			elif armed and state == S.LOITER:
 				upper = "ready_hold"
+			elif (civilian or part == "worker") and weapon == EnemyGuns.NONE:
+				upper = daily_upper(look, part == "worker", hs)
 	rig.update_pose(lower, upper, hs, delta, aim_at)
 	if rig.procedural:
 		# "Hands on your head!": fingers on the crown while they kneel.

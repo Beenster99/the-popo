@@ -407,6 +407,7 @@ func _seat_driver(dr: Dictionary) -> void:
 		v.add_child(rig)
 		rig.position = v.seats[0]
 		SuspectLook.apply(rig.model, dr.look)
+		EnemyGuns.show_in_hand(rig.model, EnemyGuns.NONE)   # a driver, not a gunman
 		for mi in rig.model.find_children("*", "GeometryInstance3D", true, false):
 			(mi as GeometryInstance3D).visibility_range_end = 90.0
 		rig.update_pose("sit", "drive", 0.0, 0.016)

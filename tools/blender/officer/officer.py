@@ -30,7 +30,8 @@ def toon_mat(name, color, shadow=0.45, outline=False):
         nt.links.new(mix.outputs[0], out.inputs[0])
         m.use_backface_culling = True
         m.use_backface_culling_shadow = True
-        m.shadow_method = 'NONE' if hasattr(m, 'shadow_method') else None
+        if hasattr(m, 'shadow_method'):
+            m.shadow_method = 'NONE'
         return m
     dif = nt.nodes.new('ShaderNodeBsdfDiffuse')
     s2r = nt.nodes.new('ShaderNodeShaderToRGB')
@@ -590,7 +591,7 @@ class Animator:
 
 
 def set_interp(rig, kind='BEZIER', easing=None):
-    for fc in rig.animation_data.action.fcurves:
+    for fc in fcurves(rig.animation_data.action):
         for k in fc.keyframe_points:
             k.interpolation = kind
             k.handle_left_type = 'AUTO_CLAMPED'
@@ -598,7 +599,7 @@ def set_interp(rig, kind='BEZIER', easing=None):
 
 
 def interp_range(rig, bones, f0, f1, kind='LINEAR', prop=None):
-    for fc in rig.animation_data.action.fcurves:
+    for fc in fcurves(rig.animation_data.action):
         if not any('"%s"' % b in fc.data_path for b in bones):
             continue
         if prop and prop not in fc.data_path:
@@ -690,3 +691,16 @@ def build_officer():
     rig = build_rig()
     build_body(rig)
     return rig
+
+
+def fcurves(action):
+    """An action's F-curves on Blender 4 (action.fcurves) and 5 (layered
+    actions: the curves live in the channel bags of its keyframe strips)."""
+    if hasattr(action, "fcurves"):
+        return list(action.fcurves)
+    out = []
+    for layer in action.layers:
+        for strip in layer.strips:
+            for bag in getattr(strip, "channelbags", []):
+                out.extend(bag.fcurves)
+    return out

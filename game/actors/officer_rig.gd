@@ -11,7 +11,11 @@ const MODEL := preload("res://assets/models/characters/officer.glb")
 const UPPER_BONES := ["spine", "chest_2", "neck_2", "head_2", "upper_arm.L", "forearm.L", "hand.L", "upper_arm.R", "forearm.R", "hand.R"]
 const LOWER_STATES := ["idle", "walk", "walk_ready", "run", "crouch_idle", "crouch_walk", "prone_idle", "crawl", "cover_idle",
 	"peek", "slide", "roll", "mantle", "climb", "jump", "fall", "kick", "cover_low_idle", "limp", "sit", "kneel"]
-const UPPER_STATES := ["none", "aim_hold", "ready_hold", "punch", "reload", "holster", "draw", "drive", "hands_up", "cuffed"]
+const UPPER_STATES := ["none", "aim_hold", "ready_hold", "punch", "reload", "holster", "draw", "drive", "hands_up", "cuffed",
+	"civ_phone", "civ_texting", "civ_pockets", "civ_arms_folded", "civ_hands_behind", "work_dig", "work_hammer"]
+## Everyday upper-body loops (OfficerClips.CIVILIAN_PATH) and what each one
+## holds in the right hand.
+const DAILY_HELD := {"civ_phone": "phone", "civ_texting": "phone", "work_dig": "shovel", "work_hammer": "hammer"}
 var RUN_CLIP_SPEED := 3.3    # m/s of the run cycle (2.27 for the mocap run)
 var WALK_CLIP_SPEED := 1.4   # m/s of the walk cycle (0.87 for the mocap walk)
 ## The tactical walk (gun out or aiming): four 100STYLE "SWAT" mocap loops in
@@ -65,7 +69,8 @@ func _ready() -> void:
 	var lib := OfficerClips.library(anim_player, skeleton)
 	anim_player.remove_animation_library("")
 	anim_player.add_animation_library("", lib)
-	for n in ["idle", "walk", "walk_ready", "walk_back", "walk_left", "walk_right", "run", "crouch_idle", "crouch_walk", "prone_idle", "crawl", "cover_idle", "cover_low_idle", "fall", "aim_hold", "ready_hold", "peek", "limp", "sit", "drive", "kneel", "hands_up", "cuffed"]:
+	for n in ["idle", "walk", "walk_ready", "walk_back", "walk_left", "walk_right", "run", "crouch_idle", "crouch_walk", "prone_idle", "crawl", "cover_idle", "cover_low_idle", "fall", "aim_hold", "ready_hold", "peek", "limp", "sit", "drive", "kneel", "hands_up", "cuffed",
+			"civ_phone", "civ_texting", "civ_pockets", "civ_arms_folded", "civ_hands_behind", "work_dig", "work_hammer"]:
 		if lib.has_animation(n):
 			lib.get_animation(n).loop_mode = Animation.LOOP_LINEAR
 	if "run" in OfficerClips.mocap_clips:
@@ -109,7 +114,7 @@ func _build_tree() -> void:
 		upper.set_input_name(i, UPPER_STATES[i])
 		upper.set_input_reset(i, UPPER_STATES[i] in ["punch", "reload", "holster", "draw"])
 		var an := AnimationNodeAnimation.new()
-		an.animation = "aim_hold" if UPPER_STATES[i] == "none" else UPPER_STATES[i]
+		an.animation = "aim_hold" if UPPER_STATES[i] == "none" or not anim_player.has_animation(UPPER_STATES[i]) else UPPER_STATES[i]
 		bt.add_node("u_" + UPPER_STATES[i], an)
 	bt.add_node("upper", upper)
 	for i in UPPER_STATES.size():
@@ -298,7 +303,13 @@ func update_from(o: Officer, delta: float) -> void:
 		tree.set("parameters/upper/transition_request", upper)
 		_upper = upper
 		_upper_t = 0.0
+	if upper not in UPPER_STATES or (upper.begins_with("civ_") or upper.begins_with("work_")) and not anim_player.has_animation(upper):
+		upper = "none"
 	tree.set("parameters/split/blend_amount", 0.0 if upper == "none" else 1.0)
+	if upper != _upper:
+		tree.set("parameters/upper/transition_request", upper)
+		_upper = upper
+	_show_held(String(DAILY_HELD.get(upper, "")))
 	var hs := Vector2(o.velocity.x, o.velocity.z).length()
 	tree.set("parameters/ts_run/scale", clampf(hs / RUN_CLIP_SPEED, 0.6, 1.7))
 	tree.set("parameters/ts_limp/scale", clampf(hs / WALK_CLIP_SPEED, 0.5, 1.6))
@@ -454,10 +465,15 @@ func update_pose(lower: String, upper: String, hs: float, delta: float, aim_at :
 	if lower != _lower:
 		tree.set("parameters/lower/transition_request", lower)
 		_lower = lower
+	if upper not in UPPER_STATES or (upper.begins_with("civ_") or upper.begins_with("work_")) and not anim_player.has_animation(upper):
+		upper = "none"
+	tree.set("parameters/split/blend_amount", 0.0 if upper == "none" else 1.0)
 	if upper != _upper:
 		tree.set("parameters/upper/transition_request", upper)
 		_upper = upper
-	tree.set("parameters/split/blend_amount", 0.0 if upper == "none" else 1.0)
+	_show_held(String(DAILY_HELD.get(upper, "")))
+	if _held_kind == "shovel":
+		_lay_shovel()
 	tree.set("parameters/ts_run/scale", clampf(hs / RUN_CLIP_SPEED, 0.6, 1.7))
 	tree.set("parameters/ts_walk/scale", clampf(hs / WALK_CLIP_SPEED, 0.5, 1.8))
 	tree.set("parameters/ts_crouch_walk/scale", clampf(hs / CROUCH_CLIP_SPEED, 0.5, 1.8))
@@ -537,3 +553,54 @@ func set_downed(on: bool, push := Vector3.ZERO, carry := Vector3.ZERO) -> void:
 	else:
 		physics.physical_bones_stop_simulation()
 		physics.influence = 0.0
+
+
+## The thing in a person's right hand for an everyday clip: a phone, a
+## shovel or a hammer (built once, on first use). "" puts it away.
+var _held_kind := ""
+var _held_nodes := {}
+
+
+func _show_held(kind: String) -> void:
+	if kind == _held_kind:
+		return
+	_held_kind = kind
+	for k in _held_nodes:
+		(_held_nodes[k] as Node3D).visible = k == kind
+	if kind == "" or _held_nodes.has(kind) or skeleton == null:
+		return
+	# The shovel runs through both hands (laid each frame by _lay_shovel);
+	# the rest ride in the right hand.
+	var att: Node3D
+	if kind == "shovel":
+		att = Node3D.new()
+		add_child(att)
+	else:
+		att = BoneAttachment3D.new()
+		(att as BoneAttachment3D).bone_name = "hand.R"
+		skeleton.add_child(att)
+	var n := HeldProps.make(kind)
+	att.add_child(n)
+	for vi in n.find_children("*", "VisualInstance3D", true, false):
+		(vi as VisualInstance3D).layers = Gore.BODY_LAYER
+	_held_nodes[kind] = att
+
+
+## Points the shovel's shaft from the right hand down to a spot on the
+## ground in front, lifting the blade as the hands come up (the throw).
+func _lay_shovel() -> void:
+	var att: Node3D = _held_nodes.get("shovel")
+	if att == null:
+		return
+	var r := skeleton.global_transform * skeleton.get_bone_global_pose(skeleton.find_bone("hand.R"))
+	var top := r.origin
+	var fwd := global_transform.basis.z.normalized()    # the model faces +Z
+	var ground := global_position.y
+	var lift := clampf((top.y - ground - 0.95) * 3.0, 0.0, 0.6)
+	var blade := global_position + fwd * 0.8 + Vector3(0, 0.08 + lift, 0)
+	var dir := (blade - top).normalized()
+	var x := fwd.cross(dir).normalized()
+	if x.length() < 0.1:
+		x = global_transform.basis.x
+	var z := x.cross(-dir).normalized()
+	att.global_transform = Transform3D(Basis(x, -dir, z), top)
