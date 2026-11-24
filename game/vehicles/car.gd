@@ -77,6 +77,11 @@ var dent_log: Array = []
 const DENT_LOG_MAX := 200
 var bumper_attached := true
 var _wheels: Array = []     # [{pos: local mount, front: bool, rear: bool, node: Node3D, compress: float}]
+## v0.12.0 skid marks: a friend's copy of the car (frozen, following the
+## host) estimates its tyres' slide from how it moved since last tick.
+var _skid_prev := Transform3D()
+var _skid_prev_v := Vector3.ZERO
+var _skid_ok := false
 var _steer_smooth := 0.0
 var _body_mesh: ArrayMesh
 var _body_mi: MeshInstance3D
@@ -142,7 +147,8 @@ func _ready() -> void:
 		holder.add_child(_make_wheel())
 		add_child(holder)
 		var front: bool = absf((m as Vector3).z - front_z) < 0.3
-		_wheels.append({"pos": m, "front": front, "node": holder, "compress": 0.0, "spin": 0.0})
+		_wheels.append({"pos": m, "front": front, "node": holder, "compress": 0.0, "spin": 0.0,
+			"ground": Vector3.ZERO, "normal": Vector3.UP, "slide": -1.0})
 
 
 ## The car's look: the Phase 0.4 box car. PoliceCar replaces it.
@@ -425,7 +431,10 @@ func _physics_process(delta: float) -> void:
 	_dent_cooldown -= delta
 	if freeze:
 		_update_wheel_visuals(delta, false)
+		_estimate_skids(delta)
 		return
+	_skid_ok = false
+	_lay_skids()
 	# v0.8.1: a car nobody is driving may fall asleep (parked cars were
 	# simulated every tick forever); any input wakes it.
 	var driven := absf(throttle) > 0.01 or absf(steer) > 0.01 or brake > 0.0 or handbrake
@@ -455,6 +464,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		var hit := space.intersect_ray(q)
 		if hit.is_empty():
 			w.compress = 0.0
+			w.slide = -1.0
 			continue
 		grounded += 1
 		var dist: float = (hit.position as Vector3).distance_to(mount) - wheel_radius
@@ -501,6 +511,9 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		# Friction circle.
 		var limit: float = MU * grip_k * load * (0.5 if handbrake and not w.front else 1.0)
 		var f := Vector2(lat_f, lon_f)
+		w.ground = hit.position
+		w.normal = hit.normal
+		w.slide = tyre_slide(f.length() / maxf(limit, 1.0), lat_v, lon_v, brake, handbrake and not w.front)
 		if f.length() > limit:
 			f = f.normalized() * limit
 		# Tyre forces act up near the centre height (ROLL_CENTRE) so they
@@ -523,6 +536,74 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		state.apply_torque(-fwd * (roll * ANTI_ROLL + roll_rate * ANTI_ROLL_DAMP) * mass)
 	_detect_impacts(state)
 	_update_wheel_visuals(dt, true, steer_angle)
+
+
+## How hard a tyre is sliding, 0 (gripping) to 1, for the skid marks.
+## over: how far the tyre's wanted force is past what the road can give
+## (1 = right at the limit); lat_v / lon_v: the tyre's sideways and rolling
+## speed (m/s); locked_rear: the handbrake is on this wheel.
+static func tyre_slide(over: float, lat_v: float, lon_v: float, brake_in: float, locked_rear: bool) -> float:
+	var speed := Vector2(lat_v, lon_v).length()
+	if speed < 2.0:
+		return 0.0
+	var k := clampf((over - 1.15) / 1.0, 0.0, 1.0)
+	# Sideways: past a slip angle a road tyre doesn't hold (about 7 degrees).
+	k = maxf(k, clampf((absf(lat_v) - maxf(2.0, speed * 0.12)) / 4.0, 0.0, 1.0))
+	if brake_in > 0.85 and absf(lon_v) > 4.0:
+		k = maxf(k, 0.6)   # a stamp on the brakes: the tyres lock
+	if locked_rear and absf(lon_v) > 2.0:
+		k = maxf(k, 0.8)
+	return k
+
+
+func _lay_skids() -> void:
+	var marks := SkidMarks.for_tree(get_tree()) if is_inside_tree() else null
+	if marks == null:
+		return
+	var base := get_instance_id() * 8
+	for i in _wheels.size():
+		var w: Dictionary = _wheels[i]
+		if w.slide < 0.0:
+			marks.lift(base + i)
+		else:
+			marks.wheel(base + i, w.ground, w.normal, w.slide)
+
+
+## A friend's copy: no tyre physics here, so judge the slide from the
+## motion: each wheel's sideways speed, and hard braking from the slowdown.
+func _estimate_skids(delta: float) -> void:
+	var xf := global_transform
+	if not _skid_ok or delta <= 0.0:
+		_skid_prev = xf
+		_skid_ok = true
+		_skid_prev_v = Vector3.ZERO
+		return
+	var v := (xf.origin - _skid_prev.origin) / delta
+	var turn := (_skid_prev.basis.inverse() * xf.basis).get_rotation_quaternion()
+	var w_rate := turn.get_axis() * turn.get_angle() / delta if turn.get_angle() > 0.0001 else Vector3.ZERO
+	w_rate = _skid_prev.basis * w_rate
+	var decel := (_skid_prev_v.length() - v.length()) / delta
+	_skid_prev = xf
+	_skid_prev_v = v
+	var marks := SkidMarks.for_tree(get_tree()) if is_inside_tree() else null
+	if marks == null:
+		return
+	var up := xf.basis.y
+	var space := get_world_3d().direct_space_state
+	var base := get_instance_id() * 8
+	for i in _wheels.size():
+		var w: Dictionary = _wheels[i]
+		var mount: Vector3 = xf * (w.pos as Vector3)
+		var pv := v + w_rate.cross(mount - xf.origin)
+		var slide := tyre_slide(0.0, pv.dot(xf.basis.x), pv.dot(xf.basis.z), 1.0 if decel > 7.0 else 0.0, false)
+		if slide < 0.05:
+			marks.lift(base + i)
+			continue
+		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(mount, mount - up * (rest + wheel_radius + 0.2), 1 | 16, [get_rid()]))
+		if hit.is_empty():
+			marks.lift(base + i)
+		else:
+			marks.wheel(base + i, hit.position, hit.normal, slide)
 
 
 func _detect_impacts(state: PhysicsDirectBodyState3D) -> void:

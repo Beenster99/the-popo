@@ -12,6 +12,18 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
+DRIVING AND ON-FOOT FEEL (0.12.1)
+On foot you walk by default now. Hold Shift to sprint (controller: hold L3).
+Alt switches to a steady run and back (controller: tap L3); the corner
+shows RUN MODE while it's on.
+The run no longer splays the knees out: they stay over the feet.
+Footsteps are real boot recordings now, and much quieter.
+Cars leave black skid marks wherever the tyres slide: stamping on the
+brakes, handbrake turns, drifts and wheelspin. They stay on the road and
+the oldest fade away over a shift.
+Driving, the camera swings back round behind the car a couple of seconds
+after you stop moving the mouse (or right stick).
+
 EVERYTHING TOGETHER (0.11.1)
 One build with all of the below: the frame rate work, the taller city, walk
 mode, and the slower, more tactical fights with one job at a time.

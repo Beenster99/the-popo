@@ -55,6 +55,12 @@ var _indoor_k := 0.0
 const TP_INDOOR_DIST := 2.0
 const TP_INDOOR_SHOULDER := 0.42
 const TP_INDOOR_FOV := 78.0
+## v0.12.0 (beenster): driving, the camera swings back to look the way the
+## car points once the mouse / right stick has been left alone this long.
+const CAR_RECENTRE_AFTER := 2.0   # s
+const CAR_RECENTRE_RATE := 2.5    # 1/s: how quickly it swings round
+const CAR_PITCH := -10.0
+var _look_idle := 0.0             # s since the player last turned the camera
 
 
 func _ready() -> void:
@@ -154,6 +160,8 @@ func _input(event: InputEvent) -> void:
 		var m := event as InputEventMouseMotion
 		if m and not PlayerInput.blocked and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 			var k := TP_MOUSE_DEG_PER_PX * float(Settings.values.get("tp_sensitivity", 1.0))
+			if m.relative.length() > 0.5:
+				_look_idle = 0.0
 			_yaw -= m.relative.x * k
 			_yaw_target = _yaw
 			tp_pitch = clampf(tp_pitch - m.relative.y * k, TP_PITCH_MIN, TP_PITCH_MAX)
@@ -233,9 +241,12 @@ func _process(delta: float) -> void:
 func _process_third_person(delta: float) -> void:
 	if not PlayerInput.blocked:
 		var stick := Input.get_vector("aim_left", "aim_right", "aim_up", "aim_down", float(Settings.values.get("pad_deadzone", 0.25)))
+		if stick.length() > 0.0:
+			_look_idle = 0.0
 		_yaw -= stick.x * TP_STICK_DEG_PER_S * delta
 		tp_pitch = clampf(tp_pitch - stick.y * TP_STICK_DEG_PER_S * 0.6 * delta, TP_PITCH_MIN, TP_PITCH_MAX)
 		_yaw_target = _yaw
+	_look_idle += delta
 	var height := 1.55
 	var dist := tp_distance
 	var shoulder := TP_SHOULDER
@@ -251,6 +262,7 @@ func _process_third_person(delta: float) -> void:
 				dist = tp_distance * 2.0
 				shoulder = 0.0
 				exclude.append(o.car.get_rid())
+				_recentre_on_car(o.car, delta)
 			elif o.state == Officer.S.PRONE:
 				height = 0.7
 			elif o.state in [Officer.S.CROUCH, Officer.S.COVER]:
@@ -288,6 +300,28 @@ func _process_third_person(delta: float) -> void:
 		var k := trauma * trauma * 0.12
 		jolt = b * Vector3(sin(_shake_t * 61.0) + sin(_shake_t * 37.0) * 0.5, sin(_shake_t * 53.0 + 1.0) + sin(_shake_t * 29.0) * 0.5, 0) * k
 	camera.global_transform = Transform3D(b, from + back * _tp_pull + jolt)
+
+
+## Driving: once the player has left the camera alone for
+## CAR_RECENTRE_AFTER seconds, it eases round behind the car (and back to a
+## level-ish pitch), and keeps following the car's heading after that.
+func _recentre_on_car(car: Node3D, delta: float) -> void:
+	if _look_idle < CAR_RECENTRE_AFTER or PlayerInput.blocked or Input.is_action_pressed("aim"):
+		return
+	var fwd := car.global_basis.z
+	if Vector2(fwd.x, fwd.z).length() < 0.2:
+		return   # on its side or nose up: no heading to follow
+	var behind := rad_to_deg(atan2(fwd.x, fwd.z)) + 180.0
+	_yaw = recentred_yaw(_yaw, behind, delta, minf((_look_idle - CAR_RECENTRE_AFTER) * 2.0, 1.0))
+	_yaw_target = _yaw
+	tp_pitch = lerpf(tp_pitch, CAR_PITCH, 1.0 - exp(-CAR_RECENTRE_RATE * delta))
+
+
+## One step of the camera yaw (degrees) toward want, the short way round.
+## ease_in 0..1 ramps the swing up so it doesn't start with a jerk.
+static func recentred_yaw(yaw: float, want: float, delta: float, ease_in := 1.0) -> float:
+	var diff := wrapf(want - yaw, -180.0, 180.0)
+	return yaw + diff * (1.0 - exp(-CAR_RECENTRE_RATE * ease_in * delta))
 
 
 func _apply() -> void:
