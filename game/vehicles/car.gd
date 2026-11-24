@@ -446,6 +446,13 @@ func speed_kmh() -> float:
 	return linear_velocity.length() * 3.6
 
 
+## v0.19.0: past this (m) from the camera a car's tyres are simplified.
+const FAR := 110.0
+var _far := false
+var _tick_n := 0
+var _still_t := 0.0
+
+
 func _physics_process(delta: float) -> void:
 	if horn != _horn_player.playing:
 		if horn:
@@ -458,13 +465,28 @@ func _physics_process(delta: float) -> void:
 		_estimate_skids(delta)
 		return
 	_skid_ok = false
-	_lay_skids()
+	# v0.19.0: cars well away from the camera do less each tick.
+	var cam := get_viewport().get_camera_3d() if is_inside_tree() else null
+	_far = cam != null and cam.global_position.distance_squared_to(global_position) > FAR * FAR
+	if not _far:
+		_lay_skids()
 	# v0.8.1: a car nobody is driving may fall asleep (parked cars were
 	# simulated every tick forever); any input wakes it.
-	var driven := absf(throttle) > 0.01 or absf(steer) > 0.01 or brake > 0.0 or handbrake
+	# (v0.19.0: a parked car has its handbrake on; that alone is not
+	# driving it, or no parked car ever slept.)
+	var driven := absf(throttle) > 0.01 or absf(steer) > 0.01 \
+		or ((brake > 0.0 or handbrake) and linear_velocity.length_squared() > 0.25)
 	can_sleep = not driven
 	if driven and sleeping:
 		sleeping = false
+	# Jolt keeps a body awake while forces are put on it (the suspension
+	# does, every tick), so a car standing still is put to sleep here.
+	if not driven and not sleeping and linear_velocity.length_squared() < 0.02 and angular_velocity.length_squared() < 0.02:
+		_still_t += delta
+		if _still_t > 1.0:
+			sleeping = true
+	else:
+		_still_t = 0.0
 
 
 func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
@@ -482,10 +504,21 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	var steer_angle: float = _steer_smooth * lerpf(steer_max, steer_min, speed_t)
 	var space := state.get_space_state()
 	var grounded := 0
+	_tick_n += 1
+	var reuse := _far and (_tick_n + get_instance_id()) % 2 == 0
 	for w in _wheels:
 		var mount: Vector3 = xf * (w.pos as Vector3)
-		var q := PhysicsRayQueryParameters3D.create(mount, mount - up * (rest + wheel_radius), 1 | 4 | 16 | 32, [get_rid()])
-		var hit := space.intersect_ray(q)
+		var hit: Dictionary
+		# v0.19.0: a car far from the camera feels the road every other tick
+		# (the last hit, carried along with the car, in between).
+		if reuse and w.has("hit_d") and float(w.hit_d) >= 0.0:
+			hit = {"position": mount - up * (float(w.hit_d) + wheel_radius), "normal": w.hit_n}
+		else:
+			var q := PhysicsRayQueryParameters3D.create(mount, mount - up * (rest + wheel_radius), 1 | 4 | 16 | 32, [get_rid()])
+			hit = space.intersect_ray(q)
+			w.hit_d = (hit.position as Vector3).distance_to(mount) - wheel_radius if not hit.is_empty() else -1.0
+			if not hit.is_empty():
+				w.hit_n = hit.normal
 		if hit.is_empty():
 			w.compress = 0.0
 			w.slide = -1.0
@@ -576,7 +609,8 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		var roll_rate := state.angular_velocity.dot(fwd)
 		state.apply_torque(-fwd * (roll * ANTI_ROLL + roll_rate * ANTI_ROLL_DAMP) * mass)
 	_detect_impacts(state)
-	_update_wheel_visuals(dt, true, steer_angle)
+	if not _far:
+		_update_wheel_visuals(dt, true, steer_angle)
 
 
 ## How hard a tyre is sliding, 0 (gripping) to 1, for the skid marks.

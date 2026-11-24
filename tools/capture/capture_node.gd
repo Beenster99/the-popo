@@ -97,6 +97,18 @@ func _run() -> void:
 			PlayerInput.slot_refused_at = Time.get_ticks_msec() / 1000.0 + 5.0
 			await _frames(60)
 			await _save()
+		"smoke_stage", "gas_stage":
+			# A smoke or gas grenade on an empty lit floor (quick to render).
+			var root := _plain_stage(Vector3(-8, 2.4, -6), Vector3(0, 1.6, 0))
+			var thrower := Node3D.new()
+			root.add_child(thrower)
+			var kind := Grenades.Kind.SMOKE if shot == "smoke_stage" else Grenades.Kind.GAS
+			Grenades.throw(thrower, kind, Vector3(0, 0.3, 0), Vector3.ZERO)
+			var t := float(args_extra) if args_extra != "" else 8.0
+			var wait: float = Grenades.FUSE[kind] + t
+			# Run with --fixed-fps 30 so the sim keeps time however slow drawing is.
+			await _frames(int(wait * 30.0))
+			await _save()
 		"nade_smoke", "nade_gas", "nade_flash", "nade_frag":
 			# Grenades: a cloud of smoke or CS gas in the street, a flashbang
 			# going off, a frag blast.
