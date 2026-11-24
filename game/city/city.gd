@@ -172,6 +172,10 @@ func _ready() -> void:
 	mm.dispatcher = dispatch
 	mm.pawn_getter = func(): return sync.my_pawn()
 	add_child(mm)
+	var bar := HotBar.new()
+	bar.name = "HotBar"
+	bar.pawn_getter = func(): return sync.my_pawn()
+	add_child(bar)
 	if first_shift == null and not has_node("Benchmark"):
 		var tips := GameTips.new()
 		tips.name = "Tips"
@@ -185,7 +189,7 @@ func _ready() -> void:
 		var where := "-"
 		if o and gen:
 			where = "%s, %s" % [gen.district_at(o.global_position), CityGenerator.street_at(o.global_position)]
-		return "city seed %d   %d pieces (built in %d ms)   walk routes %d/%d   %s\n%s\n1 pistol  2 charge [%s]   G new city   J call in a job   K weather   N +3 hours (host)   %s" % [
+		return "city seed %d   %d pieces (built in %d ms)   walk routes %d/%d   %s\n%s\n1-7 shortcut bar [%s]   G new city   J call in a job   K weather   N +3 hours (host)   %s" % [
 			seed_value, world.pieces.size(), build_ms, nav.baked_count() if nav else 0, gen.blocks.size() if gen else 0, st, where,
 			"charge" if PlayerInput.alt_tool else "pistol",
 			Controls.help(["stance", "cover", "aim", "fire", "reload", "kick", "interact"])]

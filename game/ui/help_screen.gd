@@ -35,7 +35,7 @@ The clock is top left (a game day lasts 48 minutes) with the station's pay next 
 
 [b]Towers and roofs.[/b] Downtown towers have a lift by the stairs: {interact} at the door calls it, {interact} inside picks the floor (or a number key, 0 for G). Most buildings have stairs up to a hut on the roof.
 
-[b]Grapple hook[/b] (armoury, Gear): hold {aim} at a building from outside and press {interact} to be hauled up onto the roof. At a roof edge facing out, {interact} goes over on the rope: move forward to climb, back to slide, {sprint} drops fast, {jump} swings you in through the window in front of you, {interact} lets go."""],
+[b]Grapple hook[/b] (armoury, Gear): hold {aim} at a building from outside and press {interact} (or pick it on the bar with {slot_7} and press {fire}) to be hauled up onto the roof. At a roof edge facing out, {interact} goes over on the rope: move forward to climb, back to slide, {sprint} drops fast, {jump} swings you in through the window in front of you, {interact} lets go."""],
 	["Guns and fighting", "Aiming, reloading, picking up guns, melee and grenades.",
 		"""[b]Your pistol.[/b] You start with it holstered: {holster} draws it (or just hold {aim}). Hold {aim} to aim, {fire} to fire at the dot in the middle of the screen, {reload} to reload. Rounds in the gun and spare rounds are bottom right.
 
@@ -47,13 +47,15 @@ The clock is top left (a game day lasts 48 minutes) with the station's pay next 
 
 [b]Hands.[/b] {punch} punches (while sprinting: a shoulder barge). {kick} kicks, and kicks doors in. A punch or a gun in the face makes most suspects give up.
 
-[b]Grenades[/b] (once the armoury has them): {throw} throws the picked one at the dot, {grenade_next} picks smoke, CS gas or flashbang. You carry two of each, refilled at a patrol car's boot.
+[b]The shortcut bar[/b] along the bottom is what's in your hand: {weapon_1} pistol, {weapon_2} charge, {slot_3} smoke, {slot_4} CS gas, {slot_5} flashbang, {slot_6} first aid, {slot_7} grapple hook. Pick one and {fire} uses it: shoots, sticks the charge on, throws the grenade, patches someone up (hold) or fires the hook. Each slot shows its key and how many you have; empty ones are dimmed. On a controller, D-pad left / right steps along it and RT uses it. Settings > Gameplay can hide it (the keys still work).
+
+[b]Grenades[/b] (once the armoury has them): pick one on the bar and {fire} throws it at the dot, or {throw} throws the picked one straight away. You carry two of each, refilled at a patrol car's boot.
  • Smoke: a thick cloud nobody can see or shoot through. Cross a street or reach a downed friend.
  • CS gas: anyone in it coughs and can't aim; most give up. It gets you too.
  • Flashbang: stuns anyone who sees it for a few seconds. Don't look at it yourself.
 Some armed crooks carry frag grenades. Listen for the clink, look for the red GRENADE! warning, and move.
 
-[b]Second slot.[/b] With breach charges or C4 in your loadout, {weapon_2} gets them out: aim and fire to stick one on. {weapon_1} goes back to the pistol.
+[b]Charges.[/b] With breach charges or C4 in your loadout, {weapon_2} gets them out: aim and fire to stick one on. {weapon_1} goes back to the pistol.
 
 [b]Things break.[/b] Furniture, glass and walls break. Red barrels and gas bottles explode and start fires; shoot a red extinguisher to put fires out round it. Badly shot cars catch fire and blow up."""],
 	["Arrests and orders", "Shouting orders, cuffing, prisoners and booking.",
@@ -109,7 +111,7 @@ Each of you picks your own pistol, rounds and loadout (ammo backpack, breach cha
 	["Getting hurt", "Wounds, first aid, going down, reviving and dragging.",
 		"""[b]Wounds.[/b] A leg wound makes you limp (no sprint), an arm wound shakes your aim, bleeding drains health. Your wounds are listed bottom right.
 
-[b]First aid.[/b] Hold {interact} to treat yourself, or stand next to a hurt teammate and hold {interact} to treat them. Each use patches one wound. You carry three; the car boot fixes everything and refills the pouch.
+[b]First aid.[/b] Hold {interact} to treat yourself, or stand next to a hurt teammate and hold {interact} to treat them. Or pick first aid on the shortcut bar ({slot_6}) and hold {fire}. Each use patches one wound. You carry three; the car boot fixes everything and refills the pouch.
 
 [b]Going down.[/b] At zero health you go down. A teammate holds {interact} on you to get you up where you are, or after the wait press {reload} to respawn at the start with full health and ammo. On your own you get up by yourself after 30 seconds.
 

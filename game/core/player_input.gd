@@ -24,6 +24,19 @@ const THROW := 262144  # throw a grenade
 ## Which grenade is picked (Grenades.Kind 0-2), in two bits from here.
 const NADE_SHIFT := 19
 static var nade_kind := 0
+## v0.23: the shortcut bar along the bottom (HotBar). Number keys 1-7 (or
+## the D-pad on a controller) pick what's in your hand; fire uses it: the
+## pistol shoots, the charge is stuck on, a grenade is thrown, the first aid
+## is used (held), the grapple is fired. Q still throws the picked grenade
+## straight away.
+const AID := 1 << 21      # held: first aid only (yourself or a teammate)
+const GRAPPLE := 1 << 22  # fire the grapple at the aim point, or go over on the rope
+enum Slot { PISTOL, GEAR, SMOKE, GAS, FLASH, AID, GRAPPLE }
+const SLOT_ACTIONS := ["weapon_1", "weapon_2", "slot_3", "slot_4", "slot_5", "slot_6", "slot_7"]
+static var slot := Slot.PISTOL
+## Set when a slot key is pressed with nothing in that slot (the bar flashes it).
+static var slot_refused := -1
+static var slot_refused_at := 0.0
 static var torch_on := false
 
 ## The stance key (Ctrl): tap to crouch or stand back up, hold to lie prone,
@@ -87,16 +100,24 @@ static func sample(cam: IsoCamera, from: Node3D) -> Dictionary:
 		torch_on = not torch_on
 	if torch_on:
 		buttons |= TORCH
-	if Input.is_action_just_pressed("weapon_1"):
+	var o := from as Officer
+	for i in SLOT_ACTIONS.size():
+		if InputMap.has_action(SLOT_ACTIONS[i]) and Input.is_action_just_pressed(SLOT_ACTIONS[i]):
+			pick_slot(i, o)
+	if InputMap.has_action("hotbar_next") and Input.is_action_just_pressed("hotbar_next"):
+		step_slot(1, o)
+	elif InputMap.has_action("hotbar_prev") and Input.is_action_just_pressed("hotbar_prev"):
+		step_slot(-1, o)
+	if Input.is_action_just_pressed("grenade_next"):
+		_next_grenade(o)
+	if not slot_ready(slot, o):
+		slot = Slot.PISTOL
 		alt_tool = false
-	elif Input.is_action_just_pressed("weapon_2"):
-		alt_tool = true
 	if alt_tool:
 		buttons |= ALT_TOOL
-	if Input.is_action_just_pressed("grenade_next"):
-		nade_kind = (nade_kind + 1) % 3
 	if Input.is_action_pressed("throw"):
 		buttons |= THROW
+	buttons = slot_buttons(buttons, slot)
 	buttons |= nade_kind << NADE_SHIFT
 	var aim_yaw := 0.0
 	var point := Vector3.ZERO
@@ -127,6 +148,71 @@ static func sample(cam: IsoCamera, from: Node3D) -> Dictionary:
 		var d2 := point - from.global_position
 		aim_yaw = atan2(d2.x, d2.z)
 	return {"move": Vector2(world.x, world.z), "buttons": buttons, "aim_yaw": aim_yaw, "aim_point": point}
+
+
+## Whether a shortcut bar slot has anything in it for this officer.
+static func slot_ready(i: int, o: Officer) -> bool:
+	match i:
+		Slot.PISTOL:
+			return true
+		Slot.GEAR:
+			return o != null and o.charges > 0
+		Slot.SMOKE, Slot.GAS, Slot.FLASH:
+			var k := i - Slot.SMOKE
+			return o != null and Armoury.owns(Armoury.NADE_ITEMS[k]) and Grenades.count(o.nades, k) > 0
+		Slot.AID:
+			return o != null and o.pouch > 0
+		Slot.GRAPPLE:
+			return Armoury.owns(Armoury.GRAPPLE)
+	return false
+
+
+## Picks a slot (a number key). An empty slot is refused and flashes.
+static func pick_slot(i: int, o: Officer) -> void:
+	if not slot_ready(i, o):
+		slot_refused = i
+		slot_refused_at = Time.get_ticks_msec() / 1000.0
+		return
+	slot = i as Slot
+	alt_tool = i == Slot.GEAR
+	if i >= Slot.SMOKE and i <= Slot.FLASH:
+		nade_kind = i - Slot.SMOKE
+
+
+## The next (dir 1) or previous (-1) slot with something in it.
+static func step_slot(dir: int, o: Officer) -> void:
+	var n := SLOT_ACTIONS.size()
+	for k in range(1, n):
+		var i := posmod(slot + dir * k, n)
+		if slot_ready(i, o):
+			pick_slot(i, o)
+			return
+
+
+## The grenade key: the next grenade you have (and in hand if one already is).
+static func _next_grenade(o: Officer) -> void:
+	for k in range(1, 4):
+		var g := (nade_kind + k) % 3
+		if slot_ready(Slot.SMOKE + g, o):
+			nade_kind = g
+			if slot >= Slot.SMOKE and slot <= Slot.FLASH:
+				slot = (Slot.SMOKE + g) as Slot
+			return
+
+
+## Fire uses what's in your hand: a grenade is thrown, first aid is used,
+## the grapple is fired.
+static func slot_buttons(buttons: int, s: int) -> int:
+	if (buttons & FIRE) == 0:
+		return buttons
+	match s:
+		Slot.SMOKE, Slot.GAS, Slot.FLASH:
+			return (buttons & ~FIRE) | THROW
+		Slot.AID:
+			return (buttons & ~FIRE) | AID
+		Slot.GRAPPLE:
+			return (buttons & ~FIRE) | GRAPPLE
+	return buttons
 
 
 ## L3 on a controller: a quick tap switches walk / run (a hold is sprint).
