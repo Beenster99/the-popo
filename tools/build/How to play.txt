@@ -1,5 +1,9 @@
 THE POPO - test build vVERSION
 
+This build (0.23.0) brings together everything from 0.14 to 0.21: the sound
+pack, the mini map, blood, frame rate and lift fixes, car shots and the
+muzzle flash.
+
 Double-click ThePopo-vVERSION.exe. If Windows warns about an unknown app,
 choose More info, then Run anyway.
 
@@ -12,6 +16,36 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
+FRAME RATE, LIFTS AND SKID MARKS (0.19.0)
+Your benchmark showed the graphics card was fine (5 ms a frame); the game's
+own code was the slow part. Parked cars now really go to sleep (before,
+every car in the city was simulated every tick), cars far from you do less,
+crooks check who they can see ten times a second instead of every tick,
+and car and footstep sounds are only worked out within earshot.
+Lifts ride smoothly: the floor moves with you instead of jumping each tick,
+and the camera follows you between physics steps.
+Skid marks fade away after about 40 seconds (at most 1,500 at once).
+
+TYRES, WINDOWS AND BULLET HOLES (0.20.0)
+Shoot a car's tyre and it goes flat and the car pulls to that side; shoot
+its windows and they break; bullets leave holes in the body. Police cars are rear-wheel drive: floor it from a standstill and the
+back wheels spin up and smoke.
+
+MUZZLE FLASH AND GUN SMOKE (0.21.0)
+Every shot now throws a flash of flame from the barrel, sized by the gun:
+the compact 9mm is a snap of fire, the .45 and the .357 bigger, and the
+sawn-off a long tongue of flame. The flash lights up the walls, the floor
+and the faces round the gun for an instant (no extra shadows, so no fps
+cost). Burnt powder smoke and embers blast out in front, and a grey puff
+hangs at the muzzle and curls away for a couple of seconds. At night the
+smoke is darker so it doesn't glow. Criminals' guns do the same.
+
+SMOKE (0.22.0)
+Smoke grenades now pour out a thick, billowing cloud: a low jet hissing out
+of the can, then rolling white smoke that spreads, drifts on the air and
+thins away. No more separate white balls, and the black blob in the middle
+is gone. CS gas looks the same way, paler and thinner. It dims at night.
+
 BLOOD (0.18.0)
 A shot now bursts out of the exit wound as a fine red mist and a spray of
 tiny droplets, which leave fine spatter on the walls, floor and anything
@@ -20,6 +54,10 @@ them off (they turn up about a minute and a half after a fight, or while
 they're already fixing damage nearby). Blood under a body still lying there
 is left alone. All of it follows Settings > Gameplay > Gore.
 Fixed: the blood pool no longer follows you around after you're revived.
+
+POLICE V8 (0.14.1)
+Police cars now sound like a big V8: a lumpy burble ticking over, a deep
+growl pulling away that climbs through the gears, louder when you floor it.
 
 MINI MAP AND JOB MARKERS (0.15.0)
 A mini map sits in the bottom left: roads, buildings, the station in blue,
@@ -35,6 +73,21 @@ Settings > Debug > Max money fills the station's pay (host or single
 player). The custody bay's blue lamp now hangs on the station wall instead
 of a post in the middle of the road, and POLICE on the car doors reads the
 right way round. The frame rate counter (F11) moved to the top right.
+
+TRAFFIC THAT KEEPS MOVING (0.16.0)
+Drivers no longer sit for ever behind a car stopped in their lane (a crash,
+an abandoned car, one of yours left in the road): they edge round it, or
+pull out and overtake it when the other side of the road is clear, and
+duck back in for oncoming traffic.
+Vans and lorries no longer stop dead beside cars parked at the kerb.
+Two drivers waiting on each other in a junction sort it out: one goes.
+A car wedged on something it can't see (rubble, a post) backs off turned
+away from it, tries again, then goes round it on the other side.
+As a last resort, a car that has gone nowhere for 25 seconds, with none of
+you within 70 m, is quietly put back into the traffic somewhere else.
+Pulling over for a siren no longer drives them into the parked cars.
+Shipping containers on the docks no longer drop through the ground: two
+were being placed inside each other and the shove pushed one under.
 
 PRISONERS IN THE CAR (0.14.0)
 Walk your prisoners to a police car and press F at a door: the back door
@@ -58,6 +111,8 @@ bricks and rubble, a rumble when a building gives way, car start-ups,
 engines ticking over, tyre squeals, red shotgun shells on the floor, radio
 clicks and static, and a new order: "Stand down, put the gun on the floor
 and we can all walk out of here happy."
+
+
 DRIVING AND ON-FOOT FEEL (0.12.1)
 On foot you walk by default now. Hold Shift to sprint (controller: hold L3).
 Alt switches to a steady run and back (controller: tap L3); the corner
@@ -65,8 +120,8 @@ shows RUN MODE while it's on.
 The run no longer splays the knees out: they stay over the feet.
 Footsteps are real boot recordings now, and much quieter.
 Cars leave black skid marks wherever the tyres slide: stamping on the
-brakes, handbrake turns, drifts and wheelspin. They stay on the road and
-the oldest fade away over a shift.
+brakes, handbrake turns, drifts and wheelspin. They fade away after about
+40 seconds (0.19.0).
 Driving, the camera swings back round behind the car a couple of seconds
 after you stop moving the mouse (or right stick).
 

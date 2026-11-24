@@ -130,6 +130,7 @@ func _light(minute: float, delta: float) -> void:
 	var up := sun_height(minute)
 	var cloud: float = maxf(float(CLOUD[kind]), rain * 0.8)
 	night = clampf(1.0 - (up + 0.12) / 0.32, 0.0, 1.0)
+	MuzzleFx.smoke_shade = lerpf(1.0, 0.32, night)
 	var dusk := clampf(1.0 - absf(up - 0.08) / 0.22, 0.0, 1.0)    # the low, warm light either end of the day
 	_flash = maxf(0.0, _flash - delta * 4.0)
 	if sun:
