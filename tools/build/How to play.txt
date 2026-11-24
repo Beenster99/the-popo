@@ -1,5 +1,12 @@
 THE POPO - test build vVERSION
 
+NEW IN 0.25.1: a steadier frame rate. One slow frame no longer snowballs
+into a run of stutters, furniture draws in one go per piece, traffic and
+people far from you update less often, and impact sounds no longer cause a
+regular hitch. Benchmark and the F11 overlay show the real 3D resolution.
+For the 4K number, pick Epic under Settings > Graphics > Apply a preset
+before running Benchmark.
+
 NEW IN 0.25.0: the job card, crooks upstairs and on roofs (stairs now go
 all the way up), repair crews with a crane, people doing everyday things,
 car interiors and see-through glass, textured buildings, 90 Blender props,
