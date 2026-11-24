@@ -22,6 +22,22 @@ Lifts ride smoothly: the floor moves with you instead of jumping each tick,
 and the camera follows you between physics steps.
 Skid marks fade away after about 40 seconds (at most 1,500 at once).
 
+BLOOD (0.18.0)
+A shot now bursts out of the exit wound as a fine red mist and a spray of
+tiny droplets, which leave fine spatter on the walls, floor and anything
+nearby. The marks stay until the council clean-up crew comes and scrubs
+them off (they turn up about a minute and a half after a fight, or while
+they're already fixing damage nearby). Blood under a body still lying there
+is left alone. All of it follows Settings > Gameplay > Gore.
+Fixed: the blood pool no longer follows you around after you're revived.
+
+PRISONERS IN THE CAR (0.14.0)
+Walk your prisoners to a police car and press F at a door: the back door
+swings open and every prisoner walking with you climbs in (back seats
+first, then the front passenger seat). Drive them to the custody bay at the
+station to book them. Prisoners following you on foot now walk in single
+file behind you instead of bunching up.
+
 DRIVING AND ON-FOOT FEEL (0.12.1)
 On foot you walk by default now. Hold Shift to sprint (controller: hold L3).
 Alt switches to a steady run and back (controller: tap L3); the corner

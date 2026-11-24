@@ -191,3 +191,57 @@ func test_left_alone_runs_and_is_caught() -> void:
 	# Grab them: they walk with the officer again.
 	s.cuff(o)
 	t.check(s.state == Suspect.S.CUFFED and not s.stay and s.escort == o, "grabbed: walking with the officer")
+
+
+func test_prisoners_walk_in_single_file() -> void:
+	await _block()
+	var p := nav.closest(Vector3(24, BlockGenerator.BASE_Y + 0.05, 1.5))
+	var o := _officer(p + Vector3(0, 0, -1.2))
+	var line := []
+	for i in 3:
+		var s := dispatch.spawn_suspect(p + Vector3(i * 0.3, 0, 0.2 * i), Suspect.S.SURRENDER, false)
+		s.cuff(o)
+		s._runner = false
+		line.append(s)
+	await _run(o, _cmd(0, Vector2(1, 0)), 180)
+	var gaps := []
+	var ok := true
+	for i in 3:
+		var ahead: Node3D = o if i == 0 else line[i - 1]
+		var g := Vector2(line[i].global_position.x - ahead.global_position.x, line[i].global_position.z - ahead.global_position.z).length()
+		gaps.append("%.2f" % g)
+		if g < 0.7 or g > 1.6:
+			ok = false
+	print("    gaps along the line: %s" % [gaps])
+	t.check(ok, "three prisoners in single file about a metre apart: %s" % [gaps])
+	t.check(line[2]._in_front_in_line() == line[1] and line[0]._in_front_in_line() == null, "each follows the one in front")
+
+
+func test_prisoners_climb_into_the_back() -> void:
+	await _block()
+	var bay := dispatch.bay_position()
+	var pc := PoliceCar.new()
+	pc.position = Vector3(bay.x, 1.0, bay.z - 20.0)
+	add_child(pc)
+	cars.add_car(pc)
+	for i in 30:
+		await get_tree().physics_frame
+	var o := _officer(pc.door_point(2) * Vector3(1, 0, 1) + Vector3(0, BlockGenerator.BASE_Y, 0))
+	var two := []
+	for i in 2:
+		var s := dispatch.spawn_suspect(o.global_position + Vector3(-1.0 - i, 0, -1.0), Suspect.S.SURRENDER, false)
+		s.cuff(o)
+		s._runner = false
+		two.append(s)
+	await _run(o, _cmd(), 3)
+	var door: Node3D = pc.parts["door_rl"].node
+	var shut := door.transform
+	await _run(o, _cmd(PlayerInput.INTERACT), 1)
+	await _run(o, _cmd(), 20)
+	t.check(two.all(func(s): return s.state == Suspect.S.IN_CAR), "both prisoners going in with one press")
+	t.check(not door.transform.is_equal_approx(shut), "the back door swings open")
+	t.check(two[0].global_position.distance_to(pc.seat_point(two[0].seat)) > 0.3, "walking to the door, not popped onto the seat")
+	await _run(o, _cmd(), 240)
+	t.check(two.all(func(s): return s.global_position.distance_to(pc.seat_point(s.seat)) < 0.4), "sat in their seats")
+	t.check(door.transform.is_equal_approx(shut), "the door is shut again")
+	t.check(o.state != Officer.S.VEHICLE, "the officer stayed outside")
