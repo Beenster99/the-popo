@@ -1,14 +1,15 @@
 THE POPO - test build vVERSION
 
-This build (0.23.0) brings together everything from 0.14 to 0.21: the sound
-pack, the mini map, blood, frame rate and lift fixes, car shots and the
-muzzle flash.
+NEW IN 0.25.0: the job card, crooks upstairs and on roofs (stairs now go
+all the way up), repair crews with a crane, people doing everyday things,
+car interiors and see-through glass, textured buildings, 90 Blender props,
+and a fairer Benchmark.
 
 Double-click ThePopo-vVERSION.exe. If Windows warns about an unknown app,
 choose More info, then Run anyway.
 
 PLAYING
-JOB CARD: when a call comes in, a card under the clock (top left) tells you
+JOB CARD (v0.25.0): when a call comes in, a card under the clock (top left) tells you
 what it is, the pay, how far and which way it is, the full dispatch
 message, how many suspects and how many are armed (and with what), how many
 you've dealt with, and what to do.
@@ -188,6 +189,8 @@ so you can send them over. If V-Sync is on, the frame rate can't go above
 your screen's refresh rate.
 CARS: they no longer roll over on hard turns, and the handbrake is much
 gentler (it swings the tail out instead of spinning the car).
+Benchmark now measures with V-Sync off so it shows the game's real top
+speed; run it in Borderless fullscreen on Epic for the 4K number (v0.25.0).
 
 TALLER CITY AND ROOFTOPS (0.10.0)
 The city blocks come in different sizes now, so the streets aren't an even
