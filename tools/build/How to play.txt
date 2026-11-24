@@ -12,6 +12,23 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
+HELP, KEY BINDS AND TIPS (0.12.0)
+HELP is on the Esc menu, the main menu and the Online screen: every
+control (keyboard and controller, as you have them set) and how each part
+of the game works: moving, guns, arrests, driving, jobs, the armoury,
+getting hurt, playing online and settings.
+KEY BINDS (Esc menu, or Settings > Gameplay > Change keys) now works. Two
+tabs, Keyboard and mouse, and Controller: click a binding (or select it and
+press A), then press the new key or button. Clear takes one off, and two
+actions on the same key are flagged in orange. Saved straight away.
+TOOLTIPS: hover over any setting, menu button, armoury tab or key bind for
+what it does.
+TIPS WHILE PLAYING: the first time something comes up (gun out, first car,
+first job, someone gives up, a wound, a teammate down) a short tip with the
+keys for it slides in on the right. Each shows once. Settings > Gameplay
+turns them off or shows them all again.
+On-screen prompts show controller buttons when you're on a controller.
+
 EVERYTHING TOGETHER (0.11.1)
 One build with all of the below: the frame rate work, the taller city, walk
 mode, and the slower, more tactical fights with one job at a time.

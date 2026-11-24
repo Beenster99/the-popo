@@ -1,6 +1,6 @@
 extends Control
 ## The opening menu: Single Player (straight into the game), Online (the
-## host / join lobby), Settings, Quit. Test scenes are under Settings > Debug.
+## host / join lobby), Help, Settings, Quit. Test scenes are under Settings > Debug.
 
 var _home: VBoxContainer
 
@@ -32,19 +32,25 @@ func _ready() -> void:
 	col.add_child(gap)
 
 	_home = VBoxContainer.new()
-	_home.add_theme_constant_override("separation", 14)
+	_home.add_theme_constant_override("separation", 10)
 	col.add_child(_home)
 	BlockState.save_path = City.SAVE_PATH
 	var saved := BlockState.peek()
 	if not saved.is_empty():
 		var when := Time.get_datetime_string_from_unix_time(int(saved.saved) + _utc_offset(), true)
-		_home.add_child(UiTheme.big_button("Continue   (city %d, saved %s)" % [saved.seed, when.substr(5, 11)], func(): _play(Scenes.GAME, true)))
-	_home.add_child(UiTheme.big_button("Single Player" if saved.is_empty() else "New City", func(): _play(Scenes.GAME)))
-	_home.add_child(UiTheme.big_button("First Shift   (how to play)", func(): City.tutorial = true; _play(Scenes.GAME)))
-	_home.add_child(UiTheme.big_button("Online", func(): get_tree().change_scene_to_file("res://prototypes/launcher/launcher.tscn")))
-	_home.add_child(UiTheme.big_button("Settings", _open_settings))
-	_home.add_child(UiTheme.big_button("Benchmark   (frame rate test, about a minute)", func(): Perf.start_benchmark()))
-	_home.add_child(UiTheme.big_button("Quit", func(): get_tree().quit()))
+		_add("Continue   (city %d, saved %s)" % [saved.seed, when.substr(5, 11)], func(): _play(Scenes.GAME, true),
+			"Back to your saved city: the station's pay, the armoury, the stories, the time and weather, and your kit.")
+	_add("Single Player" if saved.is_empty() else "New City", func(): _play(Scenes.GAME),
+		"A brand new city on your own." if saved.is_empty() else "Start again in a brand new city. Your saved city is replaced once this one saves.")
+	_add("First Shift   (how to play)", func(): City.tutorial = true; _play(Scenes.GAME),
+		"A step-by-step first shift: moving, your gun, the patrol car, a call, an arrest and booking. It never touches your saved city.")
+	_add("Online", func(): get_tree().change_scene_to_file("res://prototypes/launcher/launcher.tscn"),
+		"Host a game for up to two friends, or join one, over the internet or at home.")
+	_add("Help", _open_help, "How to play: controls, fighting, arrests, driving, jobs, kit and playing online.")
+	_add("Settings", _open_settings, "Graphics, sound, gameplay and key binds.")
+	_add("Benchmark   (frame rate test, about a minute)", func(): Perf.start_benchmark(),
+		"Flies a camera through the same city every time and shows your frame rate. Results are saved next to the game.")
+	_add("Quit", func(): get_tree().quit(), "Close the game.")
 
 	var foot := UiTheme.title("v%s   ·   test build for friends   ·   a game controller works too" %
 		ProjectSettings.get_setting("application/config/version", "dev"), 16, UiTheme.DIM)
@@ -64,10 +70,23 @@ func _ready() -> void:
 	(_home.get_child(0) as Button).grab_focus.call_deferred()
 
 
+func _add(text: String, cb: Callable, tip: String) -> void:
+	var b := UiTheme.big_button(text, cb)
+	b.custom_minimum_size.y = 52
+	b.tooltip_text = tip
+	_home.add_child(b)
+
+
 func _open_settings() -> void:
 	var s := SettingsScreen.new()
 	s.closed.connect(func(): (_home.get_child(_home.get_child_count() - 3) as Button).grab_focus())
 	add_child(s)
+
+
+func _open_help() -> void:
+	var h := HelpScreen.new()
+	h.closed.connect(func(): (_home.get_child(_home.get_child_count() - 4) as Button).grab_focus())
+	add_child(h)
 
 
 func _play(path: String, resume := false) -> void:

@@ -5,6 +5,28 @@ extends CanvasLayer
 
 static var _open: ArmouryScreen
 
+## Tooltips for the category tabs, in Armoury.Cat order.
+const CAT_TIPS := [
+	"Six pistols. Buy one for the station, then each officer picks the one they carry.",
+	"Upgrades fitted at the bench to every pistol: bigger mags, compensators, match barrels, speed loaders.",
+	"Rounds: hollow points hit harder, armour piercing gets through vests and cover.",
+	"Body armour, pouches, grenades and the grapple hook. Bought once, everyone gets them.",
+	"The one extra thing you carry yourself: ammo backpack, breach charges, C4 or a tactical torch.",
+	"Plain clothes, and the stings you can run in them.",
+	"More cars at the station: the garage, an interceptor, a prisoner van, an unmarked car.",
+	"Things for the station itself, like the firing range out the back.",
+]
+const BUTTON_TIPS := {
+	"Buy": "Spend the station's pay on it. It's for everyone at the station.",
+	"Carry": "Take this out on patrol. Only you: your friends pick their own.",
+	"Carrying": "You have this with you.",
+	"Load": "Load your pistol with these rounds. Only yours.",
+	"Loaded": "Your pistol has these rounds in.",
+	"Wear them": "Change into plain clothes. Crooks take you for anyone until you give yourself away.",
+	"Back in uniform": "Change back into your uniform.",
+	"Owned": "The station already has this.",
+}
+
 var armoury: Armoury
 var pawn_getter: Callable
 var _cat := 0
@@ -70,6 +92,7 @@ func _ready() -> void:
 		b.text = Armoury.CAT_NAMES[i]
 		b.toggle_mode = true
 		b.custom_minimum_size = Vector2(140, 42)
+		b.tooltip_text = CAT_TIPS[i]
 		b.pressed.connect(func(): _cat = i; _try = -1; _look_pistol = -1; _fill(); _show_bench())
 		_tabs.add_child(b)
 	var split := HBoxContainer.new()
@@ -107,6 +130,7 @@ func _ready() -> void:
 	var close := Button.new()
 	close.text = "Close"
 	close.custom_minimum_size = Vector2(160, 44)
+	close.tooltip_text = "Back to the game (Esc / B)."
 	close.pressed.connect(close_screen)
 	foot.add_child(close)
 	box.add_child(foot)
@@ -217,6 +241,12 @@ func _row_button(row: HBoxContainer, text: String, enabled: bool, cb: Callable) 
 	b.text = text
 	b.custom_minimum_size = Vector2(190, 44)
 	b.disabled = not enabled
+	if text == "Not enough pay":
+		b.tooltip_text = "The station needs more pay. Close jobs and bring suspects in to earn it."
+	elif text.begins_with("Needs"):
+		b.tooltip_text = "Buy that first, then this."
+	else:
+		b.tooltip_text = BUTTON_TIPS.get(text, "")
 	b.pressed.connect(cb)
 	row.add_child(b)
 
