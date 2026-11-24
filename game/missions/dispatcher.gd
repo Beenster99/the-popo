@@ -607,10 +607,18 @@ func suspect_shot(s: Suspect, origin: Vector3, dir: Vector3, damage := SHOT_DAMA
 	if loud:
 		get_tree().call_group("alarm_listeners", "on_alarm", origin, 45.0)
 	var end: Vector3 = hit.position if hit else origin + dir * 60.0
+	# v0.20.0: a tyre in the way bursts (they sit below the car's collider).
+	var tyre := cars.tyre_on_path(origin, end) if cars else {}
+	if not tyre.is_empty():
+		cars.burst_tyre(tyre.car, tyre.wheel)
+		end = tyre.point
+		hit = {}
 	var what := 2 if not hit else (1 if (hit.collider is Officer or hit.collider is Suspect) else 0)
 	var surface := Sfx.surface_of(hit.collider) if hit else "concrete"
-	if hit and hit.collider is Car:
+	if (hit and hit.collider is Car) or not tyre.is_empty():
 		surface = "metal"
+	if not tyre.is_empty():
+		what = 0
 	if hit and hit.collider is Officer:
 		var o := hit.collider as Officer
 		o.take_damage(damage, dir, o.body_part_at(hit.position))

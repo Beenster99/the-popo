@@ -12,6 +12,15 @@ static func resolve(world: DestructionWorld, cars: CarSync, origin: Vector3, dir
 	var hit := Melee.bullet_ray(shooter.get_world_3d().direct_space_state, origin, dir, shooter)
 	if Net.is_host() and not through:
 		shooter.get_tree().call_group("alarm_listeners", "on_alarm", origin, 45.0)
+	# v0.20.0: tyres hang below the car's collision box, so a shot can
+	# pass right through one without touching a collider: check the path.
+	if not alt and cars and Net.is_host():
+		var ty := cars.tyre_on_path(origin, hit.position if hit else origin + dir * 60.0)
+		if not ty.is_empty():
+			cars.burst_tyre(ty.car, ty.wheel)
+			_sound(origin, ty.point, "metal", 0, shooter)
+			whizz(shooter.get_tree(), origin, ty.point, shooter)
+			return ty.point
 	if alt:
 		# Phase 3.6: a breach charge or C4, stuck where you aimed (in reach).
 		var at: Vector3 = hit.position if hit and (hit.position as Vector3).distance_to(origin) < 12.0 else origin + dir * 3.0

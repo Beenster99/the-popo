@@ -18,7 +18,7 @@ const MSG_CAR_SNAP := 32    # host -> all
 const MSG_CAR_DENT := 33
 const MSG_CAR_MODE := 34
 const MSG_CAR_HIT := 35     # driver -> host: hit a building piece
-const MSG_CAR_SHOT := 36    # host -> all: a bullet broke a window
+const MSG_CAR_SHOT := 36    # host -> all: a bullet broke a window (or, TYRE_CODE + i, burst tyre i)
 const MSG_CAR_FIRE := 37    # host -> all: a car smokes, burns or is a wreck (Phase 1.5)
 
 ## Phase 1.5: cars take damage from bullets, crashes, blasts and fire. Low,
@@ -30,6 +30,9 @@ const TANK_DAMAGE := 12.0     # a bullet in the fuel tank (low at the back)
 const BODY_DAMAGE := 3.0
 enum Fire { OK, SMOKING, BURNING, WRECKED }
 const SIZE_Z_TANK := 1.3      # m behind the middle where the tank is
+## v0.20.0: in MSG_CAR_SHOT and the catch-up glass list, codes from here up
+## are burst tyres (TYRE_CODE + wheel index), below are windows.
+const TYRE_CODE := 128
 
 enum Mode { HOST, DRIVER }
 
@@ -315,7 +318,7 @@ func _interpolate() -> void:
 			var a: Dictionary = buf[0][1]
 			var c: Dictionary = buf[1][1]
 			var k: float = clamp((rt - buf[0][0]) / max(buf[1][0] - buf[0][0], 0.0001), 0.0, 1.0)
-			s = {"pos": a.pos.lerp(c.pos, k), "rot": (a.rot as Quaternion).slerp(c.rot, k), "lv": a.lv.lerp(c.lv, k), "av": a.av.lerp(c.av, k), "steer": lerpf(a.steer, c.steer, k), "horn": c.horn,
+			s = {"pos": a.pos.lerp(c.pos, k), "rot": (a.rot as Quaternion).slerp(c.rot, k), "lv": a.lv.lerp(c.lv, k), "av": a.av.lerp(c.av, k), "steer": lerpf(a.steer, c.steer, k), "horn": c.horn, "spin": c.get("spin", 0.0),
 				"lights": c.get("lights", false), "siren": c.get("siren", 0)}
 		else:
 			s = buf[0][1]
@@ -324,6 +327,7 @@ func _interpolate() -> void:
 		car.angular_velocity = s.av
 		car.steer = s.steer
 		car.horn = s.get("horn", false)
+		car.spin_k = s.get("spin", 0.0)
 		if car is PoliceCar:
 			(car as PoliceCar).lights = s.get("lights", false)
 			(car as PoliceCar).siren = s.get("siren", 0)
@@ -393,8 +397,14 @@ func bullet_hit(car: Car, point: Vector3, dir: Vector3) -> String:
 	if idx < 0 or not Net.is_host():
 		return "metal"
 	var lp := car.global_transform.affine_inverse() * point
+	var ld := (car.global_transform.basis.inverse() * dir).normalized()
+	# v0.20.0: tyres first (they sit low, under the windows): a hit bursts it.
+	var ty := car.tyre_at(lp, ld)
+	if ty >= 0:
+		burst_tyre(car, ty)
+		return "metal"   # (the bang and hiss play from the tyre)
 	if car is PoliceCar:
-		var w := (car as PoliceCar).window_at(lp)
+		var w := (car as PoliceCar).window_at(lp, ld)
 		if w != "":
 			var names := (car as PoliceCar).glass.keys()
 			var b := StreamPeerBuffer.new()
@@ -403,26 +413,60 @@ func bullet_hit(car: Car, point: Vector3, dir: Vector3) -> String:
 			Net.broadcast(MSG_CAR_SHOT, b.data_array)
 			(car as PoliceCar).shatter(w)
 			return "glass"
-	var ld := (car.global_transform.basis.inverse() * dir).normalized()
 	var b2 := StreamPeerBuffer.new()
 	b2.put_u8(idx)
 	for v in [lp, ld]:
 		b2.put_float(v.x)
 		b2.put_float(v.y)
 		b2.put_float(v.z)
-	b2.put_float(0.015)
+	b2.put_float(Car.BULLET_DENT)
 	Net.broadcast(MSG_CAR_DENT, b2.data_array)
-	car.apply_dent(lp, ld, 0.015)
+	car.apply_dent(lp, ld, Car.BULLET_DENT)
 	var tank := lp.z < -SIZE_Z_TANK and lp.y < 0.1
 	damage_car(car, TANK_DAMAGE if tank else BODY_DAMAGE, point)
 	return "metal"
+
+
+## v0.20.0: the first tyre a shot from a to b passes through, before it
+## reaches b: {car, wheel, point}, or empty. Only cars near the line count.
+func tyre_on_path(a: Vector3, b: Vector3) -> Dictionary:
+	var best := {}
+	var best_d := INF
+	for car in cars:
+		var c := car as Car
+		if c == null or not is_instance_valid(c) or not c.is_inside_tree():
+			continue
+		var cp := c.global_position
+		if Geometry3D.get_closest_point_to_segment(cp, a, b).distance_squared_to(cp) > 16.0:
+			continue
+		var inv := c.global_transform.affine_inverse()
+		var r: Array = c.tyre_on_segment(inv * a, inv * b)
+		if r[0] < 0:
+			continue
+		var p: Vector3 = c.global_transform * (r[1] as Vector3)
+		var d := a.distance_to(p)
+		if d < best_d:
+			best_d = d
+			best = {"car": c, "wheel": r[0], "point": p}
+	return best
+
+
+## Host: bursts a tyre for everyone.
+func burst_tyre(car: Car, wheel: int) -> void:
+	var idx := cars.find(car)
+	if idx < 0 or not Net.is_host() or car.tyre_flat(wheel):
+		return
+	Net.broadcast(MSG_CAR_SHOT, PackedByteArray([idx, TYRE_CODE + wheel]))
+	car.flatten_tyre(wheel)
 
 
 func _on_shot(from: int, data: PackedByteArray) -> void:
 	if from != 1 or Net.is_host():
 		return
 	var idx := data[0]
-	if idx < cars.size() and cars[idx] is PoliceCar:
+	if idx < cars.size() and data[1] >= TYRE_CODE:
+		cars[idx].flatten_tyre(data[1] - TYRE_CODE)
+	elif idx < cars.size() and cars[idx] is PoliceCar:
 		var pc := cars[idx] as PoliceCar
 		var names := pc.glass.keys()
 		if data[1] < names.size():
@@ -573,6 +617,9 @@ func write_state(b: StreamPeerBuffer) -> void:
 			for k in names.size():
 				if (car as PoliceCar).glass[names[k]].broken:
 					broken.append(k)
+		for k in car._wheels.size():
+			if car.tyre_flat(k):
+				broken.append(TYRE_CODE + k)
 		b.put_u8(broken.size())
 		for k in broken:
 			b.put_u8(k)
@@ -605,6 +652,9 @@ func read_state(b: StreamPeerBuffer, from_save := false) -> void:
 		if car.dent_log.is_empty():
 			for d in dents:
 				car.apply_dent(d[0], d[1], d[2])
+		for k in glass:
+			if k >= TYRE_CODE:
+				car.flatten_tyre(k - TYRE_CODE, true)
 		if car is PoliceCar:
 			var pc := car as PoliceCar
 			var names: Array = pc.glass.keys()
