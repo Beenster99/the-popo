@@ -27,6 +27,17 @@ bricks and rubble, a rumble when a building gives way, car start-ups,
 engines ticking over, tyre squeals, red shotgun shells on the floor, radio
 clicks and static, and a new order: "Stand down, put the gun on the floor
 and we can all walk out of here happy."
+DRIVING AND ON-FOOT FEEL (0.12.1)
+On foot you walk by default now. Hold Shift to sprint (controller: hold L3).
+Alt switches to a steady run and back (controller: tap L3); the corner
+shows RUN MODE while it's on.
+The run no longer splays the knees out: they stay over the feet.
+Footsteps are real boot recordings now, and much quieter.
+Cars leave black skid marks wherever the tyres slide: stamping on the
+brakes, handbrake turns, drifts and wheelspin. They stay on the road and
+the oldest fade away over a shift.
+Driving, the camera swings back round behind the car a couple of seconds
+after you stop moving the mouse (or right stick).
 
 HELP, KEY BINDS AND TIPS (0.12.0)
 HELP is on the Esc menu, the main menu and the Online screen: every

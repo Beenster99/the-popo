@@ -36,13 +36,14 @@ static var _stance_down_at := -1.0
 static var _stance_used := false
 
 static var alt_tool := false
-## Walk mode (Alt, or tap L3 on a controller): moves at a walk instead of a
-## run, with the mocap walk (tactical with the gun out, relaxed holstered).
-## Sprint still runs while held. A controller also walks by tilting the
-## stick part of the way.
-static var walk_on := false
+## Walk mode: moves at a walk instead of a run, with the mocap walk
+## (tactical with the gun out, relaxed holstered). v0.12.0: walking is the
+## default on foot (beenster); Shift (hold L3 on a controller) sprints, and
+## Alt (tap L3) switches to a steady run and back. A controller also walks
+## by tilting the stick part of the way.
+static var walk_on := true
 const WALK_SPEED := 1.3         # m/s, a steady patrol pace
-## Tapping L3 (shorter than this) switches walk mode; holding it sprints.
+## Tapping L3 (shorter than this) switches walk / run; holding it sprints.
 const PAD_WALK_TAP := 0.25
 static var _l3_down_at := -1.0
 ## Where the local player is aiming, for the reticle.
@@ -128,7 +129,7 @@ static func sample(cam: IsoCamera, from: Node3D) -> Dictionary:
 	return {"move": Vector2(world.x, world.z), "buttons": buttons, "aim_yaw": aim_yaw, "aim_point": point}
 
 
-## L3 on a controller: a quick tap switches walk mode (a hold is sprint).
+## L3 on a controller: a quick tap switches walk / run (a hold is sprint).
 ## Returns true on the tap's release.
 static func pad_walk_tap(held: bool, now: float) -> bool:
 	if held:

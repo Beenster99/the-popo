@@ -54,14 +54,14 @@ const COUNTS := {"amb_air": 1, "amb_docks": 1, "amb_far_traffic": 1, "amb_indust
 	"flashbang": 4, "frag_crack": 2, "gas_hiss": 1, "gear": 4, "glass_big": 5, "glass_break": 4,
 	"glass_settle": 4, "gore_hit": 5, "grapple_fire": 2, "grapple_hit": 3, "gun_9mm_near": 10,
 	"gun_9mm_room": 4, "gun_crack_near": 3, "gun_far": 8, "gun_heavy_mid": 4, "gun_heavy_near": 3,
-	"gun_heavy_room": 4, "gun_mech": 1, "gun_shotgun_body": 3, "gun_shotgun_near": 4,
-	"gun_shotgun_room": 4, "gun_smg": 8, "gun_sub": 3, "gun_tail_city": 3, "gun_thump": 3, "holster": 2,
-	"impact_concrete": 4, "impact_glass": 3, "impact_metal": 5, "impact_wood": 4, "lift_ding": 1,
-	"mag_drop_concrete": 2, "mag_drop_metal": 2, "mag_drop_wood": 2, "mag_in": 1, "mag_out": 1,
-	"nade_bounce": 5, "nade_pin": 2, "ping": 1, "punch": 5, "radio_key": 3, "radio_unkey": 4, "radio_voice": 6,
-	"ricochet": 4, "room_tone": 1, "rope_slide": 2, "rubble": 10, "shell_shotgun": 4, "shotgun_pump": 4,
-	"siren_wail": 1, "siren_yelp": 1, "slide_rack": 1, "smoke_hiss": 1, "smoke_pop": 2, "step_concrete": 6,
-	"step_dirt": 6, "step_wood": 4, "thunder": 3, "tyre_chirp": 4, "tyre_skid": 1, "whoosh": 3}
+	"gun_heavy_room": 4, "gun_mech": 1, "gun_shotgun_body": 3, "gun_shotgun_near": 4, "gun_shotgun_room": 4,
+	"gun_smg": 8, "gun_sub": 3, "gun_tail_city": 3, "gun_thump": 3, "holster": 2, "impact_concrete": 4,
+	"impact_glass": 3, "impact_metal": 5, "impact_wood": 4, "lift_ding": 1, "mag_drop_concrete": 2,
+	"mag_drop_metal": 2, "mag_drop_wood": 2, "mag_in": 1, "mag_out": 1, "nade_bounce": 5, "nade_pin": 2,
+	"ping": 1, "punch": 5, "radio_key": 3, "radio_unkey": 4, "radio_voice": 6, "ricochet": 4, "room_tone": 1,
+	"rope_slide": 2, "rubble": 10, "shell_shotgun": 4, "shotgun_pump": 4, "siren_wail": 1, "siren_yelp": 1,
+	"slide_rack": 1, "smoke_hiss": 1, "smoke_pop": 2, "step_concrete": 6, "step_dirt": 6, "step_metal": 4,
+	"step_wood": 4, "thunder": 3, "tyre_chirp": 4, "tyre_skid": 1, "whoosh": 3}
 const BUS_AMBIENCE := "Ambience"
 const BUS_AMBIENCE_OUT := "AmbienceOut"
 const BUS_VEHICLES := "Vehicles"

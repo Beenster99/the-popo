@@ -53,5 +53,11 @@
   "speed_mps": 0.58,
   "turn_rad_s": 0.117,
   "mirror": true
+ },
+ "run": {
+  "take": "officer_mocap.glb run, knees brought in",
+  "length_s": 4.167,
+  "knee_out_cm_before": 18.6,
+  "knee_out_cm_after": 1.0
  }
 }

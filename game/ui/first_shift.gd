@@ -7,7 +7,7 @@ extends CanvasLayer
 ## city is never saved over your own.
 
 const STEPS := [
-	{"id": "walk", "title": "On your feet", "text": "Walk to the blue light. {move_forward}{move_left}{move_back}{move_right} to move, {sprint} to run. The mouse looks round."},
+	{"id": "walk", "title": "On your feet", "text": "Walk to the blue light. {move_forward}{move_left}{move_back}{move_right} to move, {sprint} to sprint ({walk} switches to a steady run). The mouse looks round."},
 	{"id": "draw", "title": "Your sidearm", "text": "Draw your pistol: {holster}."},
 	{"id": "fire", "title": "Aim and fire", "text": "Hold {aim} to aim, {fire} to fire. Fire three shots into the air (or at that wall)."},
 	{"id": "reload", "title": "Reload", "text": "Reload: {reload}. Spare rounds are shown bottom right."},
