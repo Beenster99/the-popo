@@ -146,6 +146,11 @@ var _route_i := 0
 var _panic_from := Vector3.INF
 var _calm_t := 0.0
 var _pace := 1.0
+## Repair crews (host): where this worker stands to work and what they face.
+var work_spot := Vector3.INF
+var work_face := Vector3.INF
+## Every machine: down on one knee for the job (welding, scrubbing, shovelling).
+var work_crouch := false
 
 ## Wave 3, Phase 3.1: parts people play in a job.
 ##  part: "" (a suspect or a passer-by), "victim" (stays put, shaken, and
@@ -727,7 +732,14 @@ func _physics_process(delta: float) -> void:
 						_swing_t = _rng.randf_range(0.9, 1.6)
 						_land_swing()
 		S.WANDER:
-			if route.is_empty():
+			if work_spot != Vector3.INF:
+				# A repair crew on the job: go to their spot and face the work.
+				if Vector2(work_spot.x - global_position.x, work_spot.z - global_position.z).length() > 0.35:
+					wish = _steer(work_spot, delta)
+					speed = WALK * 0.9
+				elif work_face != Vector3.INF:
+					_face(work_face)
+			elif route.is_empty():
 				pass
 			else:
 				var g: Vector3 = route[_route_i % route.size()]
@@ -1657,6 +1669,8 @@ func _process(delta: float) -> void:
 			upper = "cuffed"
 		_:
 			lower = "idle" if hs < 0.2 else ("walk" if hs < 2.2 else "run")
+			if work_crouch and hs < 0.2 and state == S.WANDER:
+				lower = "crouch_idle"
 			if aim_at != Vector3.ZERO:
 				upper = "aim_hold"
 			elif armed and state == S.LOITER:
