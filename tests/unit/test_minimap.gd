@@ -1,5 +1,5 @@
 extends Node
-## v0.14.0: the mini map, the job markers and the Max money cheat.
+## v0.15.0: the mini map, the job markers and the Max money cheat.
 
 var t
 

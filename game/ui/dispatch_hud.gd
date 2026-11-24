@@ -122,7 +122,7 @@ func _has_prisoner() -> bool:
 	return false
 
 
-## v0.14.0: every job, the custody bay (while anyone has a prisoner) and a
+## v0.15.0: every job, the custody bay (while anyone has a prisoner) and a
 ## cuffed runner get a marker. On screen: a pin over the spot with what it
 ## is and how far, seen through walls. Off screen: a big arrow at the screen
 ## edge that points the way to go round you (from the camera's heading, so it

@@ -278,7 +278,7 @@ def word(name, text, centre, s, size, m):
     t.data.materials.append(m)
     # Text is made flat on Blender's XY plane; stand it on the car side.
     # Facing out from the side (normal +x on the right, -x on the left) so the
-    # word reads left to right from outside (it was mirrored before v0.14.0).
+    # word reads left to right from outside (it was mirrored before v0.15.0).
     t.rotation_euler = (math.pi / 2, 0, math.pi / 2 if s > 0 else -math.pi / 2)
     t.location = g2b(centre)
     return t

@@ -12,7 +12,7 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
-MINI MAP AND JOB MARKERS (0.14.0)
+MINI MAP AND JOB MARKERS (0.15.0)
 A mini map sits in the bottom left: roads, buildings, the station in blue,
 you (white arrow), the other officers, patrol cars, and every job as a
 pulsing red dot with a line along the roads to the nearest one. It turns

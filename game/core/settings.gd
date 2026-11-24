@@ -326,7 +326,7 @@ func _ready() -> void:
 	_layer.layer = 90
 	add_child(_layer)
 	_fps_label = Label.new()
-	# Top right (v0.14.0: the mini map has the bottom left corner).
+	# Top right (v0.15.0: the mini map has the bottom left corner).
 	_fps_label.add_theme_font_size_override("font_size", 14)
 	_fps_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	_fps_label.add_theme_constant_override("outline_size", 4)

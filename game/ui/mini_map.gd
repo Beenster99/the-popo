@@ -1,6 +1,6 @@
 class_name MiniMap
 extends CanvasLayer
-## v0.14.0: the mini map, bottom left. Roads, lots and buildings from the
+## v0.15.0: the mini map, bottom left. Roads, lots and buildings from the
 ## city generator, you (white arrow), the other officers (their ping
 ## colours), patrol cars, the custody bay while anyone has a prisoner, a
 ## cuffed prisoner doing a runner, and the open jobs with a route along the

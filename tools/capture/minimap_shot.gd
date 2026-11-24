@@ -1,5 +1,5 @@
 extends Node
-## v0.14.0 check shots: the mini map (small and large), the job markers on
+## v0.15.0 check shots: the mini map (small and large), the job markers on
 ## and off screen, the custody bay in front of the station, and both sides
 ## of a patrol car (POLICE must read left to right). Run as a scene:
 ##   xvfb-run -a -s "-screen 0 1600x900x24" godot --path . res://tools/capture/minimap_shot.tscn -- <out_dir>

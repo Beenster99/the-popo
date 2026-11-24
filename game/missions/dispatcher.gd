@@ -1173,7 +1173,7 @@ func _make_marker(col: Color) -> Node3D:
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.albedo_color = Color(col.r, col.g, col.b, 0.3)
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	# v0.14.0: a wide soft beam with a bright core, tall enough to clear the
+	# v0.15.0: a wide soft beam with a bright core, tall enough to clear the
 	# towers, so it shows over the rooftops from streets away. Starts above
 	# head height so it never tints the people at the call.
 	for b in [[0.9, 0.22], [0.3, 0.75]]:
@@ -1235,7 +1235,7 @@ func _build_bay() -> void:
 	sign.rotation_degrees = Vector3(-90, 90, 0)
 	sign.position = bay + Vector3(0, 0.05, 0)
 	_bay_node.add_child(sign)
-	# v0.14.0: the blue lamp hangs on the station wall over the garage door.
+	# v0.15.0: the blue lamp hangs on the station wall over the garage door.
 	# (It used to stand on a post in the middle of the road.)
 	var lamp_at := bay + Vector3(BAY_RADIUS * 0.75, 3.3, 0)
 	if city and not city.station().is_empty():
