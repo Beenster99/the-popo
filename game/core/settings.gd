@@ -146,6 +146,12 @@ const SCHEMA := [
 	["Gameplay", "", "Screen", "head"],
 	["Gameplay", "ammo_hud", "Ammo panel", "bool", true],
 	["Gameplay", "reticle", "Aiming reticle", "bool", true],
+	["Gameplay", "minimap", "Mini map", "enum", 1, ["Off", "Small", "Large (whole city)"],
+		null, "The map in the bottom left corner: roads, buildings, officers, jobs and the way to the nearest job. The mini map key (M) switches between Small, Large and Off."],
+	["Gameplay", "minimap_rotate", "Mini map turns with the camera", "bool", true,
+		null, "On: up on the small map is the way you're looking. Off: north is always up."],
+	["Gameplay", "job_markers", "Job markers on screen", "bool", true,
+		null, "A marker over each job with its distance, seen through walls, and an arrow at the screen edge when it's off screen."],
 	["Gameplay", "tips", "Tips while playing", "bool", true,
 		null, "A short tip the first time something comes up: your first car, first job, first wound and so on. Each shows once."],
 	["Gameplay", "tips_reset", "Show every tip again", "button", null, "reset_tips",
@@ -168,6 +174,9 @@ const SCHEMA := [
 	["Debug", "tests", "Open a test scene...", "button", null, "show_tests"],
 	["Debug", "", "Simulation (single player only)", "head"],
 	["Debug", "time_scale", "Game speed", "range", 1.0, [0.1, 2.0, 0.05, "x"]],
+	["Debug", "", "Cheats (in game)", "head"],
+	["Debug", "max_money", "Max money", "button", null, "max_money",
+		"Fills the station's pay to £9,999,999 so you can buy anything at the armoury. In a game you're hosting, or playing alone."],
 ]
 
 ## Tooltips for the rows that have no help text in SCHEMA.
@@ -317,13 +326,16 @@ func _ready() -> void:
 	_layer.layer = 90
 	add_child(_layer)
 	_fps_label = Label.new()
-	_fps_label.position = Vector2(12, 860)
+	# Top right (v0.15.0: the mini map has the bottom left corner).
 	_fps_label.add_theme_font_size_override("font_size", 14)
 	_fps_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	_fps_label.add_theme_constant_override("outline_size", 4)
-	_fps_label.anchor_top = 1.0
-	_fps_label.anchor_bottom = 1.0
-	_fps_label.offset_top = -40
+	_fps_label.anchor_left = 1.0
+	_fps_label.anchor_right = 1.0
+	_fps_label.offset_left = -420
+	_fps_label.offset_right = -12
+	_fps_label.offset_top = 8
+	_fps_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_layer.add_child(_fps_label)
 	apply_all()
 
@@ -575,8 +587,10 @@ func _apply_audio() -> void:
 	Sfx.ensure_buses()
 	_bus_volume("Master", values.vol_master)
 	_bus_volume(Sfx.BUS_SFX, values.vol_sfx)
-	_bus_volume(Sfx.BUS_OUTDOOR, values.vol_outdoor)
-	_bus_volume(Sfx.BUS_INDOOR, values.vol_indoor)
+	for b in Sfx.OUTDOOR_BUSES:
+		_bus_volume(b, values.vol_outdoor)
+	for b in Sfx.INDOOR_BUSES:
+		_bus_volume(b, values.vol_indoor)
 	_bus_volume(Sfx.BUS_AMBIENCE, values.vol_ambience)
 	_bus_volume(Sfx.BUS_VEHICLES, values.vol_vehicles)
 	_bus_volume(Sfx.BUS_MUSIC, values.vol_music)

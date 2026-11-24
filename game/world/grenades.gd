@@ -370,7 +370,7 @@ func _start_cloud(kind: int, at: Vector3, can: RigidBody3D) -> void:
 	h.volume_db = -2.0
 	h.max_distance = 40.0
 	h.unit_size = 4.0
-	h.bus = Sfx.bus_at(get_tree(), at)
+	h.bus = Sfx.space_bus(self, at)
 	add_child(h)
 	h.global_position = at
 	h.play()
@@ -534,7 +534,7 @@ func _flash(at: Vector3) -> void:
 				s.flashed(k)
 	if _headless():
 		return
-	Sfx.play(self, "flashbang", at, 9.0, 400.0, 0.04, Sfx.bus_at(get_tree(), at))
+	Sfx.play(self, "flashbang", at, 9.0, 400.0, 0.04, Sfx.space_bus(self, at))
 	Sfx.play(self, "gun_crack_near", at, 6.0, 120.0, 0.05)
 	Sfx.play(self, "gun_sub", at, 6.0, 120.0, 0.05)
 	Feel.blast_shake(get_tree(), at, 2.5)
@@ -619,7 +619,7 @@ func _frag(at: Vector3) -> void:
 		return
 	if world == null or not is_instance_valid(world):
 		Sfx.explosion(self, at, 1.2)   # the world plays it otherwise
-	Sfx.play(self, "frag_crack", at, 8.0, 300.0, 0.05, Sfx.bus_at(get_tree(), at))
+	Sfx.play(self, "frag_crack", at, 8.0, 300.0, 0.05, Sfx.space_bus(self, at))
 	Feel.blast_shake(get_tree(), at, 4.0)
 	var light := OmniLight3D.new()
 	light.light_color = Color(1.0, 0.65, 0.3)

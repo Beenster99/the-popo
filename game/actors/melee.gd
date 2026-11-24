@@ -22,7 +22,9 @@ static func bullet_ray(space: PhysicsDirectSpaceState3D, origin: Vector3, dir: V
 		exclude.append(shooter.car.get_rid())   # shooting out of your own car
 	var ff := friendly_fire()
 	for i in 4:
-		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(origin, origin + dir * length, 1 | 2 | 16 | Gore.RAGDOLL_LAYER, exclude))
+		# v0.20.0: cars (layer 4) too. Officers' bullets used to pass
+		# straight through every car, so windows and tyres never broke.
+		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(origin, origin + dir * length, 1 | 2 | 4 | 16 | Gore.RAGDOLL_LAYER, exclude))
 		if hit and hit.collider is Officer and not ff:
 			exclude.append((hit.collider as Officer).get_rid())
 			continue
