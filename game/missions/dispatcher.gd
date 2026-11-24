@@ -298,6 +298,7 @@ func start_call(kind: Kind, opts := {}) -> int:
 			c.pos = civ_car.global_position
 			c.text = "Speeding car lapping the block. Get behind it with your lights on and pull it over." if city == null else \
 				"Speeding car going round and round the block by %s. Get behind it with your lights on and pull it over." % CityGenerator.street_at(c.pos)
+			c.text += " Driver: %s." % SuspectLook.describe(s.look)
 			_traffic = {"call": c.id, "phase": "drive", "t": 0.0, "near_t": 0.0, "suspect": s.net_id}
 		Kind.THEFT:
 			if traffic == null:
@@ -317,7 +318,8 @@ func start_call(kind: Kind, opts := {}) -> int:
 			th.home = door
 			c.suspects.append(th.net_id)
 			c.pos = car.global_position
-			c.text = "Someone breaking into a %s %s on %s. Get there before they're away in it." % [_colour_name(car.paint), _kind_name(car.kind), CityGenerator.street_at(c.pos)]
+			c.text = "Someone breaking into a %s %s on %s. Get there before they're away in it." % [_colour_name(car.paint), _kind_name(car.kind), CityGenerator.street_at(c.pos)] \
+				+ " Suspect: %s." % SuspectLook.describe(th.look)
 			_thefts[c.id] = {"dr": dr, "suspect": th, "t": 0.0}
 		Kind.PURSUIT:
 			if traffic == null:
@@ -330,7 +332,8 @@ func start_call(kind: Kind, opts := {}) -> int:
 			c.suspects.append(th.net_id)
 			traffic.getaway(dr, th)
 			c.pos = car.global_position
-			c.text = "Stolen %s %s spotted on %s, driving like a maniac. Stop it." % [_colour_name(car.paint), _kind_name(car.kind), CityGenerator.street_at(c.pos)]
+			c.text = "Stolen %s %s spotted on %s, driving like a maniac. Stop it." % [_colour_name(car.paint), _kind_name(car.kind), CityGenerator.street_at(c.pos)] \
+				+ " Driver: %s." % SuspectLook.describe(th.look)
 	c.marker = c.pos
 	calls[c.id] = c
 	_next_call_id += 1

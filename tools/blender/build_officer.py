@@ -23,6 +23,11 @@ import common
 import officer as O
 import clips as K
 import extra_clips as X
+import civilian_clips as C
+
+# OFFICER_CLIPS=civilian builds civilian_clips.glb instead: the same body and
+# rig with only the everyday upper-body clips (civilian_clips.py).
+CIVILIAN_ONLY = os.environ.get("OFFICER_CLIPS") == "civilian"
 
 ROOT_MOTION = {"roll", "mantle", "climb", "slide"}
 LOOPS = {"run", "idle", "walk", "crouch_idle", "crouch_walk", "prone_idle", "crawl", "fall",
@@ -36,6 +41,9 @@ A_ = None
 
 clip_fns = {name: cfg["fn"] for name, cfg in K.CLIPS.items()}
 clip_fns.update(X.EXTRA)
+if CIVILIAN_ONLY:
+    clip_fns = dict(C.CIVILIAN)
+    LOOPS = set(C.CIVILIAN)
 
 # Bones that matter in the game (deform chain). IK targets and poles are
 # controls; they are evaluated into the deform bones by the bake and dropped.
@@ -128,7 +136,7 @@ for name, frames in samples.items():
             pb.rotation_quaternion = rot
             pb.keyframe_insert("location", frame=f)
             pb.keyframe_insert("rotation_quaternion", frame=f)
-    for fc in act.fcurves:
+    for fc in O.fcurves(act):
         for k in fc.keyframe_points:
             k.interpolation = "LINEAR"
     track = rig.animation_data.nla_tracks.new()
@@ -176,7 +184,7 @@ for m in bpy.data.materials:
     bsdf.inputs["Base Color"].default_value = col
     m.node_tree.links.new(bsdf.outputs[0], out.inputs[0])
 
-path = os.path.join(common.REPO, "assets/models/characters/officer.glb")
+path = os.path.join(common.REPO, "assets/models/characters/%s.glb" % ("civilian_clips" if CIVILIAN_ONLY else "officer"))
 os.makedirs(os.path.dirname(path), exist_ok=True)
 bpy.ops.export_scene.gltf(
     filepath=path, export_format="GLB", export_yup=True, export_apply=True,

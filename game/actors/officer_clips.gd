@@ -12,6 +12,10 @@ const MOCAP_PATH := "res://assets/models/characters/mocap/officer_mocap.glb"
 ## retargeted by tools/blender/mocap/build_walks.py: walk (relaxed), and the
 ## tactical walk_ready / walk_back / walk_left / walk_right.
 const WALKS_PATH := "res://assets/models/characters/mocap/officer_walks.glb"
+## Everyday upper-body clips for people who aren't police or crooks (phone,
+## texting, hands in pockets, arms folded, hands behind, digging, hammering),
+## hand-keyed by tools/blender/officer/civilian_clips.py.
+const CIVILIAN_PATH := "res://assets/models/characters/civilian_clips.glb"
 const ROOT_MOTION_CLIPS := ["roll", "mantle", "climb", "slide"]
 
 static var _library: AnimationLibrary
@@ -36,6 +40,7 @@ static func library(template: AnimationPlayer, skeleton: Skeleton3D) -> Animatio
 		_library.add_animation(n, base.get_animation(n))
 	for path in [MOCAP_PATH, WALKS_PATH]:
 		_merge_mocap(path, skeleton)
+	_merge_mocap(CIVILIAN_PATH, skeleton, false)
 	# The mocap aim holds a steady sight picture from about 2.0 s to 4.0 s:
 	# that slice becomes the upper-body aim loop.
 	if _library.has_animation("aim"):
@@ -60,7 +65,7 @@ static func library(template: AnimationPlayer, skeleton: Skeleton3D) -> Animatio
 
 ## Adds one mocap file's clips to the library; a clip with the same name as
 ## a hand-keyed one replaces it (the hand-keyed one stays as hk_<name>).
-static func _merge_mocap(path: String, skeleton: Skeleton3D) -> void:
+static func _merge_mocap(path: String, skeleton: Skeleton3D, is_mocap := true) -> void:
 	if not ResourceLoader.exists(path):
 		return
 	var moc: Node = (load(path) as PackedScene).instantiate()
@@ -76,7 +81,7 @@ static func _merge_mocap(path: String, skeleton: Skeleton3D) -> void:
 			_library.add_animation("hk_" + n, _library.get_animation(n))
 			_library.remove_animation(n)
 		_library.add_animation(n, a)
-		if n not in mocap_clips:
+		if is_mocap and n not in mocap_clips:
 			mocap_clips.append(n)
 	moc.free()
 

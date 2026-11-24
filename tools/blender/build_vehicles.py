@@ -29,6 +29,7 @@ from mathutils import Vector
 
 sys.path.insert(0, os.path.dirname(__file__))
 import common as C  # noqa: E402
+import interiors as I  # noqa: E402
 
 PAINT = (0.85, 0.85, 0.83)
 BLACK = (0.06, 0.06, 0.07)
@@ -243,6 +244,15 @@ def seats(out, rows, y=-0.12):
             out.append(gbox("interior_benchback", (1.40, 0.55, 0.12), (0, y + 0.3, z - 0.25), seat, 0.03))
 
 
+def _doors(out):
+    found = {}
+    for o in out:
+        for sn in ("l", "r"):
+            if o.name == "door_f" + sn:
+                found[sn] = o
+    return found
+
+
 def wheel(r, width=0.24):
     t = cyl("wheel", r, width, (0, 0, 0), "x", mat("tyre", BLACK), 18)
     rim = cyl("wheel_rim", r * 0.6, width + 0.02, (0, 0, 0), "x", mat("chrome", CHROME), 12)
@@ -311,9 +321,9 @@ def car(spec):
     bumpers(out, L, W, -0.24)
     mirrors(out, W, belt + 0.12, bf - 0.15)
     lamps(out, L, W, 0.10, 0.12)
-    seats(out, [(0.05, True), (-0.80, False)])
-    dash = gbox("interior_dash", (W - 0.25, 0.2, 0.3), (0, 0.24, bf - 0.1), mat("black", BLACK))
-    out.append(dash)
+    I.fit_out(sys.modules[__name__], out, W, [(0.05, "pair"), (-0.80, "bench")], -0.12, -0.27,
+              (0.22, bf - 0.13, 0.34), (0.30, 0.50), roof_y=spec["roof"], screen_z=spec["cab_front"][1],
+              doors=_doors(out), shelf=(belt + 0.03, br + 0.20) if br - (-L / 2) > 0.4 else None)
     return out
 
 
@@ -357,10 +367,11 @@ def van(spec, kind):
     bumpers(out, L, W, -0.26)
     mirrors(out, W, belt + 0.25, bf - 0.15)
     lamps(out, L, W, 0.12, 0.2)
-    rows = [(bf - 0.85, True)]
+    rows = [(bf - 0.85, "pair")]
     if kind == "minibus":
-        rows += [(bf - 1.8, False), (bf - 2.6, False), (bf - 3.4, False)]
-    seats(out, rows)
+        rows += [(bf - 1.8, "bench"), (bf - 2.6, "bench"), (bf - 3.4, "bench")]
+    I.fit_out(sys.modules[__name__], out, W, rows, -0.12, -0.28, (belt - 0.04, bf - 0.18, 0.40), (belt + 0.04, bf - 0.47),
+              roof_y=spec["roof"], screen_z=spec["cab_front"][1], doors=_doors(out))
     return out
 
 
@@ -395,7 +406,8 @@ def trash_truck(spec):
     mirrors(out, W, 1.0, cab_z1 - 0.3)
     out.append(gbox("bumper_f", (W + 0.04, 0.3, 0.2), (0, -0.55, L / 2 + 0.08), mat("grey", GREY), 0.03))
     lamps(out, L, W, -0.2, 0.0, cab_z1 + 0.01, -L / 2 - 0.02)
-    seats(out, [(cab_z0 + 0.8, True)], y=0.0)
+    I.fit_out(sys.modules[__name__], out, W, [(cab_z0 + 0.8, "pair")], 0.0, -0.16, (0.40, cab_z1 - 0.28, 0.36), (0.55, cab_z1 - 0.62),
+              roof_y=1.52, screen_z=cab_z1 - 0.08, doors=_doors(out))
     return out
 
 
@@ -420,7 +432,8 @@ def hgv_tractor(spec):
     mirrors(out, W, 1.1, cab_z1 - 0.35)
     for s in (-1, 1):
         out.append(gbox("headlamp", (0.36, 0.14, 0.04), (s * (W / 2 - 0.35), -0.35, cab_z1 + 0.06), mat("lamp", LAMP)))
-    seats(out, [(cab_z0 + 1.0, True)], y=0.25)
+    I.fit_out(sys.modules[__name__], out, W, [(cab_z0 + 1.0, "pair")], 0.25, 0.08, (0.68, cab_z1 - 0.28, 0.36), (0.82, cab_z1 - 0.62),
+              roof_y=1.40, screen_z=cab_z1 - 0.06, doors=_doors(out))
     return out
 
 

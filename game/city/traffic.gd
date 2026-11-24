@@ -64,6 +64,7 @@ var respawns := 0              # stuck cars moved on out of sight (for tests)
 
 func _ready() -> void:
 	add_to_group("alarm_listeners")
+	add_to_group("traffic")
 	Net.register(MSG_TRAFFIC, _on_traffic)
 
 
@@ -110,7 +111,8 @@ func _spawn_moving(kind: String, a: Vector2i, b: Vector2i, n: int) -> void:
 	var dr := {"car": v, "idx": v.net_id, "a": a, "b": b, "pts": [], "wi": 0, "mode": "drive", "t": 0.0,
 		"stuck": 0.0, "wait": 0.0, "rev": 0.0, "yield": 0.0, "pace": _rng.randf_range(0.85, 1.1),
 		"off": 0.0, "off_want": 0.0, "pass": 0.0, "tries": 0, "blk": null, "rev_steer": 0.0, "lost": 0.0,
-		"look": _rng.randi_range(0, 255), "rig": null, "wb": _wheelbase(v), "seen": true}
+		"look": _rng.randi_range(0, 255), "rig": null, "wb": _wheelbase(v), "seen": true, "hurt": 0}
+	dr.rider = kind != "motorbike" and has_passenger(dr.look)
 	dr.pts = [[at, 0, Vector2i.ZERO, false]]
 	_append_lane(dr, a, b, 0.0)
 	drivers.append(dr)
@@ -398,34 +400,136 @@ func _update_lights() -> void:
 
 # --- the drivers -----------------------------------------------------------------------
 
-## A person at the wheel (drawn sat down, posed once and left still).
+## A person at the wheel (drawn sat down, posed once and left still), and
+## in about one car in four someone beside them. v0.25: an armed getaway
+## driver has the gun in their hand, and someone shot through the glass
+## slumps in the seat (dr.hurt: bit 0 the driver, bit 1 the passenger).
 func _seat_driver(dr: Dictionary) -> void:
 	var v: CivilianVehicle = dr.car
 	if dr.rig == null:
-		var rig := OfficerRig.new()
-		rig.name = "Driver"
-		v.add_child(rig)
-		rig.position = v.seats[0]
-		SuspectLook.apply(rig.model, dr.look)
-		for mi in rig.model.find_children("*", "GeometryInstance3D", true, false):
-			(mi as GeometryInstance3D).visibility_range_end = 90.0
-		rig.update_pose("sit", "drive", 0.0, 0.016)
-		dr.rig = rig
-		var wr: WeakRef = weakref(rig)   # the city may be gone by then
-		get_tree().create_timer(0.4).timeout.connect(func():
-			var r := wr.get_ref() as OfficerRig
-			if r and r.tree:
-				r.tree.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL)
-	else:
-		SuspectLook.apply((dr.rig as OfficerRig).model, dr.look)
-	(dr.rig as Node3D).visible = true
+		dr.rig = _seat_rig(v, 0, "Driver", "drive")
+	var rig := dr.rig as OfficerRig
+	SuspectLook.apply(rig.model, dr.look)
+	EnemyGuns.show_in_hand(rig.model, int(dr.get("gun", EnemyGuns.NONE)))
+	rig.visible = true
+	_slump(rig, int(dr.get("hurt", 0)) & 1 != 0, v.seats[0])
+	var pr: OfficerRig = dr.get("prig")
+	if dr.get("rider", false) and v.seats.size() > 1:
+		var pl := passenger_look(dr.look)
+		if pr == null or not is_instance_valid(pr):
+			pr = _seat_rig(v, 1, "Passenger", Suspect.daily_upper(pl, false, 0.0))
+			dr.prig = pr
+		else:
+			_repose(pr, Suspect.daily_upper(pl, false, 0.0))
+		SuspectLook.apply(pr.model, pl)
+		pr.visible = true
+		_slump(pr, int(dr.get("hurt", 0)) & 2 != 0, v.seats[1])
+	elif pr and is_instance_valid(pr):
+		pr.visible = false
 	dr.seen = true
+
+
+func _seat_rig(v: CivilianVehicle, seat: int, nm: String, upper: String) -> OfficerRig:
+	var rig := OfficerRig.new()
+	rig.name = nm
+	v.add_child(rig)
+	rig.position = v.seats[seat]
+	EnemyGuns.show_in_hand(rig.model, EnemyGuns.NONE)   # a driver, not a gunman
+	for mi in rig.model.find_children("*", "GeometryInstance3D", true, false):
+		(mi as GeometryInstance3D).visibility_range_end = 90.0
+	rig.update_pose("sit", upper, 0.0, 0.016)
+	var wr: WeakRef = weakref(rig)   # the city may be gone by then
+	get_tree().create_timer(0.4).timeout.connect(func():
+		var r := wr.get_ref() as OfficerRig
+		if r and r.tree:
+			r.tree.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL)
+	return rig
+
+
+## A still rig, posed again (its tree only moves when told to).
+func _repose(rig: OfficerRig, upper: String) -> void:
+	rig.update_pose("sit", upper, 0.0, 0.016)
+	if rig.tree and rig.tree.callback_mode_process == AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL:
+		rig.tree.advance(0.5)
+
+
+## Shot in the seat: slumped forward and over, sunk down.
+static func _slump(rig: OfficerRig, hurt: bool, seat: Vector3) -> void:
+	if hurt:
+		rig.rotation = Vector3(0.55, 0.0, 0.3 * signf(seat.x if seat.x != 0.0 else 1.0))
+		rig.position = seat + Vector3(0, -0.12, 0)
+	else:
+		rig.rotation = Vector3.ZERO
+		rig.position = seat
+
+
+## Whether a car whose driver has this look has someone in the passenger
+## seat (the same on every machine, from the look alone).
+static func has_passenger(look: int) -> bool:
+	return look % 4 == 1
+
+
+static func passenger_look(look: int) -> int:
+	return (look * 53 + 11) % SuspectLook.WORKER
 
 
 func _clear_driver(dr: Dictionary) -> void:
 	if dr.rig and is_instance_valid(dr.rig):
 		(dr.rig as Node3D).visible = false
+	var pr: Node3D = dr.get("prig")
+	if pr and is_instance_valid(pr):
+		pr.visible = false
 	dr.seen = false
+	dr.hurt = 0
+
+
+## Host, v0.25: a shot into car through a window (at: where it met the car,
+## dir: its way) hits whoever is sat in the line of it. A getaway driver
+## takes the bullet and bails; anyone else slumps in the seat and the car
+## rolls to a stop. Returns where it hit them, or null if it missed them.
+func shoot_occupant(car: Car, at: Vector3, dir: Vector3, damage: float) -> Variant:
+	var dr: Dictionary = _by_car.get(car, {})
+	if dr.is_empty() or not dr.seen:
+		return null
+	var a := at - dir * 0.2
+	var b := at + dir * 3.2
+	var best = null
+	for who in [["rig", 1], ["prig", 2]]:
+		var rig: OfficerRig = dr.get(who[0])
+		if rig == null or not is_instance_valid(rig) or not rig.visible or int(dr.get("hurt", 0)) & int(who[1]):
+			continue
+		for part in [["head_2", 0.19, true], ["chest_2", 0.27, false]]:
+			var p = _bone_at(rig, part[0])
+			if p == null:
+				continue
+			var q := Geometry3D.get_closest_point_to_segment(p, a, b)
+			if q.distance_to(p) < part[1] and (best == null or a.distance_to(q) < best.d):
+				best = {"d": a.distance_to(q), "at": q, "bit": who[1], "head": part[2]}
+	if best == null:
+		return null
+	var s: Suspect = dr.get("suspect")
+	if best.bit == 1 and s and is_instance_valid(s) and dr.mode == "getaway":
+		_bail(dr)
+		if is_instance_valid(s):
+			s.take_damage(damage * (3.0 if best.head else 1.0), dir)
+		return best.at
+	dr.hurt = int(dr.get("hurt", 0)) | int(best.bit)
+	if best.bit == 1 and dr.mode in ["drive", "flee"]:
+		dr.mode = "parked"
+		cars.ai_inputs.erase(dr.idx)
+	_seat_driver(dr)
+	if dispatch and best.bit == 1:
+		dispatch.say("DISPATCH: reports of a driver shot at the wheel. Get an ambulance rolling.")
+	return best.at
+
+
+static func _bone_at(rig: OfficerRig, bone: String) -> Variant:
+	if rig.skeleton == null:
+		return null
+	var i := rig.skeleton.find_bone(bone)
+	if i < 0:
+		return null
+	return rig.skeleton.global_transform * (rig.skeleton.get_bone_global_pose(i).origin + Vector3(0, 0.08, 0))
 
 
 func active_count() -> int:
@@ -960,6 +1064,9 @@ func _recycle() -> void:
 		if _place_on_free_lane(dr, eyes, 110.0):
 			dr.mode = "drive"
 			dr.look = _rng.randi_range(0, SuspectLook.WORKER - 1)
+			dr.rider = car is CivilianVehicle and (car as CivilianVehicle).kind != "motorbike" and has_passenger(dr.look)
+			dr.gun = EnemyGuns.NONE
+			dr.hurt = 0
 			_seat_driver(dr)
 			return
 
@@ -1082,6 +1189,8 @@ func getaway(dr: Dictionary, s: Suspect) -> void:
 	dr.suspect = s
 	dr.still = 0.0
 	dr.look = s.look
+	dr.rider = false   # a thief on their own
+	dr.gun = s.weapon if s.armed else EnemyGuns.NONE
 	s.set_meta("getaway", dr.car)
 	s.set_state(Suspect.S.DRIVE)
 	_seat_driver(dr)
@@ -1223,7 +1332,8 @@ func _encode() -> PackedByteArray:
 	b.put_float(clock)
 	b.put_u8(drivers.size())
 	for dr in drivers:
-		b.put_u8(1 if dr.seen else 0)
+		# bit 0 seen, 1 a passenger, 2-3 the driver's gun, 4-5 who's been shot.
+		b.put_u8((1 if dr.seen else 0) | (2 if dr.get("rider", false) else 0) | (int(dr.get("gun", 0)) & 3) << 2 | (int(dr.get("hurt", 0)) & 3) << 4)
 		b.put_u8(dr.look)
 	return b.data_array
 
@@ -1238,13 +1348,20 @@ func _on_traffic(from: int, data: PackedByteArray) -> void:
 		clock = c
 	var n := b.get_u8()
 	for i in n:
-		var seen := b.get_u8() == 1
+		var f := b.get_u8()
+		var seen := f & 1 == 1
 		var look := b.get_u8()
 		if i >= drivers.size():
 			continue
 		var dr: Dictionary = drivers[i]
-		if seen and (not dr.seen or dr.look != look):
+		var pas := f & 2 != 0
+		var gun := (f >> 2) & 3
+		var hurt := (f >> 4) & 3
+		if seen and (not dr.seen or dr.look != look or dr.get("rider", false) != pas or dr.get("gun", 0) != gun or dr.get("hurt", 0) != hurt):
 			dr.look = look
+			dr.rider = pas
+			dr.gun = gun
+			dr.hurt = hurt
 			_seat_driver(dr)
 		elif not seen and dr.seen:
 			_clear_driver(dr)

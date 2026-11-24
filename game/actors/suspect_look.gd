@@ -34,6 +34,27 @@ static func colours(look: int) -> Dictionary:
 	}
 
 
+const SHIRT_NAMES := ["red", "grey", "green", "black", "yellow", "white", "purple", "blue", "teal", "orange", "pink", "olive", "light blue", "brown"]
+const TROUSER_NAMES := ["blue jeans", "black trousers", "khaki trousers", "grey joggers", "navy trousers", "beige chinos", "brown trousers"]
+const HAT_NAMES := ["black", "maroon", "navy", "grey", "cream", "orange", "teal"]
+
+
+## What dispatch says about someone: "red top, blue jeans, black beanie".
+static func describe(look: int) -> String:
+	if look >= PARAMEDIC:
+		return "paramedic green uniform"
+	var r := RandomNumberGenerator.new()
+	r.seed = look * 2654435761 + 17
+	var shirt: String = SHIRT_NAMES[r.randi_range(0, SHIRTS.size() - 1)]
+	var legs: String = TROUSER_NAMES[r.randi_range(0, TROUSERS.size() - 1)]
+	r.randi_range(0, SKIN.size() - 1)
+	var hat: String = HAT_NAMES[r.randi_range(0, HATS.size() - 1)]
+	var beanie := r.randf() < 0.6
+	if look >= WORKER:
+		return "hi-vis vest, yellow hard hat, %s" % legs
+	return "%s top, %s, %s" % [shirt, legs, ("%s beanie" % hat) if beanie else "no hat"]
+
+
 static func apply(model: Node, look: int) -> void:
 	if model == null:
 		return

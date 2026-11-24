@@ -66,14 +66,14 @@ static func _load() -> void:
 	for mi: MeshInstance3D in nodes:
 		if not String(mi.name).contains("__"):
 			origins[String(mi.name)] = mi.global_transform.origin if mi.is_inside_tree() else mi.transform.origin
-			var cel_mesh := _celify(mi.mesh)
+			var cel_mesh := _celify(mi.mesh, Vector3.ZERO)
 			_pieces[String(mi.name)] = {"mesh": cel_mesh, "chunks": [], "solid": [], "aabb": cel_mesh.get_aabb(), "surfaces": surface_names(mi.mesh)}
 	for mi: MeshInstance3D in nodes:
 		var n := String(mi.name)
 		if not n.contains("__"):
 			continue
 		var base := n.get_slice("__", 0)
-		var m := _celify(mi.mesh)
+		var m := _celify(mi.mesh, mi.transform.origin - origins[base])
 		var shape: ConvexPolygonShape3D = m.create_convex_shape(true, false)
 		var a := m.get_aabb()
 		_pieces[base].solid.append({
@@ -167,11 +167,16 @@ static func _thin(src: ArrayMesh, run0: float) -> ArrayMesh:
 	return out
 
 
-## Copy of the mesh with each surface's glTF material swapped for cel shading.
-static func _celify(src: Mesh) -> ArrayMesh:
+## Copy of the mesh with each surface's glTF material swapped for cel shading,
+## and (v0.25) UVs in metres for the material textures, box-mapped in the
+## piece's own space (offset: a chunk's place in its piece), so the bricks
+## line up across a wall and stay put on the bits when it breaks.
+static func _celify(src: Mesh, offset: Vector3) -> ArrayMesh:
 	var out := ArrayMesh.new()
 	for i in src.get_surface_count():
-		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, src.surface_get_arrays(i))
+		var arr := src.surface_get_arrays(i)
+		arr[Mesh.ARRAY_TEX_UV] = box_uvs(arr[Mesh.ARRAY_VERTEX], arr[Mesh.ARRAY_NORMAL], offset)
+		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
 		var mat := src.surface_get_material(i)
 		var col := (mat as BaseMaterial3D).albedo_color if mat is BaseMaterial3D else Color(0.7, 0.7, 0.7)
 		var mname := mat.resource_name if mat else ""
@@ -179,15 +184,66 @@ static func _celify(src: Mesh) -> ArrayMesh:
 	return out
 
 
+static func box_uvs(verts: PackedVector3Array, normals: PackedVector3Array, offset: Vector3) -> PackedVector2Array:
+	var uv := PackedVector2Array()
+	uv.resize(verts.size())
+	for k in verts.size():
+		var p := verts[k] + offset
+		var n := normals[k] if k < normals.size() else Vector3.UP
+		var a := n.abs()
+		if a.y >= a.x and a.y >= a.z:
+			uv[k] = Vector2(p.x, p.z)
+		elif a.x >= a.z:
+			uv[k] = Vector2(p.z * signf(n.x), -p.y)
+		else:
+			uv[k] = Vector2(-p.x * signf(n.z), -p.y)
+	return uv
+
+
+## v0.25 (beenster: "all building materials should have textures to help
+## represent what they are"): the texture for each kit material.
+const SURFACE_TEX := {"kit_wall": "brick", "kit_brick": "brick", "kit_slab": "floor", "kit_column": "concrete",
+	"kit_plaster": "plaster", "kit_roof": "roof", "kit_pave": "pavement", "kit_road": "asphalt",
+	"kit_wood": "wood", "kit_metal": "metal"}
+static var _tex := {}
+
+
+static func texture(name: String) -> Texture2D:
+	if name == "":
+		return null
+	if not _tex.has(name):
+		_tex[name] = load(Cel.KIT_TEX_DIR + name + ".png")
+	return _tex[name]
+
+
+static func texture_for(mname: String) -> Texture2D:
+	if mname.ends_with("_inner"):
+		return null if mname.begins_with("kit_glass") else texture("rubble")
+	return texture(SURFACE_TEX.get(mname, ""))
+
+
+## What a building's outside walls are made of, from its colour: reds and
+## browns are brick, pale creams stone, greys and blues concrete.
+static func wall_texture(c: Color) -> Texture2D:
+	var hi := maxf(c.r, maxf(c.g, c.b))
+	var sat := (hi - minf(c.r, minf(c.g, c.b))) / maxf(hi, 0.001)
+	if sat > 0.35:
+		return texture("brick")
+	if c.get_luminance() > 0.62:
+		return texture("stone")
+	return texture("concrete")
+
+
 ## The cel material for a kit surface, by its glTF material name.
 static func material_for(mname: String, col: Color) -> Material:
+	var tex := texture_for(mname)
 	if mname.begins_with("kit_glass"):
 		return Cel.material(col, false, 0.02, null, 0.4)
 	if mname.begins_with("kit_road") or mname.begins_with("kit_pave") or mname.begins_with("kit_paint"):
-		return Cel.material(col, false, 0.025, null, 1.0, true)
+		return Cel.material(col, false, 0.025, tex, 1.0, true)
 	if mname.begins_with("kit_roof"):
-		return Cel.material(col, true, 0.02, null, 1.0, true)
-	return Cel.material(col, true, 0.02)
+		return Cel.material(col, true, 0.02, tex, 1.0, true)
+	return Cel.material(col, true, 0.02, tex)
 
 
 static func surface_names(m: Mesh) -> PackedStringArray:
@@ -205,7 +261,7 @@ static func tint(mi: MeshInstance3D, surfaces: PackedStringArray, color: Color) 
 		return
 	for i in surfaces.size():
 		if surfaces[i] == "kit_wall":
-			mi.set_surface_override_material(i, Cel.material(color, true, 0.02))
+			mi.set_surface_override_material(i, Cel.material(color, true, 0.02, wall_texture(color)))
 
 
 static func _hull_volume(m: Mesh) -> float:

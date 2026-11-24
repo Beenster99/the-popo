@@ -36,10 +36,20 @@ static func resolve(world: DestructionWorld, cars: CarSync, origin: Vector3, dir
 	elif hit and hit.collider.has_method("on_bullet"):
 		hit.collider.on_bullet(hit.position, shooter)   # a range target
 	elif hit and hit.collider is Car and cars:
-		var surface := cars.bullet_hit(hit.collider, hit.position, dir)
-		if world:
+		var car := hit.collider as Car
+		# v0.25: in through a window, whole or already gone, at whoever's sat there.
+		var pane := car is PoliceCar and Net.is_host() and (car as PoliceCar).window_on_path(car.global_transform.affine_inverse() * (hit.position as Vector3), car.global_transform.basis.inverse() * dir)
+		var surface := cars.bullet_hit(car, hit.position, dir) if not pane or (car as PoliceCar).window_at(car.global_transform.affine_inverse() * (hit.position as Vector3), car.global_transform.basis.inverse() * dir) != "" else "glass"
+		if world and surface != "glass":
 			world.bullet_hit(null, hit.position, hit.normal, dir)
 		_sound(origin, hit.position, surface, 0, shooter)
+		var tr := shooter.get_tree().get_first_node_in_group("traffic") as TrafficSystem
+		if surface == "glass" and tr:
+			var flesh = tr.shoot_occupant(car, hit.position, dir, shooter.shot_damage())
+			if flesh != null:
+				_sound(origin, flesh, "flesh", 1, shooter)
+				whizz(shooter.get_tree(), origin, flesh, shooter)
+				return flesh
 	elif hit and world:
 		world.bullet_hit(hit.collider, hit.position, hit.normal, dir)
 	var end: Vector3 = hit.position if hit else origin + dir * 60.0

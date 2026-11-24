@@ -166,6 +166,108 @@ const KINDS := {
 			[Vector3(1.4, 0.05, 0.02), Vector3(0, -0.05, 0.41), "2a2c30"], [Vector3(0.2, 0.2, 0.2), Vector3(0.5, 0.45, 0), "8a8d92"]]},
 	"extinguisher": {"size": Vector3(-0.1, 0.55, 0), "mass": 9.0, "hp": 12.0, "surface": "metal", "throw": true, "puffs": true,
 		"parts": [[Vector3(-0.1, 0.48, 0), Vector3(0, -0.035, 0), "c41f1f"], [Vector3(0.06, 0.08, 0.14), Vector3(0, 0.25, 0.03), "202226"]]},
+	# v0.25 (beenster, 2026-11-24: "add another 50 furniture models"): homes,
+	# kitchens and bathrooms, offices, shops, workshops and the park.
+	"coffee_table": {"size": Vector3(1.1, 0.45, 0.6), "mass": 15.0, "hp": 40.0, "surface": "wood", "throw": false, "flammable": true,
+		"parts": [[Vector3(1.1, 0.04, 0.6), Vector3(0, 0.2, 0), "6e4528"], [Vector3(1, 0.02, 0.5), Vector3(0, -0.1, 0), "6e4528"]]},
+	"tv_stand": {"size": Vector3(1.4, 0.5, 0.45), "mass": 25.0, "hp": 60.0, "surface": "wood", "throw": false, "flammable": true,
+		"parts": [[Vector3(1.4, 0.46, 0.45), Vector3(0, 0, 0), "2a2a30"]]},
+	"floor_lamp": {"size": Vector3(0.4, 1.7, 0.4), "mass": 5.0, "hp": 10.0, "surface": "metal", "throw": true, "flammable": false,
+		"parts": [[Vector3(0.03, 1.4, 0.03), Vector3(0, -0.1, 0), "8a8d92"], [Vector3(0.36, 0.3, 0.36), Vector3(0, 0.7, 0), "efe4c4"]]},
+	"side_table": {"size": Vector3(0.45, 0.55, 0.45), "mass": 5.0, "hp": 20.0, "surface": "wood", "throw": true, "flammable": true,
+		"parts": [[Vector3(0.44, 0.03, 0.44), Vector3(0, 0.26, 0), "8a5a34"], [Vector3(0.05, 0.5, 0.05), Vector3(0, 0, 0), "6e4528"]]},
+	"sideboard": {"size": Vector3(1.64, 0.85, 0.48), "mass": 40.0, "hp": 80.0, "surface": "wood", "throw": false, "flammable": true,
+		"parts": [[Vector3(1.6, 0.8, 0.45), Vector3(0, 0, 0), "6e4528"]]},
+	"piano": {"size": Vector3(1.5, 1.3, 0.7), "mass": 220.0, "hp": 200.0, "surface": "wood", "throw": false, "flammable": true,
+		"parts": [[Vector3(1.5, 1.25, 0.4), Vector3(0, 0, -0.1), "1a1214"], [Vector3(1.5, 0.05, 0.28), Vector3(0, 0.07, 0.2), "f4f2ec"]]},
+	"aquarium": {"size": Vector3(1, 1.25, 0.45), "mass": 90.0, "hp": 25.0, "surface": "glass", "throw": false, "flammable": false,
+		"parts": [[Vector3(1, 0.75, 0.45), Vector3(0, -0.25, 0), "2a2a30"], [Vector3(0.96, 0.42, 0.4), Vector3(0, 0.33, 0), "6ab0d0"]]},
+	"bean_bag": {"size": Vector3(0.9, 0.6, 0.9), "mass": 4.0, "hp": 30.0, "surface": "wood", "throw": true, "flammable": true,
+		"parts": [[Vector3(0.8, 0.5, 0.8), Vector3(0, 0, 0), "c96a3a"]]},
+	"recliner": {"size": Vector3(0.9, 1, 1.1), "mass": 35.0, "hp": 60.0, "surface": "wood", "throw": false, "flammable": true,
+		"parts": [[Vector3(0.85, 0.6, 0.85), Vector3(0, -0.2, 0), "5a3a2e"]]},
+	"dining_table": {"size": Vector3(1.8, 0.76, 0.95), "mass": 40.0, "hp": 80.0, "surface": "wood", "throw": false, "flammable": true,
+		"parts": [[Vector3(1.8, 0.05, 0.95), Vector3(0, 0.35, 0), "6e4528"], [Vector3(0.1, 0.7, 0.1), Vector3(-0.65, 0, 0), "4a3020"]]},
+	"wardrobe": {"size": Vector3(1.24, 2, 0.62), "mass": 70.0, "hp": 110.0, "surface": "wood", "throw": false, "flammable": true,
+		"parts": [[Vector3(1.2, 1.95, 0.58), Vector3(0, 0, 0), "8a5a34"]]},
+	"dresser": {"size": Vector3(1.04, 0.9, 0.5), "mass": 40.0, "hp": 80.0, "surface": "wood", "throw": false, "flammable": true,
+		"parts": [[Vector3(1, 0.85, 0.48), Vector3(0, 0, 0), "9b6a3c"]]},
+	"nightstand": {"size": Vector3(0.47, 1, 0.42), "mass": 10.0, "hp": 35.0, "surface": "wood", "throw": true, "flammable": true,
+		"parts": [[Vector3(0.45, 0.5, 0.4), Vector3(0, -0.2, 0), "9b6a3c"]]},
+	"bunk_bed": {"size": Vector3(1.02, 1.7, 2), "mass": 70.0, "hp": 120.0, "surface": "metal", "throw": false, "flammable": true,
+		"parts": [[Vector3(1, 0.12, 2), Vector3(0, -0.6, 0), "3a6a8a"], [Vector3(1, 0.12, 2), Vector3(0, 0.3, 0), "3a6a8a"]]},
+	"single_bed": {"size": Vector3(0.95, 0.5, 2.02), "mass": 35.0, "hp": 80.0, "surface": "metal", "throw": false, "flammable": true,
+		"parts": [[Vector3(0.95, 0.2, 2), Vector3(0, -0.05, 0), "8a8d92"], [Vector3(0.9, 0.16, 1.95), Vector3(0, 0.13, 0), "e8e4da"]]},
+	"cot": {"size": Vector3(0.68, 0.95, 1.26), "mass": 15.0, "hp": 40.0, "surface": "wood", "throw": false, "flammable": true,
+		"parts": [[Vector3(0.66, 0.5, 1.24), Vector3(0, 0, 0), "e8e6e0"]]},
+	"laundry_basket": {"size": Vector3(0.48, 0.56, 0.48), "mass": 2.0, "hp": 15.0, "surface": "wood", "throw": true, "flammable": true,
+		"parts": [[Vector3(0.44, 0.48, 0.44), Vector3(0, 0, 0), "e8e6e0"]]},
+	"stove": {"size": Vector3(0.6, 0.9, 0.64), "mass": 60.0, "hp": 150.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(0.6, 0.86, 0.6), Vector3(0, -0.02, 0), "e8e6e0"]]},
+	"microwave": {"size": Vector3(0.5, 0.3, 0.38), "mass": 15.0, "hp": 20.0, "surface": "metal", "throw": true, "flammable": false,
+		"parts": [[Vector3(0.5, 0.3, 0.36), Vector3(0, 0, 0), "e8e6e0"]]},
+	"bar_stool": {"size": Vector3(0.4, 0.75, 0.4), "mass": 6.0, "hp": 30.0, "surface": "metal", "throw": true, "flammable": false,
+		"parts": [[Vector3(0.36, 0.06, 0.36), Vector3(0, 0.35, 0), "c41f1f"], [Vector3(0.06, 0.66, 0.06), Vector3(0, 0, 0), "b8bcc2"]]},
+	"kitchen_island": {"size": Vector3(1.86, 0.92, 0.96), "mass": 120.0, "hp": 160.0, "surface": "wood", "throw": false, "flammable": true,
+		"parts": [[Vector3(1.8, 0.86, 0.9), Vector3(0, -0.03, 0), "e8e6e0"], [Vector3(1.86, 0.05, 0.96), Vector3(0, 0.43, 0), "3a3d42"]]},
+	"pedal_bin": {"size": Vector3(0.32, 0.62, 0.4), "mass": 4.0, "hp": 40.0, "surface": "metal", "throw": true, "flammable": false,
+		"parts": [[Vector3(0.3, 0.6, 0.3), Vector3(0, 0, 0), "b8bcc2"]]},
+	"toilet": {"size": Vector3(0.42, 0.8, 0.7), "mass": 30.0, "hp": 40.0, "surface": "glass", "throw": false, "flammable": false,
+		"parts": [[Vector3(0.38, 0.4, 0.5), Vector3(0, -0.2, 0.05), "f4f4f0"], [Vector3(0.36, 0.4, 0.17), Vector3(0, 0.2, -0.2), "f4f4f0"]]},
+	"bath": {"size": Vector3(1.7, 0.6, 0.75), "mass": 70.0, "hp": 150.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(1.7, 0.56, 0.75), Vector3(0, 0, 0), "f4f4f0"]]},
+	"basin": {"size": Vector3(0.56, 1, 0.42), "mass": 25.0, "hp": 30.0, "surface": "glass", "throw": false, "flammable": false,
+		"parts": [[Vector3(0.56, 0.16, 0.42), Vector3(0, 0.3, 0), "f4f4f0"], [Vector3(0.18, 0.68, 0.18), Vector3(0, -0.1, 0), "f4f4f0"]]},
+	"shower": {"size": Vector3(0.92, 2.1, 0.92), "mass": 60.0, "hp": 40.0, "surface": "glass", "throw": false, "flammable": false,
+		"parts": [[Vector3(0.9, 0.08, 0.9), Vector3(0, -1, 0), "f4f4f0"], [Vector3(0.86, 1.9, 0.02), Vector3(0, 0, 0.44), "b9d6e2"]]},
+	"office_chair": {"size": Vector3(0.62, 1.05, 0.62), "mass": 12.0, "hp": 40.0, "surface": "metal", "throw": true, "flammable": false,
+		"parts": [[Vector3(0.48, 0.08, 0.46), Vector3(0, -0.06, 0), "2a2a30"], [Vector3(0.44, 0.48, 0.06), Vector3(0, 0.26, -0.22), "2a2a30"]]},
+	"printer": {"size": Vector3(0.45, 0.36, 0.5), "mass": 9.0, "hp": 20.0, "surface": "metal", "throw": true, "flammable": false,
+		"parts": [[Vector3(0.45, 0.24, 0.38), Vector3(0, -0.03, 0), "d9d6cf"]]},
+	"photocopier": {"size": Vector3(0.95, 1.2, 0.75), "mass": 110.0, "hp": 120.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(0.85, 0.95, 0.65), Vector3(0, -0.1, 0), "d9d6cf"]]},
+	"whiteboard": {"size": Vector3(1.5, 1.8, 0.62), "mass": 18.0, "hp": 40.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(1.5, 0.95, 0.03), Vector3(0, 0.35, 0), "fafaf6"]]},
+	"server_rack": {"size": Vector3(0.6, 2, 0.95), "mass": 180.0, "hp": 250.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(0.6, 2, 0.9), Vector3(0, 0, 0), "1a1a1c"]]},
+	"safe": {"size": Vector3(0.6, 0.8, 0.68), "mass": 300.0, "hp": 900.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(0.6, 0.8, 0.6), Vector3(0, 0, 0), "3a3d42"]]},
+	"coat_stand": {"size": Vector3(0.5, 1.8, 0.5), "mass": 6.0, "hp": 25.0, "surface": "wood", "throw": true, "flammable": true,
+		"parts": [[Vector3(0.05, 1.75, 0.05), Vector3(0, 0, 0), "4a3020"], [Vector3(0.36, 0.8, 0.14), Vector3(0.12, 0.35, 0), "3b5677"]]},
+	"partition": {"size": Vector3(1.62, 1.5, 0.4), "mass": 20.0, "hp": 50.0, "surface": "wood", "throw": false, "flammable": true,
+		"parts": [[Vector3(1.6, 1.42, 0.06), Vector3(0, 0, 0), "5e6f7f"]]},
+	"till": {"size": Vector3(1.04, 1.1, 0.64), "mass": 70.0, "hp": 120.0, "surface": "wood", "throw": false, "flammable": true,
+		"parts": [[Vector3(1, 0.9, 0.6), Vector3(0, -0.1, 0), "2f5d8a"], [Vector3(0.36, 0.08, 0.3), Vector3(0.25, 0.43, -0.05), "202226"]]},
+	"drinks_fridge": {"size": Vector3(0.7, 1.95, 0.68), "mass": 110.0, "hp": 120.0, "surface": "glass", "throw": false, "flammable": false,
+		"parts": [[Vector3(0.7, 1.95, 0.65), Vector3(0, 0, 0), "c41f1f"]]},
+	"magazine_rack": {"size": Vector3(0.9, 1.4, 0.42), "mass": 20.0, "hp": 40.0, "surface": "metal", "throw": false, "flammable": true,
+		"parts": [[Vector3(0.9, 1.4, 0.04), Vector3(0, 0, -0.18), "8a8d92"], [Vector3(0.8, 0.26, 0.05), Vector3(0, 0.2, 0), "c41f1f"]]},
+	"clothes_rail": {"size": Vector3(1.5, 1.6, 0.5), "mass": 15.0, "hp": 40.0, "surface": "metal", "throw": false, "flammable": true,
+		"parts": [[Vector3(1.4, 0.75, 0.42), Vector3(0, 0.3, 0), "3b5677"], [Vector3(0.04, 1.55, 0.04), Vector3(-0.7, 0, 0), "b8bcc2"]]},
+	"display_table": {"size": Vector3(1.4, 0.9, 0.8), "mass": 30.0, "hp": 70.0, "surface": "wood", "throw": false, "flammable": true,
+		"parts": [[Vector3(1.4, 0.06, 0.8), Vector3(0, 0.37, 0), "e8e6e0"], [Vector3(1.3, 0.7, 0.7), Vector3(0, -0.03, 0), "d9d6cf"]]},
+	"cash_machine": {"size": Vector3(0.8, 1.7, 0.72), "mass": 350.0, "hp": 600.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(0.8, 1.7, 0.6), Vector3(0, 0, -0.05), "3a3d42"]]},
+	"chest_freezer": {"size": Vector3(1.3, 0.86, 0.7), "mass": 70.0, "hp": 120.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(1.3, 0.82, 0.65), Vector3(0, 0, 0), "e8e6e0"]]},
+	"workbench": {"size": Vector3(1.8, 1.6, 0.76), "mass": 70.0, "hp": 140.0, "surface": "wood", "throw": false, "flammable": true,
+		"parts": [[Vector3(1.8, 0.06, 0.75), Vector3(0, 0.07, 0), "a87a46"], [Vector3(0.07, 0.84, 0.07), Vector3(-0.84, -0.38, 0), "3a3d42"]]},
+	"tool_chest": {"size": Vector3(0.8, 1.1, 0.52), "mass": 90.0, "hp": 200.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(0.7, 1, 0.5), Vector3(0, 0, 0), "c41f1f"]]},
+	"steel_shelving": {"size": Vector3(1.8, 2, 0.6), "mass": 60.0, "hp": 160.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(1.8, 0.03, 0.6), Vector3(0, -0.4, 0), "8a8d92"], [Vector3(0.45, 0.35, 0.45), Vector3(0, -0.2, 0), "c9b48a"]]},
+	"boxes": {"size": Vector3(0.8, 0.9, 0.6), "mass": 12.0, "hp": 20.0, "surface": "wood", "throw": false, "flammable": true,
+		"parts": [[Vector3(0.5, 0.4, 0.4), Vector3(-0.15, -0.25, 0), "c9a87a"], [Vector3(0.4, 0.3, 0.35), Vector3(0.05, 0.1, 0), "c9a87a"]]},
+	"ladder": {"size": Vector3(0.5, 2, 0.1), "mass": 8.0, "hp": 60.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(0.04, 2, 0.08), Vector3(-0.22, 0, 0), "b8bcc2"], [Vector3(0.44, 0.03, 0.03), Vector3(0, 0, 0), "c9ccd0"]]},
+	"sack_truck": {"size": Vector3(0.6, 1.2, 0.4), "mass": 12.0, "hp": 80.0, "surface": "metal", "throw": true, "flammable": false,
+		"parts": [[Vector3(0.04, 1.15, 0.04), Vector3(-0.18, 0, 0), "c41f1f"], [Vector3(0.4, 0.02, 0.22), Vector3(0, -0.58, 0.06), "8a8d92"]]},
+	"waiting_seats": {"size": Vector3(1.8, 0.88, 0.6), "mass": 45.0, "hp": 120.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(1.8, 0.05, 0.45), Vector3(0, 0, 0), "2f5d8a"], [Vector3(1.8, 0.42, 0.05), Vector3(0, 0.24, -0.22), "2f5d8a"]]},
+	"picnic_table": {"size": Vector3(1.8, 0.76, 1.7), "mass": 60.0, "hp": 120.0, "surface": "wood", "throw": false, "flammable": true,
+		"parts": [[Vector3(1.8, 0.04, 0.45), Vector3(0, 0.36, 0), "8a5a34"], [Vector3(1.8, 0.04, 0.25), Vector3(0, 0.06, 0.6), "8a5a34"]]},
+	"bbq": {"size": Vector3(0.62, 0.95, 0.62), "mass": 12.0, "hp": 60.0, "surface": "metal", "throw": false, "flammable": false,
+		"parts": [[Vector3(0.6, 0.3, 0.6), Vector3(0, 0.27, 0), "1a1a1c"], [Vector3(0.03, 0.6, 0.03), Vector3(0.18, -0.15, 0), "1a1a1c"]]},
 }
 
 static var current: PropWorld
@@ -395,83 +497,175 @@ func _furnish_rooms(b: Dictionary, rng: RandomNumberGenerator, limit: int) -> vo
 
 func _furnish_module(b: Dictionary, rng: RandomNumberGenerator, kind: String, cx: float, y: float, cz: float, basis: Basis) -> void:
 	var roll := rng.randf()
+	# v0.25: more to furnish rooms with (fifty new pieces), picked per room.
+	var at := func(dx: float, dz: float, yaw := 0.0, up := 0.0) -> Transform3D:
+		return _local(b, cx + dx, y + up, cz + dz, basis, yaw)
 	match kind:
 		"living":
-			if roll < 0.4:
-				add_prop("sofa", _local(b, cx, y, cz + 1.2, basis, PI))
+			if roll < 0.3:
+				add_prop("sofa", at.call(0.0, 1.2, PI))
+				var r2 := rng.randf()
+				if r2 < 0.4:
+					add_prop("coffee_table", at.call(0.0, 0.1))
+				elif r2 < 0.75:
+					add_prop("tv_stand", at.call(0.0, -1.5))
+					add_prop("tv", at.call(0.0, -1.5, 0.0, 0.5))
+				else:
+					add_prop("table", at.call(0.0, -0.2))
+				if rng.randf() < 0.4:
+					add_prop("floor_lamp", at.call(1.3, 1.4))
+			elif roll < 0.45:
+				add_prop("armchair", at.call(-0.6, 0.0, rng.randf_range(-0.5, 0.5)))
+				add_prop("side_table", at.call(0.2, 0.3))
+				add_prop("plant", at.call(1.4, 1.4))
+			elif roll < 0.55:
+				add_prop("recliner", at.call(0.0, 0.3, PI + rng.randf_range(-0.4, 0.4)))
+				add_prop("bean_bag" if rng.randf() < 0.5 else "floor_lamp", at.call(1.2, 1.2))
+			elif roll < 0.65:
+				add_prop("bookcase", at.call(0.0, 1.6, PI))
 				if rng.randf() < 0.5:
-					add_prop("table", _local(b, cx, y, cz - 0.2, basis, 0.0))
-				elif rng.randf() < 0.6:
-					add_prop("cabinet", _local(b, cx, y, cz - 1.5, basis, 0.0))
-					add_prop("tv", _local(b, cx, y + 1.3, cz - 1.5, basis, 0.0))
-			elif roll < 0.6:
-				add_prop("armchair", _local(b, cx - 0.6, y, cz, basis, rng.randf_range(-0.5, 0.5)))
-				add_prop("plant", _local(b, cx + 1.4, y, cz + 1.4, basis, 0.0))
-			elif roll < 0.75:
-				add_prop("bookcase", _local(b, cx, y, cz + 1.6, basis, PI))
+					add_prop("sideboard", at.call(0.0, -1.6))
+			elif roll < 0.72:
+				add_prop("piano", at.call(0.0, 1.5, PI))
+				add_prop("chair", at.call(0.0, 0.6, PI))
+			elif roll < 0.78:
+				add_prop("aquarium", at.call(0.0, 1.6, PI))
+			elif roll < 0.88:
+				add_prop("dining_table", at.call(0.0, 0.0))
+				for n in 4:
+					var sx := -0.5 if n % 2 == 0 else 0.5
+					var sz := -0.75 if n < 2 else 0.75
+					add_prop("chair", at.call(sx, sz, 0.0 if sz > 0.0 else PI))
 			else:
 				_furnish_cell(b, rng, cx, y, cz, basis, false)
 		"bedroom":
-			add_prop("bed", _local(b, cx, y, cz + 0.6, basis, PI if roll < 0.5 else 0.0))
-			if rng.randf() < 0.5:
-				add_prop("cabinet", _local(b, cx + 1.5, y, cz - 1.4, basis, 0.0))
+			var bed := "bed" if roll < 0.5 else ("single_bed" if roll < 0.8 else "bunk_bed")
+			add_prop(bed, at.call(0.0, 0.6, PI if rng.randf() < 0.5 else 0.0))
+			var r2 := rng.randf()
+			add_prop("nightstand", at.call(-1.1, 1.3))
+			if r2 < 0.4:
+				add_prop("wardrobe", at.call(1.4, -1.5))
+			elif r2 < 0.7:
+				add_prop("dresser", at.call(1.3, -1.6))
+			elif r2 < 0.85:
+				add_prop("cabinet", at.call(1.5, -1.4))
+			if rng.randf() < 0.3:
+				add_prop("laundry_basket", at.call(-1.4, -1.4))
+			elif rng.randf() < 0.12:
+				add_prop("cot", at.call(-1.2, -1.0))
 		"kitchen":
-			add_prop("counter", _local(b, cx, y, cz + 1.6, basis, PI))
-			if roll < 0.6:
-				add_prop("fridge", _local(b, cx + 1.4, y, cz - 1.2, basis, 0.0))
+			add_prop("counter", at.call(0.0, 1.6, PI))
+			if rng.randf() < 0.6:
+				add_prop("microwave", at.call(-0.5, 1.6, PI, 1.0))
+			if roll < 0.35:
+				add_prop("fridge", at.call(1.4, -1.2))
+			elif roll < 0.55:
+				add_prop("washer", at.call(-1.4, -1.3))
 			elif roll < 0.8:
-				add_prop("washer", _local(b, cx - 1.4, y, cz - 1.3, basis, 0.0))
-			for n in rng.randi_range(0, 3):
-				add_prop("bottle", _local(b, cx - 0.6 + n * 0.3, y + 1.01, cz + 1.6, basis, 0.0))
-			if rng.randf() < 0.5:
-				add_prop("gas", _local(b, cx + 1.4, y, cz + 1.5, basis, 0.0))
-		"bathroom":
-			add_prop("cabinet", _local(b, cx, y, cz + 1.6, basis, PI))
-		"shopfloor":
-			add_prop("shelf", _local(b, cx, y, cz + 0.4, basis, PI))
-			for n in rng.randi_range(1, 3):
-				add_prop("bottle", _local(b, cx - 0.5 + n * 0.25, y + 1.81, cz + 0.4, basis, 0.0))
-			if roll < 0.25:
-				add_prop("counter", _local(b, cx, y, cz - 1.0, basis, 0.0))
-		"stock", "hall":
-			if roll < 0.5:
-				add_prop("pallet", _local(b, cx, y, cz, basis, rng.randf_range(-0.2, 0.2)))
-				for n in rng.randi_range(1, 4):
-					add_prop("crate", _local(b, cx - 0.3 + (n % 2) * 0.6, y + 0.15 + (n / 2) * 0.6, cz, basis, 0.0))
-			elif roll < 0.7:
-				add_prop("shelf", _local(b, cx, y, cz + 1.4, basis, PI))
-			elif roll < 0.8:
-				add_prop("barrel", _local(b, cx, y, cz, basis, 0.0))
-			elif roll < 0.9:
-				add_prop("tyres", _local(b, cx, y, cz, basis, 0.0))
+				add_prop("stove", at.call(1.4, -1.3))
 			else:
-				add_prop("gas", _local(b, cx + 0.8, y, cz + 0.8, basis, 0.0))
+				add_prop("kitchen_island", at.call(0.0, -0.4))
+				for n in 2:
+					add_prop("bar_stool", at.call(-0.4 + n * 0.8, -1.2))
+			for n in rng.randi_range(0, 3):
+				add_prop("bottle", at.call(0.1 + n * 0.25, 1.6, 0.0, 1.01))
+			if rng.randf() < 0.5:
+				add_prop("pedal_bin", at.call(-1.5, 1.6))
+			elif rng.randf() < 0.5:
+				add_prop("gas", at.call(1.4, 1.5))
+		"bathroom":
+			add_prop("toilet", at.call(-1.2, 1.4, PI))
+			add_prop("basin", at.call(0.0, 1.65, PI))
+			add_prop("bath" if roll < 0.55 else "shower", at.call(0.0, -1.2) if roll < 0.55 else at.call(1.3, -1.3))
+			if rng.randf() < 0.4:
+				add_prop("cabinet", at.call(1.5, 1.6, PI))
+		"shopfloor":
+			if roll < 0.35:
+				add_prop("shelf", at.call(0.0, 0.4, PI))
+				for n in rng.randi_range(1, 3):
+					add_prop("bottle", at.call(-0.5 + n * 0.25, 0.4, 0.0, 1.81))
+			elif roll < 0.5:
+				add_prop("drinks_fridge", at.call(0.0, 1.5, PI))
+			elif roll < 0.62:
+				add_prop("clothes_rail", at.call(0.0, 0.0, rng.randf_range(-0.2, 0.2)))
+			elif roll < 0.72:
+				add_prop("display_table", at.call(0.0, 0.0))
+			elif roll < 0.8:
+				add_prop("magazine_rack", at.call(0.0, 1.6, PI))
+			elif roll < 0.86:
+				add_prop("chest_freezer", at.call(0.0, 0.5))
+			elif roll < 0.93:
+				add_prop("till", at.call(0.0, -1.0))
+			else:
+				add_prop("cash_machine", at.call(0.0, 1.5, PI))
+		"stock", "hall":
+			if roll < 0.35:
+				add_prop("pallet", at.call(0.0, 0.0, rng.randf_range(-0.2, 0.2)))
+				for n in rng.randi_range(1, 4):
+					add_prop("crate", at.call(-0.3 + (n % 2) * 0.6, 0.0, 0.0, 0.15 + (n / 2) * 0.6))
+			elif roll < 0.5:
+				add_prop("shelf" if rng.randf() < 0.4 else "steel_shelving", at.call(0.0, 1.4, PI))
+			elif roll < 0.6:
+				add_prop("workbench", at.call(0.0, 1.4, PI))
+				if rng.randf() < 0.6:
+					add_prop("tool_chest", at.call(1.4, 1.5, PI))
+			elif roll < 0.68:
+				add_prop("boxes", at.call(0.0, 0.0, rng.randf() * TAU))
+			elif roll < 0.74:
+				add_prop("ladder", at.call(0.0, 1.75, PI))
+				add_prop("sack_truck", at.call(1.0, 1.0, rng.randf() * TAU))
+			elif roll < 0.82:
+				add_prop("barrel", at.call(0.0, 0.0))
+			elif roll < 0.9:
+				add_prop("tyres", at.call(0.0, 0.0))
+			else:
+				add_prop("gas", at.call(0.8, 0.8))
 		"office":
-			add_prop("desk", _local(b, cx, y, cz, basis, PI if roll < 0.5 else 0.0))
-			add_prop("chair", _local(b, cx, y, cz + (0.7 if roll >= 0.5 else -0.7), basis, PI if roll >= 0.5 else 0.0))
+			add_prop("desk", at.call(0.0, 0.0, PI if roll < 0.5 else 0.0))
+			add_prop("office_chair" if rng.randf() < 0.7 else "chair", at.call(0.0, 0.7 if roll >= 0.5 else -0.7, PI if roll >= 0.5 else 0.0))
 			var extra := rng.randf()
-			if extra < 0.3:
-				add_prop("cabinet", _local(b, cx + 1.6, y, cz + 1.5, basis, PI))
-			elif extra < 0.42:
-				add_prop("plant", _local(b, cx + 1.6, y, cz + 1.5, basis, 0.0))
-			elif extra < 0.5:
-				add_prop("water_cooler", _local(b, cx + 1.6, y, cz + 1.5, basis, 0.0))
+			if extra < 0.2:
+				add_prop("cabinet", at.call(1.6, 1.5, PI))
+			elif extra < 0.3:
+				add_prop("plant", at.call(1.6, 1.5))
+			elif extra < 0.36:
+				add_prop("water_cooler", at.call(1.6, 1.5))
+			elif extra < 0.44:
+				add_prop("photocopier", at.call(1.4, 1.4, PI))
+			elif extra < 0.52:
+				add_prop("partition", at.call(0.0, 1.2))
+			elif extra < 0.58:
+				add_prop("server_rack", at.call(1.5, 1.4, PI))
+			elif extra < 0.64:
+				add_prop("safe", at.call(1.5, 1.5, PI))
+			elif extra < 0.7:
+				add_prop("coat_stand", at.call(1.6, 1.6))
+			if rng.randf() < 0.3:
+				add_prop("printer", at.call(-0.5, 0.0, 0.0, 0.76))
 		"meeting":
-			add_prop("table", _local(b, cx, y, cz, basis, 0.0))
+			add_prop("table" if roll < 0.6 else "dining_table", at.call(0.0, 0.0))
 			for n in 4:
 				var a := n * TAU / 4.0 + 0.4
-				add_prop("chair", _local(b, cx + cos(a) * 0.95, y, cz + sin(a) * 0.95, basis, -a - PI * 0.5))
+				add_prop("chair" if roll < 0.6 else "office_chair", at.call(cos(a) * 0.95 * (1.2 if roll >= 0.6 else 1.0), sin(a) * 0.95, -a - PI * 0.5))
+			if rng.randf() < 0.5:
+				add_prop("whiteboard", at.call(0.0, 1.6, PI))
 		"lobby":
-			if roll < 0.4:
-				add_prop("counter", _local(b, cx, y, cz, basis, 0.0))
-			elif roll < 0.55:
-				add_prop("vending", _local(b, cx, y, cz + 1.4, basis, PI))
+			if roll < 0.3:
+				add_prop("counter", at.call(0.0, 0.0))
+			elif roll < 0.45:
+				add_prop("vending", at.call(0.0, 1.4, PI))
+			elif roll < 0.6:
+				add_prop("waiting_seats", at.call(0.0, 1.4, PI))
 			elif roll < 0.7:
-				add_prop("plant", _local(b, cx, y, cz, basis, 0.0))
+				add_prop("plant", at.call(0.0, 0.0))
+			elif roll < 0.78:
+				add_prop("cash_machine", at.call(0.0, 1.5, PI))
+			elif roll < 0.86:
+				add_prop("coat_stand", at.call(0.0, 0.0))
 			else:
-				add_prop("chair", _local(b, cx, y, cz, basis, rng.randf() * TAU))
+				add_prop("chair", at.call(0.0, 0.0, rng.randf() * TAU))
 		"cell":
-			add_prop("bench", _local(b, cx, y, cz + 1.4, basis, PI))
+			add_prop("bench", at.call(0.0, 1.4, PI))
 		_:
 			_furnish_cell(b, rng, cx, y, cz, basis, false)
 
@@ -504,6 +698,12 @@ func _furnish_outdoors(blk: Dictionary, rng: RandomNumberGenerator, limit: int) 
 			for k in 8:
 				var p := o + Vector3(rng.randf_range(8.0, ex - 8.0), y - 0.05, rng.randf_range(8.0, ez - 8.0))
 				add_prop("bench", Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p))
+			# v0.25: picnic tables and a barbecue.
+			for k in 3:
+				var p := o + Vector3(rng.randf_range(8.0, ex - 8.0), y - 0.05, rng.randf_range(8.0, ez - 8.0))
+				add_prop("picnic_table", Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p))
+				if k == 0:
+					add_prop("bbq", Transform3D(Basis(), p + Vector3(1.6, 0, 0)))
 		"docks", "industrial":
 			# Container stacks in the yards (good, hard cover), pallets and
 			# barrels.
@@ -714,17 +914,49 @@ func add_prop(kind: String, xf: Transform3D) -> int:
 ## v0.8.1: props past these distances (m) stop drawing.
 const INDOOR_RANGE := 55.0
 const OUTDOOR_RANGE := 110.0
-const OUTDOOR_KINDS := ["bench", "bin", "barrel", "gas", "crate", "pallet", "container", "post_box", "phone_box",
+const OUTDOOR_KINDS := ["picnic_table", "bbq", "bench", "bin", "barrel", "gas", "crate", "pallet", "container", "post_box", "phone_box",
 	"hydrant", "cone", "planter", "vending", "wheelie_bin", "bike_rack", "trolley", "tyres", "extinguisher"]
 static var _kind_meshes := {}
 ## kind -> per surface: whether it holds the kind's first part.
 static var _kind_first := {}
 
 
-## Every part of a kind merged into one mesh, a surface per colour.
+## v0.25: the props' Blender models (tools/blender/build_furniture.py), one
+## mesh per kind, centred on the kind's collision box.
+const MODELS_PATH := "res://assets/models/props/furniture.glb"
+static var _models := {}
+
+
+static func model_of(kind: String) -> Mesh:
+	if _models.is_empty():
+		_models[""] = null
+		var ps := load(MODELS_PATH) as PackedScene
+		if ps:
+			var root := ps.instantiate()
+			for mi in root.find_children("*", "MeshInstance3D", true, false):
+				_models[String(mi.name)] = (mi as MeshInstance3D).mesh
+			root.free()
+	return _models.get(kind)
+
+
+## Every part of a kind merged into one mesh, a surface per colour (the
+## Blender model's, cel shaded, when there is one).
 static func _kind_mesh(kind: String) -> ArrayMesh:
 	if _kind_meshes.has(kind):
 		return _kind_meshes[kind]
+	var model := model_of(kind)
+	if model:
+		var out := ArrayMesh.new()
+		var fs: Array = []
+		for i in model.get_surface_count():
+			out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, model.surface_get_arrays(i))
+			var src := model.surface_get_material(i)
+			var col := (src as BaseMaterial3D).albedo_color if src is BaseMaterial3D else Color(0.7, 0.7, 0.7)
+			out.surface_set_material(i, Cel.material(col, true, 0.012))
+			fs.append(src != null and src.resource_name.begins_with("paint_"))
+		_kind_meshes[kind] = out
+		_kind_first[kind] = fs
+		return out
 	var by_colour := {}    # colour -> SurfaceTool
 	var order: Array = []
 	var first_col := ""
