@@ -12,6 +12,15 @@ old test scenes are still there under Settings > Debug > Open a test scene. Esc 
 Settings, Leave. Settings has Graphics (every option, with presets Low to
 Max), Sound, Gameplay (friendly fire on/off, camera, keys) and Debug.
 
+BLOOD (0.18.0)
+A shot now bursts out of the exit wound as a fine red mist and a spray of
+tiny droplets, which leave fine spatter on the walls, floor and anything
+nearby. The marks stay until the council clean-up crew comes and scrubs
+them off (they turn up about a minute and a half after a fight, or while
+they're already fixing damage nearby). Blood under a body still lying there
+is left alone. All of it follows Settings > Gameplay > Gore.
+Fixed: the blood pool no longer follows you around after you're revived.
+
 TRAFFIC THAT KEEPS MOVING (0.16.0)
 Drivers no longer sit for ever behind a car stopped in their lane (a crash,
 an abandoned car, one of yours left in the road): they edge round it, or
@@ -26,6 +35,13 @@ you within 70 m, is quietly put back into the traffic somewhere else.
 Pulling over for a siren no longer drives them into the parked cars.
 Shipping containers on the docks no longer drop through the ground: two
 were being placed inside each other and the shove pushed one under.
+
+PRISONERS IN THE CAR (0.14.0)
+Walk your prisoners to a police car and press F at a door: the back door
+swings open and every prisoner walking with you climbs in (back seats
+first, then the front passenger seat). Drive them to the custody bay at the
+station to book them. Prisoners following you on foot now walk in single
+file behind you instead of bunching up.
 
 DRIVING AND ON-FOOT FEEL (0.12.1)
 On foot you walk by default now. Hold Shift to sprint (controller: hold L3).

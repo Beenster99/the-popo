@@ -102,3 +102,33 @@ func test_hurt_crew_stops_work() -> void:
 	t.check(fresh >= RepairCrews.CREW.x, "crew all down: a fresh crew sent (%d)" % fresh)
 	s.queue_free()
 	await get_tree().process_frame
+
+
+func test_crews_clean_up_blood() -> void:
+	# beenster (2026-11-24): blood stays until it is cleaned.
+	Settings.values["gore"] = 3
+	var s := await _city()
+	var r := s.repairs
+	var at: Vector3 = s.gen.pavement_near((s.gen.buildings[3].origin as Vector3))
+	for k in 6:
+		Gore.splat(s, at + Vector3(k * 0.5, 0.0, 0.0), Vector3.UP, 0.8, false, Gore.TEX_SPECKLE)
+	var blood := get_tree().get_nodes_in_group("blood").size()
+	t.check(blood >= 6, "blood on the pavement: %d" % blood)
+	for i in 60:
+		await get_tree().physics_frame
+	t.check(get_tree().get_nodes_in_group("blood").size() == blood, "and it stays there")
+	for d in get_tree().get_nodes_in_group("blood"):
+		d.set_meta("t", Time.get_ticks_msec() - int(RepairCrews.BLOOD_WAIT * 1000.0) - 1)
+	r._tick = 0.0
+	for i in 5:
+		await get_tree().physics_frame
+	t.check(r.sites.size() >= 1, "a crew is sent for it")
+	for i in 60 * 60:
+		if r.sites.is_empty():
+			break
+		await get_tree().physics_frame
+	t.check(get_tree().get_nodes_in_group("blood").filter(func(d): return not d.is_queued_for_deletion()).is_empty(), "the crew scrubbed it all away")
+	t.check(r.scrubbed >= 1, "a mark at a time (%d scrubbed)" % r.scrubbed)
+	t.check(r.sites.is_empty(), "and packed up")
+	s.queue_free()
+	await get_tree().process_frame
