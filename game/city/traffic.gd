@@ -266,6 +266,21 @@ func _extend(dr: Dictionary) -> void:
 			if d > best:
 				best = d
 				c = n
+	elif dr.has("goal_lane"):
+		# Heading for one lane (an ambulance): into it from its first
+		# junction, or towards that junction.
+		var gl: Array = dr.goal_lane
+		var ga: Vector2i = gl[0]
+		if b == ga and opts.has(gl[1]):
+			c = gl[1]
+		else:
+			var gp := CityGenerator.junction(ga.x, ga.y)
+			var best := INF
+			for n in opts:
+				var d := CityGenerator.junction(n.x, n.y).distance_to(gp) + _rng.randf_range(0.0, 2.0)
+				if d < best:
+					best = d
+					c = n
 	elif opts.has(straight) and _rng.randf() < 0.5:
 		c = straight
 	else:
@@ -508,7 +523,7 @@ func _drive(dr: Dictionary, delta: float) -> void:
 			dr.mode = "drive"
 	# Sirens: pull over to the kerb and stop for a police car coming through.
 	var siren_behind := _siren_near(car)
-	if siren_behind >= 0.0 and dr.mode == "drive" and not dr.has("suspect"):
+	if siren_behind >= 0.0 and dr.mode == "drive" and not dr.has("suspect") and not dr.get("blues", false):
 		dr.yield = 3.0
 	if dr.yield > 0.0:
 		target += -xf.basis.x * 1.1   # towards the kerb, not into the parked cars
@@ -542,7 +557,7 @@ func _drive(dr: Dictionary, delta: float) -> void:
 		# A turn coming up, or under way (straight on is a single point).
 		if e[1] == 2 and ((i + 1 < pts.size() and pts[i + 1][1] == 2) or (i > 0 and pts[i - 1][1] == 2)):
 			vt = minf(vt, (8.0 if getaway else TURN_SPEED) + maxf(0.0, dist - 6.0) * 0.4)
-		if e[1] == 1 and dr.mode != "flee" and not getaway:
+		if e[1] == 1 and dr.mode != "flee" and not getaway and not dr.get("blues", false):
 			var s := light(e[2], e[3])
 			if s == L.RED or (s == L.AMBER_L and dist > 9.0):
 				vt = minf(vt, maxf(0.0, dist - 1.2) * 0.6)
@@ -809,7 +824,7 @@ func _gap_ahead(car: Car, steer_angle: float, shift := 0.0) -> float:
 ## A police car with its siren on: how far behind us it is (m), or -1.
 ## Ahead of us and coming this way counts too (we pull over for it).
 func _siren_near(car: Car) -> float:
-	for pc in get_tree().get_nodes_in_group("police_cars"):
+	for pc in get_tree().get_nodes_in_group("police_cars") + get_tree().get_nodes_in_group("emergency"):
 		var p := pc as PoliceCar
 		if p.siren <= 0 or p == car:
 			continue
