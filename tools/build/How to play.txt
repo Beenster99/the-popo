@@ -40,6 +40,12 @@ cost). Burnt powder smoke and embers blast out in front, and a grey puff
 hangs at the muzzle and curls away for a couple of seconds. At night the
 smoke is darker so it doesn't glow. Criminals' guns do the same.
 
+SMOKE (0.22.0)
+Smoke grenades now pour out a thick, billowing cloud: a low jet hissing out
+of the can, then rolling white smoke that spreads, drifts on the air and
+thins away. No more separate white balls, and the black blob in the middle
+is gone. CS gas looks the same way, paler and thinner. It dims at night.
+
 BLOOD (0.18.0)
 A shot now bursts out of the exit wound as a fine red mist and a spray of
 tiny droplets, which leave fine spatter on the walls, floor and anything
