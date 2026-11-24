@@ -84,6 +84,7 @@ func _arrive(r: RepairCrews) -> void:
 	r._send_t = 0.0
 	for i in 3:
 		await get_tree().physics_frame
+		await get_tree().process_frame
 
 
 func test_crane_lifts_a_piece_into_place() -> void:

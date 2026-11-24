@@ -202,6 +202,8 @@ func set_park(lorry_xf: Transform3D, crane_xf: Transform3D, host_age: float) -> 
 		age = host_age
 	if fresh and is_inside_tree():
 		_place()
+	elif lorry and not leaving:
+		_update_vehicles(0.0)
 
 
 func _place() -> void:
