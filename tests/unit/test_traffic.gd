@@ -193,6 +193,10 @@ func test_car_thief_and_chase() -> void:
 	# Settle the first thief so his gunfire can't startle the next one
 	# (armed suspects hear shots up to HEAR_SHOTS away).
 	th.set_state(Suspect.S.SURRENDER)
+	# ...and put the smashed car well out of the way: if it catches fire and
+	# goes up, the blast would rightly send the next thief running.
+	car.freeze = true
+	car.global_position += Vector3(0, -300, 0)
 	# A theft: left alone, the thief is in and away.
 	var id2 := d.start_call(Dispatcher.Kind.THEFT)
 	t.check(id2 > 0, "a car theft call: %s" % (d.calls[id2].text if id2 > 0 else "none"))
