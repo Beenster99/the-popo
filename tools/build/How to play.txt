@@ -27,9 +27,8 @@ and the camera follows you between physics steps.
 Skid marks fade away after about 40 seconds (at most 1,500 at once).
 
 TYRES, WINDOWS AND BULLET HOLES (0.20.0)
-Shoot a car's tyres out and it pulls to that side and slows on the rim;
-shoot its windows and they crack and shatter; bullets leave holes in the
-body. Police cars are rear-wheel drive: floor it from a standstill and the
+Shoot a car's tyre and it goes flat and the car pulls to that side; shoot
+its windows and they break; bullets leave holes in the body. Police cars are rear-wheel drive: floor it from a standstill and the
 back wheels spin up and smoke.
 
 MUZZLE FLASH AND GUN SMOKE (0.21.0)
