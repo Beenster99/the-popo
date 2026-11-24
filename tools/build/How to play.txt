@@ -22,6 +22,15 @@ Lifts ride smoothly: the floor moves with you instead of jumping each tick,
 and the camera follows you between physics steps.
 Skid marks fade away after about 40 seconds (at most 1,500 at once).
 
+MUZZLE FLASH AND GUN SMOKE (0.21.0)
+Every shot now throws a flash of flame from the barrel, sized by the gun:
+the compact 9mm is a snap of fire, the .45 and the .357 bigger, and the
+sawn-off a long tongue of flame. The flash lights up the walls, the floor
+and the faces round the gun for an instant (no extra shadows, so no fps
+cost). Burnt powder smoke and embers blast out in front, and a grey puff
+hangs at the muzzle and curls away for a couple of seconds. At night the
+smoke is darker so it doesn't glow. Criminals' guns do the same.
+
 BLOOD (0.18.0)
 A shot now bursts out of the exit wound as a fine red mist and a spray of
 tiny droplets, which leave fine spatter on the walls, floor and anything

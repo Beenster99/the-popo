@@ -2,8 +2,8 @@ class_name Feel
 extends RefCounted
 ## Phase 1.5: how hits feel. Camera shake (your shots, blasts, rounds
 ## cracking past you, getting hit), a hit marker on the reticle when your
-## bullet lands on someone, a short hit-stop when playing on your own, the
-## muzzle flash light, and the extinguisher's cloud.
+## bullet lands on someone, a short hit-stop when playing on your own, and
+## the extinguisher's cloud.
 
 const CAMERA_GROUP := "iso_camera"
 
@@ -48,20 +48,6 @@ static func hit_stop(tree: SceneTree, seconds: float) -> void:
 	tree.create_timer(seconds, true, false, true).timeout.connect(func():
 		Engine.time_scale = 1.0
 		_stopping = false)
-
-
-## The muzzle lights up the room for a frame or two.
-static func muzzle(parent: Node, at: Vector3, big := false) -> void:
-	if parent == null or not parent.is_inside_tree() or DisplayServer.get_name() == "headless":
-		return
-	var flash := OmniLight3D.new()
-	flash.light_color = Color("ffd38a")
-	flash.light_energy = 5.0 if big else 3.5
-	flash.omni_range = 6.0 if big else 4.5
-	flash.shadow_enabled = false
-	parent.add_child(flash)
-	flash.global_position = at
-	parent.get_tree().create_timer(0.05).timeout.connect(flash.queue_free)
 
 
 ## A burst extinguisher: a thick white cloud that hangs a few seconds.

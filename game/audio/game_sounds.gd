@@ -419,7 +419,7 @@ func _officer_foley(o: Officer, _delta: float) -> void:
 		var weight: float = float(Armoury.pistol_of(int(kt)).weight) if gun == 0 and kt != null else 1.0
 		Sfx.shot(parent, muzzle, maxi(gun, 0), own, weight)
 		eject_casing(o, Vector3.INF, Vector3.ZERO, gun == Sfx.SHOTGUN)
-		Feel.muzzle(parent, muzzle, gun == Sfx.SHOTGUN)
+		MuzzleFx.fire(parent, muzzle, o.shot_direction(muzzle), MuzzleFx.size_for(gun, weight))
 		if own:
 			Feel.shake(get_tree(), 0.22 if gun == Sfx.SHOTGUN else 0.07)
 	# Dry: the trigger pulled on an empty gun.
