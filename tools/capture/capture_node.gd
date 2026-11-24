@@ -32,6 +32,12 @@ func _scene(path: String) -> Node:
 
 
 ## An empty lit floor with a camera, for close looks at characters.
+func _save_as(path: String) -> void:
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png(path)
+	print("saved ", path)
+
+
 func _plain_stage(cam_at: Vector3, look: Vector3) -> Node3D:
 	var root := Node3D.new()
 	get_tree().root.add_child(root)
@@ -133,42 +139,115 @@ func _run() -> void:
 			await _frames(wait)
 			await _save()
 		"repair_site":
-			# Wave 4: a council crew at a hole blown in a building.
+			# beenster (2026-11-24): the lorry and crane drive in and park, the
+			# crane lifts a piece off the lorry and sets it in, the crew guide
+			# it and fix it. Saves several frames: <out> is a folder.
 			City.next_seed = 4242
 			var s := await _scene("res://game/city/city.tscn")
 			await _frames(10)
 			s.find_children("*", "NetOverlay", false, false)[0].queue_free()
 			(s.dispatch as Dispatcher).enabled = false
-			s.dispatch.missions.minute = 15 * 60.0
-			var b0: Dictionary = {}
-			for b in s.gen.buildings:
-				if b.type != "station":
-					b0 = b
-					break
+			s.dispatch.missions.minute = 14 * 60.0
+			RepairCrews.watch_all = true
+			var b0: Dictionary = s.gen.buildings[3]
 			var at: Vector3 = (b0.origin as Vector3) + Vector3(1.0, 1.0, 0.0)
 			s.world.explode(at, 3.5, 400.0, 6.0)
-			await _frames(200)
+			s.world.explode(at + Vector3(0, 3.2, 0), 3.0, 400.0, 6.0)
+			RenderingServer.render_loop_enabled = false
+			await _frames(240)
 			var r: RepairCrews = s.repairs
 			for id in r._broken:
 				r._broken[id] = RepairCrews.WAIT
 			r._tick = 0.0
 			await _frames(5)
 			var site: Dictionary = r.sites.values()[0]
-			for i in 6:
-				site.t = 0.0
-				await _frames(2)
-			await _frames(90)
+			var ws: WorksSite = r._cones[site.id]
+			var lorry: Transform3D = site.lorry
+			var dir := lorry.basis.z
+			var c: Vector3 = (lorry.origin + (site.crane as Transform3D).origin) * 0.5
+			var side: Vector3 = site.at - lorry.origin
+			side = Vector3(side.x, 0, side.z).normalized()
 			var cam := Camera3D.new()
 			s.add_child(cam)
 			cam.far = 1000.0
-			var c: Vector3 = site.at
-			var out := Vector3(c.x - at.x, 0, c.z - at.z)
-			out = out.normalized() if out.length() > 0.5 else Vector3(0, 0, -1)
-			var side := Vector3(-out.z, 0, out.x)
-			cam.look_at_from_position(c + out * 11.0 + side * 6.0 + Vector3(0, 4.5, 0), (c + at) * 0.5 + Vector3(0, 1.0, 0))
 			cam.current = true
+			# Driving in.
+			site.age = 5.5
+			ws.age = 5.5
+			cam.look_at_from_position(c - side * 16.0 - dir * 10.0 + Vector3(0, 5.0, 0), c + Vector3(0, 1.5, 0))
+			RenderingServer.render_loop_enabled = true
+			await _frames(3)
+			await _save_as(out + "/1_arrive.png")
+			RenderingServer.render_loop_enabled = false
+			site.age = WorksSite.ARRIVE + WorksSite.SET_UP
+			ws.age = site.age
 			await _frames(30)
-			await _save()
+			# Knock out an outside wall upstairs, facing the lorry, so the
+			# crane has a big panel to put back.
+			var best := -1
+			var bd := INF
+			for pid in s.world.pieces_near(lorry.origin, 20.0):
+				var pp: Dictionary = s.world.pieces[pid]
+				var bx: AABB = pp.aabb
+				if pp.kind == "wall" and pp.state == "intact" and bx.position.y > 2.5 and bx.position.y < 7.0:
+					var dd := bx.get_center().distance_to(lorry.origin)
+					if dd < bd:
+						bd = dd
+						best = pid
+			if best >= 0:
+				s.world.explode((s.world.pieces[best].aabb as AABB).get_center(), 1.2, 400.0, 3.0)
+				await _frames(200)
+				for id in r._broken:
+					r._broken[id] = RepairCrews.WAIT
+				r._tick = 0.0
+				await _frames(3)
+				print("wall ", best, " ", s.world.pieces[best].state, " in site ", (site.pieces as Array).has(best))
+			# Clear the rubble quickly, keep the crew calm, then lift.
+			for i in 2400:
+				site.t = minf(site.t, 0.0) if site.stage == "clean" else site.t
+				for w in site.crew:
+					if is_instance_valid(w) and (w as Suspect).state in [Suspect.S.PANIC, Suspect.S.COWER]:
+						(w as Suspect)._back_to_route()
+				if site.stage == "build" and not (site.lift as Dictionary).is_empty() and site.last >= 0:
+					break
+				await get_tree().physics_frame
+			# Let one lift go round so there's a piece just set for the fitter.
+			var shots := {0.17: "2_slinging", 0.45: "3_swinging", 0.69: "4_landing", 0.95: "5_fitting"}
+			var done := {}
+			for i in 60 * 40:
+				for w in site.crew:
+					if is_instance_valid(w) and (w as Suspect).state in [Suspect.S.PANIC, Suspect.S.COWER]:
+						(w as Suspect)._back_to_route()
+				await get_tree().physics_frame
+				if ws._lift_piece < 0 or not String(s.world.pieces[ws._lift_piece].kind).begins_with("wall"):
+					continue
+				var u := ws._lift_t / ws._lift_len
+				for k in shots:
+					if u >= k and not done.has(k) and done.size() == shots.keys().find(k):
+						done[k] = true
+						var tgt: Vector3 = ws._target
+						var mid := (c + tgt) * 0.5
+						if k < 0.3:
+							cam.look_at_from_position(lorry.origin - side * 9.0 + dir * 7.0 + Vector3(0, 4.0, 0), ws.pick_point() + Vector3(0, 0.5, 0))
+						elif k < 0.6:
+							cam.look_at_from_position(mid - side * 26.0 - dir * 14.0 + Vector3(0, 10.0, 0), mid + Vector3(0, 5.0, 0))
+						elif k < 0.8:
+							cam.look_at_from_position(tgt - side * 12.0 + dir * 6.0 + Vector3(0, -1.0, 0), tgt + Vector3(0, -3.5, 0))
+						else:
+							var fit := Vector3.INF
+							for nid in ws._crew:
+								if int(ws._crew[nid].job) in [WorksSite.Job.DRILL, WorksSite.Job.WELD, WorksSite.Job.GRIND]:
+									fit = (ws._crew[nid].w as Node3D).global_position
+							if fit == Vector3.INF:
+								fit = site.at
+							cam.look_at_from_position(fit - side * 6.0 + dir * 3.0 + Vector3(0, 2.2, 0), fit + Vector3(0, 0.9, 0))
+						RenderingServer.render_loop_enabled = true
+						await get_tree().process_frame
+						await _save_as(out + "/" + shots[k] + ".png")
+						RenderingServer.render_loop_enabled = false
+				if done.size() == shots.size():
+					break
+			print("jobs ", site.jobs)
 		"station_armoury", "station_yard":
 			# Wave 3: the armoury screen, and the station grown (garage, range).
 			City.next_seed = 4242

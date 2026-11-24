@@ -37,6 +37,11 @@ var collar_weight := 0.0
 var head_hands := 0.0
 var head_hands_fwd := Vector3(0, 0, 1)
 var collar_point := Vector3.ZERO
+## Repair crews at work (a drill, a shovel, a hand up to the crane's load):
+## each hand reaches for a world point. 0..1, set every frame by WorksSite.
+var work_weight := 0.0
+var work_l := Vector3.ZERO
+var work_r := Vector3.ZERO
 
 var _legs := [["thigh.L", "shin.L", "foot.L"], ["thigh.R", "shin.R", "foot.R"]]
 var _idx := {}
@@ -71,6 +76,7 @@ func _process_modification() -> void:
 	_ledge_hands(sk)
 	_collar_hand(sk)
 	_head_hands(sk)
+	_work_hands(sk)
 
 
 func _rotate_global(sk: Skeleton3D, bone: int, q: Quaternion) -> void:
@@ -236,6 +242,18 @@ func _head_hands(sk: Skeleton3D) -> void:
 		# Wrists either side of the crown, a little behind it.
 		var grip: Vector3 = inv * (head + Vector3.UP * HEAD_HANDS_UP + right * (HEAD_HANDS_SIDE * side[1]) - fwd * HEAD_HANDS_BACK)
 		_two_bone(sk, _idx["upper_arm." + side[0]], _idx["forearm." + side[0]], hand, cur.lerp(grip, head_hands))
+
+
+func _work_hands(sk: Skeleton3D) -> void:
+	if work_weight <= 0.001:
+		return
+	var inv := sk.global_transform.affine_inverse()
+	for side in [["L", work_l], ["R", work_r]]:
+		var hand: int = _idx["hand." + side[0]]
+		if hand < 0 or _idx["upper_arm." + side[0]] < 0:
+			continue
+		var cur := sk.get_bone_global_pose(hand).origin
+		_two_bone(sk, _idx["upper_arm." + side[0]], _idx["forearm." + side[0]], hand, cur.lerp(inv * (side[1] as Vector3), work_weight))
 
 
 const HEAD_HANDS_UP := 0.15

@@ -388,3 +388,14 @@ voice/stand_down_1.ogg,Sound Pack 1 / stand down 1.mp3,"Made by beenster for The
 voice/stand_down_2.ogg,Sound Pack 1 / stand down 2.mp3,"Made by beenster for The Popo (ElevenLabs Sound Effects), Sound Pack 1","""Stand down, put the gun on the floor and we can all walk out of here happy."""
 sfx/v8_idle_1.wav,Sonniss GDC 2020 / Pole Position - Camaro ZL1 2014 / Camaro_ZL1_t11_Onbrd_On_Idle_Blips_Off_Exhaust_Mix.flac (https://archive.org/details/gameaudiogdc-part1through7),"Sonniss GDC Game Audio Bundle licence (royalty-free, games allowed, no attribution)","V8 idling, exhaust (looped) (start 69.0 s, 8.0 s long)"
 sfx/v8_drive_1.wav,Sonniss GDC 2020 / Pole Position - Camaro ZL1 2014 / Camaro_ZL1_t7_Onbrd_Start_Idle_Blips_Steady_in_Neutral_Off_Engine_Intake_DPA4062.flac (https://archive.org/details/gameaudiogdc-part1through7),"Sonniss GDC Game Audio Bundle licence (royalty-free, games allowed, no attribution)","V8 held at about 1,250 rpm, low end lifted (looped) (start 160.5 s, 10.0 s long)"
+sfx/works_drill_1.wav,Made by tools/audio/make_works.py,Project's own (no third-party audio),cordless hammer drill into concrete
+sfx/works_drill_2.wav,Made by tools/audio/make_works.py,Project's own (no third-party audio),cordless hammer drill into concrete
+sfx/works_grind_1.wav,Made by tools/audio/make_works.py,Project's own (no third-party audio),angle grinder on steel
+sfx/works_grind_2.wav,Made by tools/audio/make_works.py,Project's own (no third-party audio),angle grinder on steel
+sfx/works_weld_1.wav,Made by tools/audio/make_works.py,Project's own (no third-party audio),arc welding crackle
+sfx/works_weld_2.wav,Made by tools/audio/make_works.py,Project's own (no third-party audio),arc welding crackle
+sfx/works_beep_1.wav,Made by tools/audio/make_works.py,Project's own (no third-party audio),reversing beeper
+sfx/works_hyd_1.wav,Made by tools/audio/make_works.py,Project's own (no third-party audio),crane hydraulics over diesel
+sfx/works_hyd_2.wav,Made by tools/audio/make_works.py,Project's own (no third-party audio),crane hydraulics over diesel
+sfx/works_chain_1.wav,Made by tools/audio/make_works.py,Project's own (no third-party audio),"sling chains rattle, load lands"
+sfx/works_chain_2.wav,Made by tools/audio/make_works.py,Project's own (no third-party audio),"sling chains rattle, load lands"

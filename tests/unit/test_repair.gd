@@ -39,10 +39,16 @@ func test_crews_clear_rubble_and_rebuild() -> void:
 		await get_tree().physics_frame
 	t.check(r.sites.size() >= 1, "a repair site opened (%d)" % r.sites.size())
 	var site: Dictionary = r.sites.values()[0] if not r.sites.is_empty() else {}
+	t.check((site.get("crew", []) as Array).is_empty(), "nobody on site while the lorry and crane drive in")
+	await _arrive(r)
 	var crew: Array = site.get("crew", [])
-	t.check(crew.size() >= RepairCrews.CREW.x, "a crew turned up: %d workers" % crew.size())
+	t.check(crew.size() == RepairCrews.CREW, "a crew turned up: %d workers" % crew.size())
+	t.check(not (site.jobs as Dictionary).is_empty(), "everyone has a job (%s)" % str(site.jobs))
 	t.check(crew.all(func(c): return (c as Suspect).look >= SuspectLook.WORKER and (c as Suspect).part == "worker"), "in hi-vis")
-	t.check(r._cones.size() == r.sites.size(), "cones out round the site")
+	t.check(r._cones.size() == r.sites.size(), "the lorry, crane and cones are out")
+	var ws: WorksSite = r._cones.values()[0]
+	t.check(ws.lorry.global_position.distance_to((site.lorry as Transform3D).origin) < 0.1, "the lorry parked at the kerb")
+	t.check(RepairCrews.on_road(ws.crane.global_position), "the crane parked in the road")
 	# Let them work, quickly.
 	var cleared_at := -1
 	for i in 60 * 120:
@@ -59,6 +65,7 @@ func test_crews_clear_rubble_and_rebuild() -> void:
 	t.check(cleared_at >= 0, "the clean-up finished")
 	t.check(still.is_empty(), "everything that came down is built back (%d left)" % still.size())
 	t.check(r.sites.is_empty() and r._cones.is_empty(), "the crew packed up and the cones are gone")
+	t.check(ws.leaving, "the lorry and crane drive off")
 	var nodes_ok: bool = lost.all(func(id): return is_instance_valid(w.pieces[id].node) and w.pieces[id].node.is_inside_tree())
 	t.check(nodes_ok, "restored pieces are back in the world")
 	# And they stand: nothing falls again over a few seconds.
@@ -66,6 +73,59 @@ func test_crews_clear_rubble_and_rebuild() -> void:
 		await get_tree().physics_frame
 	var again: int = lost.filter(func(id): return w.pieces[id].state != "intact").size()
 	t.check(again == 0, "the rebuilt wall stays up (%d fell again)" % again)
+	s.queue_free()
+	await get_tree().process_frame
+
+
+## Skip the drive in and set up.
+func _arrive(r: RepairCrews) -> void:
+	for st in r.sites.values():
+		st.age = WorksSite.ARRIVE + WorksSite.SET_UP
+	r._send_t = 0.0
+	for i in 3:
+		await get_tree().physics_frame
+		await get_tree().process_frame
+
+
+func test_crane_lifts_a_piece_into_place() -> void:
+	# beenster (2026-11-24): a crane lifts the parts into place off the lorry.
+	var s := await _city()
+	var r := s.repairs
+	var w := s.world
+	var b0: Dictionary = s.gen.buildings[3]
+	w.explode((b0.origin as Vector3) + Vector3(1.0, 1.0, 0.0), 3.5, 400.0, 6.0)
+	for i in 120:
+		await get_tree().physics_frame
+	for id in r._broken:
+		r._broken[id] = RepairCrews.WAIT
+	r._tick = 0.0
+	for i in 5:
+		await get_tree().physics_frame
+	await _arrive(r)
+	var site: Dictionary = r.sites.values()[0]
+	var ws: WorksSite = r._cones[site.id]
+	for i in 200:
+		await get_tree().physics_frame
+	var id: int = (site.pieces as Array).filter(func(p): return w.pieces[p].state != "intact" and RepairCrews.by_crane(w.pieces[p].kind))[0]
+	w.clear_bodies(r._rubble(site))
+	site.stage = "build"
+	r._start_lift(site, id)
+	for c in site.crew:
+		(c as Suspect)._back_to_route()    # calm after the bang (it's not what's tested here)
+	var seen_load := false
+	var hook_high := -INF
+	for i in int(WorksSite.LIFT_TIME * 60.0) + 30:
+		await get_tree().physics_frame
+		if ws._lift_load and ws._lift_load.visible:
+			seen_load = true
+		if ws._hook.visible:
+			hook_high = maxf(hook_high, ws._hook.global_position.y)
+	t.check(seen_load, "a load hung on the hook")
+	t.check(hook_high > 5.0, "the hook went up (%.1f m)" % hook_high)
+	t.check(w.pieces[id].state == "intact", "the piece is set back in place")
+	t.check((site.lift as Dictionary).is_empty(), "and the lift is over")
+	var jobs: Array = (site.jobs as Dictionary).values().map(func(j): return j[0])
+	t.check(jobs.has(WorksSite.Job.SLING) and jobs.has(WorksSite.Job.BANKSMAN), "a slinger and a banksman (%s)" % str(jobs))
 	s.queue_free()
 	await get_tree().process_frame
 
@@ -83,6 +143,7 @@ func test_hurt_crew_stops_work() -> void:
 	r._tick = 0.0
 	for i in 5:
 		await get_tree().physics_frame
+	await _arrive(r)
 	var site: Dictionary = r.sites.values()[0]
 	var w0: Suspect = site.crew[0]
 	w0.set_state(Suspect.S.COWER)
@@ -99,7 +160,7 @@ func test_hurt_crew_stops_work() -> void:
 	for i in 3:
 		await get_tree().physics_frame
 	var fresh: int = (site.crew as Array).filter(func(c): return is_instance_valid(c) and (c as Suspect).state == Suspect.S.WANDER).size()
-	t.check(fresh >= RepairCrews.CREW.x, "crew all down: a fresh crew sent (%d)" % fresh)
+	t.check(fresh >= RepairCrews.CREW, "crew all down: a fresh crew sent (%d)" % fresh)
 	s.queue_free()
 	await get_tree().process_frame
 
