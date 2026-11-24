@@ -27,6 +27,13 @@ player). The custody bay's blue lamp now hangs on the station wall instead
 of a post in the middle of the road, and POLICE on the car doors reads the
 right way round. The frame rate counter (F11) moved to the top right.
 
+PRISONERS IN THE CAR (0.14.0)
+Walk your prisoners to a police car and press F at a door: the back door
+swings open and every prisoner walking with you climbs in (back seats
+first, then the front passenger seat). Drive them to the custody bay at the
+station to book them. Prisoners following you on foot now walk in single
+file behind you instead of bunching up.
+
 SOUND PACK 1 (0.13.0)
 beenster's own sounds are in: every gun has its own recording (9 mm
 pistols, the heavy .45 and .357, the machine pistol, the sawn-off with its

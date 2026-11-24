@@ -193,18 +193,21 @@ func _prompt(o: Officer) -> String:
 	var pr := o.prisoner()
 	for c in o.get_tree().get_nodes_in_group("police_cars"):
 		var pc := c as PoliceCar
+		for i in 4:
+			var dp := pc.door_point(i)
+			if Vector2(dp.x - o.global_position.x, dp.z - o.global_position.z).length() < Officer.ENTER_RANGE + (0.6 if pr else 0.0):
+				if pr and pc.can_enter():
+					return "%s open the door and put your prisoner in the back" % use
+				if not pr:
+					return "%s get in" % use
 		var bp := pc.boot_point()
 		if Vector2(bp.x - o.global_position.x, bp.z - o.global_position.z).length() < Officer.BOOT_RANGE:
 			return "Hold %s: ammo and first aid from the boot" % use
-		for i in 4:
-			var dp := pc.door_point(i)
-			if Vector2(dp.x - o.global_position.x, dp.z - o.global_position.z).length() < Officer.ENTER_RANGE + (0.4 if pr else 0.0):
-				return ("%s put the suspect in the car" % use) if pr else ("%s get in" % use)
 	var sh := Controls.key_name("shout")
 	if pr and pr.stay:
 		return "%s tell your prisoner to get up and walk with you" % sh
 	if pr:
-		return "Walk them to a police car (they follow you), or straight to the custody bay.   %s tell them to stay put" % sh
+		return "Walk them to a police car and press %s at a door to put them in the back, or walk them to the custody bay.   %s tell them to stay put" % [use, sh]
 	if o.pouch > 0:
 		var tt := o.treat_target()
 		if tt == o:
