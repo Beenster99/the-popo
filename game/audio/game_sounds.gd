@@ -38,8 +38,10 @@ var cars: CarSync
 var sync: SfxSync
 var listener: AudioListener3D
 
-const STEP_WALK_DB := -15.0
-const STEP_RUN_DB := -8.0
+## v0.12.0: boot steps from real recordings, well under the guns and voices
+## (beenster found the old ones too loud).
+const STEP_WALK_DB := -21.0
+const STEP_RUN_DB := -14.0
 const IMPACT_BUDGET := 10.0     # physics impact sounds per second, at most
 const MAX_CASINGS := 40
 
@@ -338,15 +340,17 @@ func _footsteps(n: Node3D, delta: float) -> void:
 		w.acc = minf(w.acc, 0.3)
 		return
 	w.acc += step
-	var stride := 0.6 + speed * 0.12
+	# One step per foot plant: about 0.75 m at a walk, 1.1 m at a run and
+	# 1.55 m flat out (the old 0.6 + 0.12 v stepped far too often running).
+	var stride := 0.45 + speed * 0.22
 	if w.acc < stride:
 		return
 	w.acc = 0.0
 	w.n += 1
 	var surf := surface_under(p)
-	var stem := "step_" + (surf if surf in ["wood", "dirt", "concrete"] else "concrete")
+	var stem := "step_" + (surf if surf in ["wood", "dirt", "concrete", "metal"] else "concrete")
 	var db := lerpf(STEP_WALK_DB, STEP_RUN_DB, clampf((speed - 1.5) / 3.5, 0.0, 1.0)) - (6.0 if crouched else 0.0)
-	var sp := Sfx.play(n.get_parent(), stem, p + Vector3(0, 0.05, 0), db, 28.0, 0.08)
+	var sp := Sfx.play(n.get_parent(), stem, p + Vector3(0, 0.05, 0), db, 22.0, 0.06)
 	if sp:
 		sp.pitch_scale *= 1.0 + (0.06 if w.n % 2 == 0 else -0.03)
 	if n is Officer and speed > 3.5 and w.n % 2 == 0:
@@ -428,7 +432,7 @@ func _drop_surface(s: String) -> String:
 
 
 func _step_surface(s: String) -> String:
-	return s if s in ["wood", "dirt"] else "concrete"
+	return s if s in ["wood", "dirt", "metal"] else "concrete"
 
 
 # --- brass ---------------------------------------------------------------------------

@@ -14,7 +14,10 @@ const SHOTS := [
 	["walk_back_aim", "walk_ready", "aim_hold", Vector3(0, 0, -1), 0.9, "side"],
 	["walk_left_aim", "walk_ready", "aim_hold", Vector3(1, 0, 0), 1.0, "front"],
 	["walk_right_aim", "walk_ready", "aim_hold", Vector3(-1, 0, 0), 1.0, "front"],
+	["run_front", "run", "none", Vector3(0, 0, 1), 3.0, "front"],
+	["run_side", "run", "none", Vector3(0, 0, 1), 3.0, "side"],
 ]
+## Only the shots whose label starts with this (second user argument), if given.
 
 
 func _ready() -> void:
@@ -42,8 +45,11 @@ func _run() -> void:
 	cam.fov = 40.0
 	add_child(cam)
 	cam.current = true
+	var only: String = OS.get_cmdline_user_args()[1] if OS.get_cmdline_user_args().size() > 1 else ""
 	for shot in SHOTS:
 		var label: String = shot[0]
+		if only != "" and not label.begins_with(only):
+			continue
 		DirAccess.make_dir_recursive_absolute("%s/%s" % [out, label])
 		var holder := Node3D.new()
 		add_child(holder)

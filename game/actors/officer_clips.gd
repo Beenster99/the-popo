@@ -76,7 +76,8 @@ static func _merge_mocap(path: String, skeleton: Skeleton3D) -> void:
 			_library.add_animation("hk_" + n, _library.get_animation(n))
 			_library.remove_animation(n)
 		_library.add_animation(n, a)
-		mocap_clips.append(n)
+		if n not in mocap_clips:
+			mocap_clips.append(n)
 	moc.free()
 
 

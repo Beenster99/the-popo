@@ -7,6 +7,14 @@ https://ianxmason.github.io/100style/): real XSens motion capture.
   walk_back   Swat_BW     backing off, the same tactical stance
   walk_left / walk_right  Swat_SW sidestep (right is the left one mirrored)
 
+v0.12.0, beenster: the run is "a bit knees out". The video-capture run from
+officer_mocap.glb is copied in as "run" (it replaces that one in the game)
+with each thigh turned about its hip-to-ankle line until the knee points
+along the leg's swing instead of out to the side; the foot keeps its world
+angle and the ankle does not move, so stride and timing stay the same.
+(100STYLE's runs were tried first: clean knees, but they are slow jogs,
+1.7 m/s against the game's 3-5 m/s, so the legs would have spun.)
+
 Each take is sampled (sample_bvh.py), the cleanest gait cycle is cut out and
 straightened into an in-place loop (cycle.py), then retargeted onto the
 officer by world-space rotation deltas: every officer bone turns the way its
@@ -32,12 +40,12 @@ OUT = os.path.join(REPO, "assets/models/characters/mocap/officer_walks.glb")
 TAKES = sys.argv[-1]
 FPS_IN, FPS_OUT = 60, 30
 
-CLIPS = [  # name, take, direction of travel, mirror
-    ("walk", "Neutral_FW", "forward", False),
-    ("walk_ready", "Swat_FW", "forward", False),
-    ("walk_back", "Swat_BW", "back", False),
-    ("walk_left", "Swat_SW", "left", False),
-    ("walk_right", "Swat_SW", "left", True),
+CLIPS = [  # name, take, direction of travel, mirror, cycle length range (s)
+    ("walk", "Neutral_FW", "forward", False, (0.8, 1.6)),
+    ("walk_ready", "Swat_FW", "forward", False, (0.8, 1.6)),
+    ("walk_back", "Swat_BW", "back", False, (0.8, 1.6)),
+    ("walk_left", "Swat_SW", "left", False, (0.8, 1.6)),
+    ("walk_right", "Swat_SW", "left", True, (0.8, 1.6)),
 ]
 MAP = {
     "hips": "Hips", "spine": "Chest2", "chest": "Chest4", "neck": "Neck", "head": "Head",
@@ -116,10 +124,15 @@ def min_arc(a, b):
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=SRC_GLB)
 rig = [o for o in bpy.data.objects if o.type == "ARMATURE"][0]
+IMPORT_FPS = bpy.context.scene.render.fps   # the importer keys at this rate
 for t in list(rig.animation_data.nla_tracks) if rig.animation_data else []:
     rig.animation_data.nla_tracks.remove(t)
+run_src = bpy.data.actions.get("run")
+run_src.name = "run_src"
+run_src.use_fake_user = True
 for a in list(bpy.data.actions):
-    bpy.data.actions.remove(a)
+    if a is not run_src:
+        bpy.data.actions.remove(a)
 if rig.animation_data is None:
     rig.animation_data_create()
 for pb in rig.pose.bones:
@@ -131,10 +144,10 @@ T_rest = {b.name: b.matrix_local.copy() for b in rig.data.bones}
 parent = {b.name: (b.parent.name if b.parent else None) for b in rig.data.bones}
 report = {}
 
-for clip, take, want, mirror in CLIPS:
+for clip, take, want, mirror, (min_s, max_s) in CLIPS:
     d = np.load(os.path.join(TAKES, take + ".npz"))
     names = list(d["names"])
-    S, best = cycle.pick_cycle(d, FPS_IN, want)
+    S, best = cycle.pick_cycle(d, FPS_IN, want, min_s, max_s)
     cost, c0, c1, speed, turn, seam = best
     if mirror:
         S = mirror_take(S, names)
@@ -231,6 +244,84 @@ for clip, take, want, mirror in CLIPS:
                     "speed_mps": round(float(speed * k), 3), "turn_rad_s": round(float(turn), 3), "mirror": mirror}
     print("baked", clip, report[clip])
 
+
+KNEE_OUT_MAX = 0.01   # m: how far a knee may sit outside its hip-ankle line
+
+
+def fix_run_knees(src, fps_in):
+    """The run with its knees brought in (see the top of the file)."""
+    vl = bpy.context.view_layer
+    rig.animation_data.action = src
+    f0, f1 = src.frame_range
+    length = (f1 - f0) / fps_in
+    n = round(length * FPS_OUT)
+    keyed = {fc.data_path.split('"')[1] for fc in src.fcurves if fc.data_path.startswith("pose.bones")} \
+        if hasattr(src, "fcurves") else {pb.name for pb in rig.pose.bones}
+    frames = []
+    worst = [0.0, 0.0]
+    for k in range(n + 1):
+        sf = f0 + k / FPS_OUT * fps_in
+        bpy.context.scene.frame_set(int(sf), subframe=sf - int(sf))
+        frames.append({pb.name: (pb.matrix_basis.copy(), pb.location.copy()) for pb in rig.pose.bones})
+    act = bpy.data.actions.new("run")
+    act.use_fake_user = True
+    rig.animation_data.action = act
+    prevq = {}
+    for k, pose in enumerate(frames):
+        for name, (mb, _) in pose.items():
+            rig.pose.bones[name].matrix_basis = mb
+        vl.update()
+        P = rig.pose.bones
+        lat = (P["thigh.L"].head - P["thigh.R"].head).normalized()
+        for side, sgn in (("L", 1.0), ("R", -1.0)):
+            th, sh, ft = P["thigh." + side], P["shin." + side], P["foot." + side]
+            hip, knee, ank = th.head.copy(), sh.head.copy(), ft.head.copy()
+            foot_rot = ft.matrix.to_3x3().copy()
+            axis = (ank - hip).normalized()
+            o = (knee - hip) - axis * (knee - hip).dot(axis)
+            u = (lat * sgn - axis * (lat * sgn).dot(axis)).normalized()   # outward
+            v = axis.cross(u)
+            a, b = o.dot(u), o.dot(v)
+            worst[0] = max(worst[0], a)
+            if a <= KNEE_OUT_MAX:
+                continue
+            r = math.hypot(a, b)
+            a2 = KNEE_OUT_MAX
+            b2 = math.copysign(math.sqrt(max(r * r - a2 * a2, 0.0)), b if abs(b) > 1e-4 else 1.0)
+            ang = math.atan2(b2, a2) - math.atan2(b, a)
+            R = Matrix.Translation(hip) @ Matrix.Rotation(ang, 4, axis) @ Matrix.Translation(-hip)
+            th.matrix = R @ th.matrix
+            vl.update()
+            m = foot_rot.to_4x4()
+            m.translation = ft.head
+            ft.matrix = m
+            vl.update()
+            knee2 = sh.head
+            o2 = (knee2 - hip) - axis * (knee2 - hip).dot(axis)
+            worst[1] = max(worst[1], o2.dot(u))
+        for name in keyed:
+            pb = rig.pose.bones[name]
+            q = pb.matrix_basis.to_quaternion()
+            if name in prevq and prevq[name].dot(q) < 0:
+                q.negate()
+            prevq[name] = q.copy()
+            pb.rotation_quaternion = q
+            pb.keyframe_insert("rotation_quaternion", frame=k)
+            pb.location = pb.matrix_basis.translation
+            pb.keyframe_insert("location", frame=k)
+    rig.animation_data.action = None
+    track = rig.animation_data.nla_tracks.new()
+    track.name = "run"
+    track.strips.new("run", 0, act)
+    track.mute = True
+    print("run knees: worst outward %.1f cm before, %.1f cm after" % (worst[0] * 100, worst[1] * 100))
+    return {"take": "officer_mocap.glb run, knees brought in", "length_s": round(length, 3),
+            "knee_out_cm_before": round(worst[0] * 100, 1), "knee_out_cm_after": round(worst[1] * 100, 1)}
+
+
+for pb in rig.pose.bones:
+    pb.matrix_basis = Matrix.Identity(4)
+report["run"] = fix_run_knees(run_src, IMPORT_FPS)
 for pb in rig.pose.bones:
     pb.matrix_basis = Matrix.Identity(4)
 bpy.ops.export_scene.gltf(
