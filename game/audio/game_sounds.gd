@@ -143,14 +143,31 @@ func _process(delta: float) -> void:
 
 
 ## Movement sounds work from how far things moved each physics step.
+const STEPS_HEARD := 45.0
+const CARS_HEARD := 130.0
+
+
 func _physics_process(delta: float) -> void:
 	_clock += delta
 	_budget = minf(IMPACT_BUDGET, _budget + IMPACT_BUDGET * delta)
+	# v0.19.0: only what is within earshot is worked out each tick.
+	var ear := _ear()
 	for n in get_tree().get_nodes_in_group("officers") + get_tree().get_nodes_in_group("suspects"):
-		_footsteps(n as Node3D, delta)
+		var nn := n as Node3D
+		if nn and nn.global_position.distance_squared_to(ear) < STEPS_HEARD * STEPS_HEARD:
+			_footsteps(nn, delta)
 	if cars:
 		for c in cars.cars:
-			_car(c as Car, delta)
+			var car := c as Car
+			if car == null or not is_instance_valid(car):
+				continue
+			if car.global_position.distance_squared_to(ear) > CARS_HEARD * CARS_HEARD:
+				var a: Dictionary = _car_audio.get(car.get_instance_id(), {})
+				if not a.is_empty():
+					a.last = car.global_position
+					a.away = true   # coming back in range is not a "crash"
+				continue
+			_car(car, delta)
 	_physics_impacts(delta)
 
 
@@ -526,8 +543,12 @@ func _car(c: Car, delta: float) -> void:
 		return
 	var v := (p - (a.last as Vector3)) / delta
 	var dv := (v - (a.v as Vector3)).length()
+	var back: bool = a.get("away", false)
+	if back:
+		a.away = false
+		dv = 0.0
 	a.last = p
-	var prev_v: Vector3 = a.v
+	var prev_v: Vector3 = v if back else a.v
 	a.v = v
 	var speed := Vector2(v.x, v.z).length()
 	var eng := a.engine as AudioStreamPlayer3D

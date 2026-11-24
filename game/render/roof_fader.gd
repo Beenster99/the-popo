@@ -50,7 +50,11 @@ func add_building(bounds: AABB, meshes: Array) -> void:
 ## Wave 2: a whole city of building meshes, so third person only looks at
 ## the few in grid cells round the line from the officer to the camera.
 const CELL := 8.0
-var _grid := {}   # Vector2i -> Array of MeshInstance3D
+## v0.13.2: cells are stacked by height too, so in a ten-storey tower (or a
+## lift) only the floors near the line to the camera are looked at, not
+## every piece from the basement to the roof.
+const CELL_Y := 6.0
+var _grid := {}   # Vector3i -> Array of MeshInstance3D
 
 
 ## Wave 2: registers a whole city in one pass: each building's pieces (by the
@@ -77,14 +81,15 @@ func _register(mi: MeshInstance3D, box: AABB, kind: String) -> void:
 	if _seen.has(mi):
 		return
 	_seen[mi] = true
-	var c0 := Vector2i(floori(box.position.x / CELL), floori(box.position.z / CELL))
-	var c1 := Vector2i(floori(box.end.x / CELL), floori(box.end.z / CELL))
+	var c0 := Vector3i(floori(box.position.x / CELL), floori(box.position.y / CELL_Y), floori(box.position.z / CELL))
+	var c1 := Vector3i(floori(box.end.x / CELL), floori(box.end.y / CELL_Y), floori(box.end.z / CELL))
 	for cx in range(c0.x, c1.x + 1):
-		for cz in range(c0.y, c1.y + 1):
-			var k := Vector2i(cx, cz)
-			if not _grid.has(k):
-				_grid[k] = []
-			_grid[k].append(mi)
+		for cy in range(c0.y, c1.y + 1):
+			for cz in range(c0.z, c1.z + 1):
+				var k := Vector3i(cx, cy, cz)
+				if not _grid.has(k):
+					_grid[k] = []
+				_grid[k].append(mi)
 	mi.set_meta("bottom_y", box.position.y)
 	mi.set_meta("box", box)
 	mi.set_meta("kind", kind)
@@ -125,14 +130,15 @@ func _process(delta: float) -> void:
 		candidates = []
 		var a := probes[2] as Vector3
 		var c := cam.global_position
-		var c0 := Vector2i(floori((minf(a.x, c.x) - 2.0) / CELL), floori((minf(a.z, c.z) - 2.0) / CELL))
-		var c1 := Vector2i(floori((maxf(a.x, c.x) + 2.0) / CELL), floori((maxf(a.z, c.z) + 2.0) / CELL))
+		var c0 := Vector3i(floori((minf(a.x, c.x) - 2.0) / CELL), floori((minf(a.y, c.y) - 2.0) / CELL_Y), floori((minf(a.z, c.z) - 2.0) / CELL))
+		var c1 := Vector3i(floori((maxf(a.x, c.x) + 2.0) / CELL), floori((maxf(a.y, c.y) + 2.0) / CELL_Y), floori((maxf(a.z, c.z) + 2.0) / CELL))
 		for cx in range(c0.x, c1.x + 1):
-			for cz in range(c0.y, c1.y + 1):
-				for m in _grid.get(Vector2i(cx, cz), []):
-					if not seen.has(m):
-						seen[m] = true
-						candidates.append(m)
+			for cy in range(c0.y, c1.y + 1):
+				for cz in range(c0.z, c1.z + 1):
+					for m in _grid.get(Vector3i(cx, cy, cz), []):
+						if not seen.has(m):
+							seen[m] = true
+							candidates.append(m)
 		for m in _state.keys():
 			if not is_instance_valid(m):
 				_state.erase(m)
@@ -180,6 +186,17 @@ func _cut_movers(home: Dictionary, floor_y: float, cutaway: bool) -> void:
 			_cut.erase(n)
 	if not is_inside_tree():
 		return
+	# v0.19.0: outside a building nothing is cut away: put back what was,
+	# without walking every prop in the city each frame. Inside, ten
+	# checks a second are plenty.
+	if not cutaway or home.is_empty():
+		for n in _cut.keys():
+			_uncut(n)
+		return
+	_cut_t -= get_process_delta_time()
+	if _cut_t > 0.0:
+		return
+	_cut_t = 0.1
 	for n in get_tree().get_nodes_in_group(CUTAWAY_GROUP):
 		var node := n as Node3D
 		if node == null:
@@ -198,6 +215,17 @@ func _cut_movers(home: Dictionary, floor_y: float, cutaway: bool) -> void:
 			(gi as GeometryInstance3D).set_instance_shader_parameter("fade", 0.0 if hide else 1.0)
 		if node is CollisionObject3D:
 			node.set_meta("see_through", hide)
+
+
+var _cut_t := 0.0
+
+
+func _uncut(n: Node3D) -> void:
+	_cut.erase(n)
+	for gi in n.find_children("*", "GeometryInstance3D", true, false):
+		(gi as GeometryInstance3D).set_instance_shader_parameter("fade", 1.0)
+	if n is CollisionObject3D:
+		n.set_meta("see_through", false)
 
 
 func cut_count() -> int:
