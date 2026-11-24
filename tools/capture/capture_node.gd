@@ -179,7 +179,7 @@ func _run() -> void:
 					break
 				await get_tree().physics_frame
 			# Let one lift go round so there's a piece just set for the fitter.
-			var shots := {0.13: "2_slinging", 0.45: "3_swinging", 0.69: "4_landing", 0.95: "5_fitting"}
+			var shots := {0.17: "2_slinging", 0.45: "3_swinging", 0.69: "4_landing", 0.95: "5_fitting"}
 			var done := {}
 			for i in 60 * 40:
 				for w in site.crew:

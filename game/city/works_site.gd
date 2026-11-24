@@ -750,6 +750,8 @@ func _animate_crew(delta: float, near: bool) -> void:
 					tool.global_transform = Transform3D(Basis.looking_at(-(head - l).normalized(), Vector3.UP), (head + l) * 0.5)
 		if tool:
 			tool.visible = true
+			if int(c.job) in [Job.DRILL, Job.GRIND]:
+				tool.scale_object_local(Vector3.ONE * 1.5)    # read at a distance
 		pr.work_weight = move_toward(pr.work_weight, weight, delta * 3.0)
 		pr.work_l = l
 		pr.work_r = rr
