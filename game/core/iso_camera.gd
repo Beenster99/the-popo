@@ -267,7 +267,13 @@ func _process_third_person(delta: float) -> void:
 				height = 0.7
 			elif o.state in [Officer.S.CROUCH, Officer.S.COVER]:
 				height = 1.15
-		global_position = global_position.lerp(target.global_position, 1.0 - exp(-25.0 * delta))
+		# v0.13.2: the officer moves on physics ticks (60 a second); at higher
+		# frame rates the camera follows where they are between ticks, so a
+		# lift ride or a sprint doesn't judder.
+		var follow := target.global_position
+		if o and o.car == null:
+			follow += o.get_real_velocity() * Engine.get_physics_interpolation_fraction() / float(Engine.physics_ticks_per_second)
+		global_position = global_position.lerp(follow, 1.0 - exp(-25.0 * delta))
 		var inside := o != null and o.car == null and Sfx.zone_at(get_tree(), target.global_position + Vector3(0, 1.0, 0)) != null
 		_indoor_k = move_toward(_indoor_k, 1.0 if inside else 0.0, delta * 2.5)
 	if _indoor_k > 0.0:

@@ -21,6 +21,7 @@ const SEAT_WINDOW := ["win_fl", "win_fr", "win_rl", "win_rr"]
 const BOOT := Vector3(0, 0, -2.75)
 const PANEL_LIMIT := 0.55
 const LIGHTS_RATE := 2.6        # flash cycles a second
+const POLICE_ENGINE := 15000.0  # N (Car.ENGINE is 9500)
 
 ## Wave 2 (Phase 2.4): civilian vehicles are this class too (seats, doors,
 ## glass, dents and parts work the same), with their own model, seats and
@@ -55,6 +56,11 @@ func _init() -> void:
 	super._init()
 	add_to_group("vehicles")
 	color = Color("eeeeea")
+	# v0.20.0 (beenster: "rear wheel drive and wheelspin and tyre smoke"):
+	# the patrol car is rear-driven (every Car drives its rear wheels) with
+	# far more power than its rear tyres can hold, so flooring it spins them
+	# up, smokes and kicks the tail out. Civilian setup() sets its own.
+	engine = POLICE_ENGINE
 
 
 func _enter_tree() -> void:
@@ -200,7 +206,26 @@ func _process(delta: float) -> void:
 # --- glass -----------------------------------------------------------------
 
 ## A bullet at this point (car space). Returns the window it broke, or "".
-func window_at(local_point: Vector3) -> String:
+## v0.20.0: with the bullet's direction, the first window along its path
+## (the shot stops on the collision box, which doesn't follow the glass:
+## a windscreen sits well inside it), so aimed shots at glass break it.
+func window_at(local_point: Vector3, local_dir := Vector3.ZERO) -> String:
+	if local_dir != Vector3.ZERO:
+		var d := local_dir.normalized()
+		var a := local_point - d * 0.4
+		var b := local_point + d * 0.9
+		var best := ""
+		var best_t := INF
+		for n in glass:
+			var g: Dictionary = glass[n]
+			if g.broken:
+				continue
+			var hit = (g.box as AABB).grow(0.04).intersects_segment(a, b)
+			if hit != null and a.distance_to(hit) < best_t:
+				best_t = a.distance_to(hit)
+				best = n
+		if best != "":
+			return best
 	for n in glass:
 		var g: Dictionary = glass[n]
 		if not g.broken and (g.box as AABB).grow(0.08).has_point(local_point):
@@ -290,6 +315,51 @@ func commandeer(by: Node) -> void:
 
 func seat_free(i: int) -> bool:
 	return not occupants().has(i)
+
+
+## A door swinging open on its front hinge, held while someone climbs in,
+## then shut (prisoners going in the back). Doors knocked off are skipped.
+const DOOR_PARTS := ["door_fl", "door_fr", "door_rl", "door_rr"]
+const DOOR_OPEN := 70.0     # degrees
+var _door_base := {}        # part name -> its transform when shut
+var _door_tween := {}
+
+
+func swing_door(i: int, hold := 1.0) -> void:
+	if i < 0 or i >= DOOR_PARTS.size() or not is_inside_tree():
+		return
+	var n: String = DOOR_PARTS[i]
+	if not parts.has(n) or not is_instance_valid(parts[n].node):
+		return
+	var node: Node3D = parts[n].node
+	if not _door_base.has(n):
+		_door_base[n] = node.transform
+	if _door_tween.has(n) and (_door_tween[n] as Tween).is_valid():
+		(_door_tween[n] as Tween).kill()
+	var box: AABB = parts[n].box
+	var left := box.get_center().x < 0.0
+	var hinge := Vector3(box.position.x if left else box.end.x, 0.0, box.end.z)
+	var side := 1.0 if left else -1.0
+	var tw := create_tween()
+	_door_tween[n] = tw
+	tw.tween_method(_set_door.bind(n, hinge, side), 0.0, 1.0, 0.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(maxf(hold, 0.2))
+	tw.tween_method(_set_door.bind(n, hinge, side), 1.0, 0.0, 0.25).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_callback(func(): Sfx.play(self, "car_door_close", door_point(i), 2.0, 40.0))
+	Sfx.play(self, "car_door_open", door_point(i), 0.0, 35.0)
+
+
+## How far open a door is (0..1), by turning it about its hinge (car space).
+func _set_door(k: float, n: String, hinge: Vector3, side: float) -> void:
+	if not parts.has(n) or not is_instance_valid(parts[n].node):
+		return
+	var node: Node3D = parts[n].node
+	var parent := node.get_parent() as Node3D
+	var P := _local_xf(parent) if parent and parent != self else Transform3D()
+	var shut: Transform3D = P * (_door_base[n] as Transform3D)
+	var h := Transform3D(Basis(), hinge)
+	var r := Transform3D(Basis(Vector3.UP, deg_to_rad(DOOR_OPEN) * k * side), Vector3.ZERO)
+	node.transform = P.affine_inverse() * (h * r * h.affine_inverse() * shut)
 
 
 ## World position of a seat or door.

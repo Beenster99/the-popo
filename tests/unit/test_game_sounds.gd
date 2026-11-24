@@ -63,7 +63,7 @@ func test_firing_makes_a_layered_shot_and_brass() -> void:
 	Sfx.history.clear()
 	await _run(me, _cmd(PlayerInput.AIM | PlayerInput.FIRE, Vector2.ZERO, Vector3(0, 1.2, 10)), 12)
 	var stems := _stems()
-	t.check(stems.has("gun_near"), "the shot itself: %s" % [stems])
+	t.check(stems.has("gun_9mm_near"), "the shot itself: %s" % [stems])
 	t.check(stems.has("gun_thump"), "and the low-end thump")
 	t.check(stems.has("gun_mech"), "and the slide, right next to the gun")
 	t.check(sounds._casings.size() > 0, "a case flew out")
@@ -234,6 +234,6 @@ func test_the_city_block_has_sound() -> void:
 	o.ammo -= 1     # as if a shot went off
 	await get_tree().process_frame
 	await get_tree().process_frame
-	t.check(_stems().has("gun_near") or _stems().has("gun_dry"), "a shot makes a bang: %s" % [_stems()])
+	t.check(_stems().has("gun_9mm_near") or _stems().has("gun_9mm_room"), "a shot makes a bang: %s" % [_stems()])
 	scene.queue_free()
 	await get_tree().process_frame

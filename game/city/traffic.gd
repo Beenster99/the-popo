@@ -32,6 +32,8 @@ const PARKED := 30
 const CRUISE := 11.5           # m/s, about 40 km/h
 const TURN_SPEED := 5.0
 const STOP_BACK := 7.8         # m from the junction centre to the stop line
+const SIDE_ROOM := 0.2         # m clear each side a driver wants going past things
+const LOST_AFTER := 25.0       # s going nowhere before a car out of sight is moved on
 const LANE := CityGenerator.LANE
 const KINDS := [["sedan", 27], ["hatchback", 26], ["van_panel", 8], ["van_box", 5], ["minibus", 5],
 	["motorbike", 8], ["trash_truck", 3], ["taxi", 6], ["work_van", 3], ["courier", 3], ["ice_cream", 1]]
@@ -55,6 +57,9 @@ var _mats := {}
 var _sync_t := 0.0
 var _hits := {}                # "car|person" -> time of the last hit
 var _people: Array = []
+var last_blocker: Object = null   # what _gap_ahead last found in the way
+var _by_car := {}              # car -> its driver record
+var respawns := 0              # stuck cars moved on out of sight (for tests)
 
 
 func _ready() -> void:
@@ -104,10 +109,12 @@ func _spawn_moving(kind: String, a: Vector2i, b: Vector2i, n: int) -> void:
 	cars.add_car(v)
 	var dr := {"car": v, "idx": v.net_id, "a": a, "b": b, "pts": [], "wi": 0, "mode": "drive", "t": 0.0,
 		"stuck": 0.0, "wait": 0.0, "rev": 0.0, "yield": 0.0, "pace": _rng.randf_range(0.85, 1.1),
+		"off": 0.0, "off_want": 0.0, "pass": 0.0, "tries": 0, "blk": null, "rev_steer": 0.0, "lost": 0.0,
 		"look": _rng.randi_range(0, 255), "rig": null, "wb": _wheelbase(v), "seen": true}
 	dr.pts = [[at, 0, Vector2i.ZERO, false]]
 	_append_lane(dr, a, b, 0.0)
 	drivers.append(dr)
+	_by_car[v] = dr
 	v.commandeered.connect(_on_commandeered.bind(dr))
 	_seat_driver(dr)
 	if kind == "hgv_tractor":
@@ -518,15 +525,21 @@ func _drive(dr: Dictionary, delta: float) -> void:
 	var siren_behind := _siren_near(car)
 	if siren_behind >= 0.0 and dr.mode == "drive" and not dr.has("suspect") and not dr.get("blues", false):
 		dr.yield = 3.0
-	# Blues on and boxed in (an ambulance): out round it on the other side.
-	var round: float = dr.get("overtake", 0.0)
-	if round > 0.0:
-		dr.overtake = round - delta
-		target += xf.basis.x * 5.2
-		vt = minf(vt, 7.0)
 	if dr.yield > 0.0:
-		target += -xf.basis.x * 2.3
+		target += -xf.basis.x * 1.1   # towards the kerb, not into the parked cars
 		vt = minf(vt, 0.0 if siren_behind >= 0.0 and siren_behind < 25.0 else 2.5)
+	# Edging out round something stopped in the lane (or overtaking it).
+	dr.off = move_toward(dr.off, dr.off_want, delta * (2.6 if dr.off_want > dr.off else 1.6))
+	var p_prev: Vector3 = pts[dr.wi - 1][0] if dr.wi > 0 else pos
+	var sd: Vector3 = (pts[mini(dr.wi, pts.size() - 1)][0] as Vector3) - p_prev
+	sd.y = 0.0
+	if sd.length() < 0.5:
+		sd = fwd
+	sd = sd.normalized()
+	var left := Vector3(sd.z, 0, -sd.x)
+	dr.act = (pos - p_prev).dot(left) if dr.wi > 0 else 0.0   # how far left of the lane we are
+	if absf(dr.off) > 0.01:
+		target += left * dr.off
 	var local := xf.affine_inverse() * target
 	var alpha := atan2(local.x, local.z)
 	var want := atan2(2.0 * float(dr.wb) * sin(alpha), look)
@@ -550,7 +563,11 @@ func _drive(dr: Dictionary, delta: float) -> void:
 				vt = minf(vt, maxf(0.0, dist - 1.2) * 0.6)
 				break
 	# Whatever is in front.
-	var gap := _gap_ahead(car, steer * max_a) if round <= 0.0 else INF
+	var gap := _gap_ahead(car, steer * max_a)
+	var blk := last_blocker
+	gap = _pass_or_wait(dr, car, gap, blk, dist_to_stop(dr, pos), delta)
+	if dr.off_want > 0.3:
+		vt = minf(vt, 6.0 if dr.off_want < 2.0 else 7.5)
 	if getaway:
 		vt = minf(vt, maxf(5.0, gap * 1.3))   # shoves its way through
 	elif gap < 40.0:
@@ -561,19 +578,48 @@ func _drive(dr: Dictionary, delta: float) -> void:
 		horn = fmod(dr.wait, 6.0) > 4.0 and fmod(dr.wait, 6.0) < 4.6
 	else:
 		dr.wait = 0.0
-	# Stuck against something with nothing in the way: back off a bit.
-	if vt > 2.0 and absf(v) < 0.6:
+	# Physically stuck (wants to go, isn't moving: debris, a kerb, a post,
+	# a wall after a shunt): back off, turned away from it, then try again.
+	# Each go reverses a bit longer; after three, take another road.
+	if vt > 2.0 and absf(v) < 0.6 and dr.rev <= 0.0:
 		dr.stuck += delta
-		if dr.stuck > 4.0:
+		if dr.stuck > 2.2:
 			dr.stuck = 0.0
-			dr.rev = 1.6
-	else:
+			dr.tries += 1
+			dr.rev = 1.2 + 0.5 * mini(dr.tries, 3)
+			# Turn the nose away from whatever we're against: reversing with
+			# the wheels turned towards it swings the front clear.
+			var side := _contact_side(car)
+			dr.rev_steer = side if absf(side) > 0.1 else (-steer if absf(steer) > 0.15 else (1.0 if dr.tries % 2 == 0 else -1.0))
+			if dr.tries >= 2:
+				# Something we can't see in our lane (rubble, a post): go
+				# round it on the other side when that's clear.
+				if _gap_ahead(car, 0.0, 2.0 * LANE) > 25.0:
+					dr.off_want = 2.0 * LANE
+					dr.pass = 6.0
+				elif dr.tries >= 4:
+					dr.off_want = 1.2
+					dr.pass = 4.0
+	elif absf(v) > 2.5:
 		dr.stuck = maxf(0.0, dr.stuck - delta)
+		if absf(v) > 5.0:
+			dr.tries = 0
+	# Last resort, out of sight: a car that has gone nowhere for a long time
+	# (boxed in, wedged) is quietly put back on a free lane elsewhere.
+	var moving := absf(v) > 1.0
+	dr.lost = 0.0 if moving or _at_red(dr, pos) else dr.lost + delta
+	if dr.lost > LOST_AFTER and not getaway and _out_of_sight(pos, 70.0):
+		dr.lost = 0.0
+		if _respawn(dr):
+			return
 	var inp := {"throttle": 0.0, "steer": steer, "handbrake": false, "horn": horn or dr.mode == "flee" or (getaway and gap < 15.0)}
 	if dr.rev > 0.0:
 		dr.rev -= delta
-		inp.throttle = -0.7
-		inp.steer = -steer
+		inp.throttle = -0.75
+		inp.steer = dr.rev_steer
+		# Don't back into what's behind.
+		if _gap_behind(car) < 1.2:
+			dr.rev = 0.0
 	elif vt < 0.3 and absf(v) < 1.0:
 		inp.handbrake = true
 	else:
@@ -583,13 +629,169 @@ func _drive(dr: Dictionary, delta: float) -> void:
 	cars.ai_inputs[dr.idx] = inp
 
 
+## Something stopped in our lane: edge round it if there's room beside it,
+## overtake it on the other side of the road if that's clear, or wait.
+## Two drivers each waiting on the other (nose to nose in a junction) let
+## the lower-numbered one go first. Returns the gap to drive to.
+func _pass_or_wait(dr: Dictionary, car: Car, gap: float, blk: Object, to_stop: float, delta: float) -> float:
+	dr.blk = blk
+	dr.pass = maxf(0.0, dr.pass - delta)
+	# Already out round something: hold the line until it's behind us,
+	# but duck back in if something's coming the other way.
+	if dr.off_want > 2.0:
+		var ahead_opp := _gap_ahead(car, 0.0, maxf(0.0, dr.off_want - float(dr.get("act", 0.0))))
+		var opp_blk := last_blocker
+		var pc: Object = dr.get("pass_car")
+		var done: bool = dr.pass <= 0.0 or (pc != null and (not is_instance_valid(pc) \
+			or (car.global_transform.affine_inverse() * (pc as Node3D).global_position).z < -((pc as Car).size.z * 0.5 + car.size.z * 0.5 + 1.5)))
+		if opp_blk != null and opp_blk != dr.get("pass_car") and ahead_opp < 14.0 and _closing(car, opp_blk) > 1.0:
+			done = true
+		if done:
+			dr.off_want = 0.0
+			dr.erase("pass_car")
+			return gap
+		return ahead_opp
+	if dr.off_want > 0.0 and dr.pass > 0.0:
+		return _gap_ahead(car, 0.0, maxf(0.0, dr.off_want - float(dr.get("act", 0.0))))
+	if blk == null or not (blk is Car) or gap > 18.0:
+		dr.off_want = 0.0
+		return gap
+	var bc := blk as Car
+	var bdr: Dictionary = _by_car.get(bc, {})
+	var b_still := bc.linear_velocity.length() < 0.8
+	if not b_still:
+		return gap
+	var bv := car.linear_velocity.length()
+	# Is it parked up / abandoned / crashed / wedged, or just queueing?
+	var dead: bool = bdr.is_empty() or bdr.mode in ["parked", "taken", "leaving"] or float(bdr.get("lost", 0.0)) > 6.0 \
+		or float(bdr.get("stuck", 0.0)) > 1.0 or float(bdr.get("rev", 0.0)) > 0.0
+	if bc is Trailer and (bc as Trailer).hitched():
+		var tdr: Dictionary = _by_car.get((bc as Trailer).tractor, {})
+		dead = tdr.is_empty() or tdr.mode in ["parked", "taken", "leaving"] or float(tdr.get("lost", 0.0)) > 6.0
+	# Deadlock: it's waiting on us too. The lower number goes.
+	if not dead and not bdr.is_empty() and bdr.get("blk") == car and dr.wait > 1.5:
+		if int(dr.idx) < int(bdr.idx):
+			return INF if gap > 0.6 else gap
+		return gap
+	if not dead:
+		return gap
+	# 1) Room to squeeze by within our own half of the road?
+	for sh in ([0.6, 1.2] if dr.wait < 1.5 else []):
+		var g2 := _gap_ahead(car, 0.0, sh)
+		if last_blocker != blk and g2 > gap + 3.0:
+			dr.off_want = sh
+			dr.pass = 3.0
+			return g2
+	# 2) Overtake on the other side once we've stopped behind it, if the
+	# other lane is clear for a good way and we're not at a junction.
+	if gap < 16.0:
+		var opp := 2.0 * LANE
+		var g3 := _gap_ahead(car, 0.0, opp)
+		var nb := last_blocker
+		if (nb == null or (nb != blk and g3 > 22.0 and _closing(car, nb) < 0.5) or g3 > 35.0) and (to_stop > bc.size.z + 10.0 or dr.wait > 5.0):
+			dr.off_want = opp
+			dr.pass = 9.0
+			dr.pass_car = bc
+			return INF if gap > 0.6 else gap
+	return gap
+
+
+## How fast thing is coming at car (m/s, >0 closing).
+func _closing(car: Car, thing: Object) -> float:
+	var n := thing as Node3D
+	var tv: Vector3 = (thing as RigidBody3D).linear_velocity if thing is RigidBody3D else Vector3.ZERO
+	var to := n.global_position - car.global_position
+	to.y = 0.0
+	if to.length() < 0.1:
+		return 0.0
+	return (car.linear_velocity - tv).dot(to.normalized())
+
+
+## m along the route to the next stop line or junction (INF if none near).
+func dist_to_stop(dr: Dictionary, pos: Vector3) -> float:
+	var pts: Array = dr.pts
+	var d := 0.0
+	var last := pos
+	for i in range(dr.wi, mini(pts.size(), dr.wi + 8)):
+		var e: Array = pts[i]
+		d += Vector2(e[0].x - last.x, e[0].z - last.z).length()
+		last = e[0]
+		if e[1] != 0:
+			return d
+		if d > 60.0:
+			break
+	return INF
+
+
+## Whether this driver is sitting at a red (or amber) light.
+func _at_red(dr: Dictionary, pos: Vector3) -> bool:
+	var pts: Array = dr.pts
+	for i in range(dr.wi, mini(pts.size(), dr.wi + 3)):
+		var e: Array = pts[i]
+		if e[1] == 1 and light(e[2], e[3]) != L.GO and pos.distance_to(e[0]) < 40.0:
+			return true
+	return false
+
+
+## Which side the car is touching something on: +1 left, -1 right, 0 front
+## or nothing (from its contacts, falling back to two short rays).
+func _contact_side(car: Car) -> float:
+	var space := car.get_world_3d().direct_space_state
+	var xf := car.global_transform
+	var o := xf.origin + xf.basis.y * 0.1
+	var reach := car.size.z * 0.5 + 1.2
+	var hit_l := false
+	var hit_r := false
+	for k in [-1.0, 1.0]:
+		var corner: Vector3 = o + xf.basis.x * float(k) * car.size.x * 0.45
+		var q := PhysicsRayQueryParameters3D.create(corner, corner + xf.basis.z * reach)
+		q.exclude = [car.get_rid()]
+		if not space.intersect_ray(q).is_empty():
+			if k > 0.0:
+				hit_l = true
+			else:
+				hit_r = true
+	if hit_l and not hit_r:
+		return 1.0
+	if hit_r and not hit_l:
+		return -1.0
+	return 0.0
+
+
+## m clear behind the car (cars only), for reversing.
+func _gap_behind(car: Car) -> float:
+	var inv := car.global_transform.affine_inverse()
+	var best := INF
+	for c in cars.cars:
+		if c == car or (c is Trailer and (c as Trailer).tractor == car):
+			continue
+		var cn := c as Car
+		if cn.global_position.distance_squared_to(car.global_position) > 225.0:
+			continue
+		var lp := inv * cn.global_position
+		if lp.z >= 0.0:
+			continue
+		if absf(lp.x) < car.size.x * 0.5 + cn.size.x * 0.5:
+			best = minf(best, -lp.z - car.size.z * 0.5 - cn.size.z * 0.5)
+	return best
+
+
+## Nobody (officer) within r m of p.
+func _out_of_sight(p: Vector3, r: float) -> bool:
+	for o in get_tree().get_nodes_in_group("officers"):
+		if (o as Node3D).global_position.distance_to(p) < r:
+			return false
+	return true
+
+
 ## m to the nearest thing in this car's path (INF for none), looking ahead
 ## along its heading bent by the steering.
-func _gap_ahead(car: Car, steer_angle: float) -> float:
+func _gap_ahead(car: Car, steer_angle: float, shift := 0.0) -> float:
 	var inv := car.global_transform.affine_inverse()
 	var half_l := car.size.z * 0.5
 	var half_w := car.size.x * 0.5
 	var best := INF
+	last_blocker = null
 	var bend := tan(steer_angle) * 0.5
 	for c in cars.cars:
 		if c == car or (c is Trailer and (c as Trailer).tractor == car):
@@ -601,9 +803,10 @@ func _gap_ahead(car: Car, steer_angle: float) -> float:
 		var ahead := lp.z - half_l - cn.size.z * 0.4
 		if lp.z <= 0.0 or ahead > best:
 			continue
-		var side := absf(lp.x - lp.z * bend)
-		if side < half_w + cn.size.x * 0.5 + 0.4:
+		var side := absf(lp.x - lp.z * bend - shift)
+		if side < half_w + cn.size.x * 0.5 + SIDE_ROOM:
 			best = ahead
+			last_blocker = cn
 	for p in _people:
 		var pn := p as Node3D
 		if pn.global_position.distance_squared_to(car.global_position) > 900.0:
@@ -612,8 +815,9 @@ func _gap_ahead(car: Car, steer_angle: float) -> float:
 		var ahead := lp.z - half_l - 0.3
 		if lp.z <= 0.0 or ahead > best:
 			continue
-		if absf(lp.x - lp.z * bend) < half_w + 0.8:
+		if absf(lp.x - lp.z * bend - shift) < half_w + 0.8:
 			best = ahead
+			last_blocker = pn
 	return best
 
 
@@ -741,8 +945,10 @@ func _recycle() -> void:
 		if dr.mode not in ["parked", "taken"] or dr.get("hold", false):
 			continue
 		var car: CivilianVehicle = dr.car
-		if car.wrecked or car.kind == "hgv_tractor" or not car.occupants().is_empty():
+		if car.wrecked or not car.occupants().is_empty():
 			continue
+		if car.kind == "hgv_tractor" and not _trailer_hitched(car):
+			continue   # an artic that has lost its trailer stays where it is
 		if int(cars.fire_state.get(dr.idx, 0)) != CarSync.Fire.OK:
 			continue
 		var far := true
@@ -751,32 +957,76 @@ func _recycle() -> void:
 				far = false
 		if not far:
 			continue
-		# A lane well away from every officer.
-		for tries in 12:
-			var lanes := _all_lanes()
-			var ln: Array = lanes[_rng.randi_range(0, lanes.size() - 1)]
-			var l2 := _lane(ln[0], ln[1])
-			var p: Vector3 = (l2[0] as Vector3).lerp(l2[1], 0.3)
-			var ok := true
-			for e in eyes:
-				if (e as Vector3).distance_to(p) < 110.0:
-					ok = false
-			for c in cars.cars:
-				if (c as Node3D).global_position.distance_to(p) < 9.0:
-					ok = false
-			if not ok:
-				continue
-			var d: Vector3 = ((l2[1] as Vector3) - (l2[0] as Vector3)).normalized()
-			car.global_transform = Transform3D(Basis(Vector3.UP, atan2(d.x, d.z)), p + Vector3(0, 1.2, 0))
-			car.linear_velocity = Vector3.ZERO
-			car.angular_velocity = Vector3.ZERO
-			dr.pts = [[p, 0, Vector2i.ZERO, false]]
-			dr.wi = 0
-			_append_lane(dr, ln[0], ln[1], (l2[0] as Vector3).distance_to(p))
+		if _place_on_free_lane(dr, eyes, 110.0):
 			dr.mode = "drive"
 			dr.look = _rng.randi_range(0, SuspectLook.WORKER - 1)
 			_seat_driver(dr)
 			return
+
+
+func _trailer_hitched(car: Car) -> bool:
+	for t in trailers:
+		if (t as Trailer).tractor == car and (t as Trailer).hitched():
+			return true
+	return false
+
+
+## Host: a driver that has been going nowhere for a long time, out of
+## everyone's sight, is put back in the traffic on a free lane elsewhere.
+func _respawn(dr: Dictionary) -> bool:
+	if not (dr.car as Car).occupants().is_empty():
+		return false
+	if not _place_on_free_lane(dr, _eyes(), 110.0):
+		return false
+	respawns += 1
+	return true
+
+
+## Moves dr's car (and its trailer) onto a random lane well away from every
+## officer and every other car, and gives it a fresh route. False if no
+## lane would do this time.
+func _place_on_free_lane(dr: Dictionary, eyes: Array, away: float) -> bool:
+	var car: CivilianVehicle = dr.car
+	var tr: Trailer = null
+	for t in trailers:
+		if (t as Trailer).tractor == car:
+			tr = t
+	var lanes := _all_lanes()
+	for tries in 12:
+		var ln: Array = lanes[_rng.randi_range(0, lanes.size() - 1)]
+		var l2 := _lane(ln[0], ln[1])
+		var p: Vector3 = (l2[0] as Vector3).lerp(l2[1], 0.62 if tr else 0.3)
+		var d: Vector3 = ((l2[1] as Vector3) - (l2[0] as Vector3)).normalized()
+		var ok := true
+		for e in eyes:
+			if (e as Vector3).distance_to(p) < away:
+				ok = false
+		for c in cars.cars:
+			if c == car or c == tr:
+				continue
+			var q := (c as Node3D).global_position
+			if q.distance_to(p) < 9.0 or (tr and q.distance_to(p - d * 10.0) < 9.0):
+				ok = false
+		if not ok:
+			continue
+		car.global_transform = Transform3D(Basis(Vector3.UP, atan2(d.x, d.z)), p + Vector3(0, 1.2, 0))
+		car.linear_velocity = Vector3.ZERO
+		car.angular_velocity = Vector3.ZERO
+		if tr:
+			var pin_t := Vector3(0, -0.25, -car.size.z / 2 + 1.0)
+			var pin_r := Vector3(0, -0.62, tr.length / 2 - Trailer.KINGPIN_Z_FROM_FRONT)
+			tr.global_transform = Transform3D(car.global_basis, car.global_transform * pin_t - car.global_basis * pin_r + Vector3(0, 0.15, 0))
+			tr.linear_velocity = Vector3.ZERO
+			tr.angular_velocity = Vector3.ZERO
+		dr.pts = [[p, 0, Vector2i.ZERO, false]]
+		dr.wi = 0
+		_append_lane(dr, ln[0], ln[1], (l2[0] as Vector3).distance_to(p))
+		for k in ["stuck", "wait", "rev", "off", "off_want", "pass", "lost"]:
+			dr[k] = 0.0
+		dr.tries = 0
+		dr.erase("pass_car")
+		return true
+	return false
 
 
 # --- car thieves and chases (Wave 2 jobs) ---------------------------------------------

@@ -168,6 +168,12 @@ func _ready() -> void:
 	dhud.armoury = armoury
 	dhud.pawn_getter = func(): return sync.my_pawn()
 	add_child(dhud)
+	var mm := MiniMap.new()
+	mm.name = "MiniMap"
+	mm.city = self
+	mm.dispatcher = dispatch
+	mm.pawn_getter = func(): return sync.my_pawn()
+	add_child(mm)
 	if first_shift == null and not has_node("Benchmark"):
 		var tips := GameTips.new()
 		tips.name = "Tips"

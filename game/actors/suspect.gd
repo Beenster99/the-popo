@@ -165,6 +165,15 @@ var _swing_t := 0.0
 ## get up and run for it still in cuffs (CUFF_RUN) until they are caught,
 ## knocked down or shouted at.
 var stay := false
+## Prisoners walking with the same officer go in single file, in the order
+## they were cuffed (or called over).
+static var _line_counter := 0
+var line_order := 0
+## Getting into a police car: walked from where they stood to the open door
+## and into the seat over BOARD_TIME-ish seconds (longer from further off).
+var _board_t := 99.0
+var _board_len := 1.0
+var _board_from := Vector3.ZERO
 var _runner := false
 var _run_after := 12.0
 
@@ -353,6 +362,10 @@ func set_state(s: S) -> void:
 		collision_layer = 2
 		collision_mask = 1 | 4 | 16
 	visible = s not in [S.DRIVE, S.BOOKED]
+	if s == S.IN_CAR:
+		_board_t = 0.0
+		if car and is_instance_valid(car) and car.has_method("swing_door"):
+			car.swing_door(seat, _board_len - 0.2)
 	_show_gun()
 	state_changed.emit(self)
 
@@ -418,6 +431,8 @@ func cuff(by: Officer) -> void:
 	escort = by
 	escort_peer = by.peer_id
 	stay = false
+	_line_counter += 1
+	line_order = _line_counter
 	_alone_t = 0.0
 	# Some will do a runner if they're ever left on their own.
 	_runner = _rng.randf() < 0.45
@@ -425,6 +440,22 @@ func cuff(by: Officer) -> void:
 	set_state(S.CUFFED)
 	if _rng.randf() < 0.3:
 		Voices.say(self, Voices.pick(Voices.Kind.PRISONER), 1.0)
+
+
+const LINE_GAP := 1.0     # m between prisoners walking in single file
+
+
+## Host: the prisoner just ahead of this one in their officer's line, or
+## null when this one is first (right behind the officer).
+func _in_front_in_line() -> Suspect:
+	var best: Suspect = null
+	for n in get_tree().get_nodes_in_group("suspects"):
+		var o := n as Suspect
+		if o == null or o == self or o.state != S.CUFFED or o.stay or o.escort != escort or o.line_order >= line_order:
+			continue
+		if best == null or o.line_order > best.line_order:
+			best = o
+	return best
 
 
 ## Host: told to stay put (they kneel where they are).
@@ -436,6 +467,9 @@ func order_stay() -> void:
 
 ## Host: told to get up and walk with `by` (who takes them over).
 func order_follow(by: Officer) -> void:
+	if stay or escort != by:
+		_line_counter += 1
+		line_order = _line_counter
 	stay = false
 	escort = by
 	escort_peer = by.peer_id
@@ -471,8 +505,33 @@ func put_in_car(c: PoliceCar, s: int) -> void:
 	stay = false
 	escort = null
 	escort_peer = 0
+	_board_from = global_position
+	var door := c.door_point(s)
+	_board_len = clampf(Vector2(door.x - _board_from.x, door.z - _board_from.z).length() / 2.2, 0.5, 3.5) + 0.5
 	set_state(S.IN_CAR)
-	_place_in_seat()
+
+
+## Host: the prisoner's path into the car: to the open door, then onto the
+## seat; after that they ride along in it.
+func _board_step(delta: float) -> void:
+	_board_t += delta
+	if _board_t >= _board_len:
+		_place_in_seat()
+		return
+	var walk := _board_len - 0.5
+	var door := car.door_point(seat)
+	var seat_p := car.global_transform * (car.seats[seat] as Vector3)
+	if _board_t < walk:
+		var k := _board_t / walk
+		var p := _board_from.lerp(Vector3(door.x, _board_from.y, door.z), k)
+		global_position = p
+		_face(door)
+	else:
+		var k := (_board_t - walk) / 0.5
+		global_position = Vector3(door.x, _board_from.y, door.z).lerp(seat_p, k)
+		var f := car.global_transform.basis.z
+		rotation.y = lerp_angle(rotation.y, atan2(f.x, f.z), k)
+	velocity = Vector3.ZERO
 
 
 func _place_in_seat() -> void:
@@ -499,6 +558,8 @@ func _physics_process(delta: float) -> void:
 	if state == S.IN_CAR:
 		if car == null or not is_instance_valid(car):
 			set_state(S.CUFFED)
+		elif _board_t < _board_len:
+			_board_step(delta)
 		else:
 			_place_in_seat()
 		return
@@ -710,6 +771,16 @@ func _physics_process(delta: float) -> void:
 				var e := escort.global_position
 				var back := Vector3(sin(escort.rotation.y), 0, cos(escort.rotation.y))
 				var spot := e - back * FOLLOW_GAP
+				# Single file: the first behind the officer, each of the
+				# rest behind the one in front, trailing like a rope.
+				var ahead := _in_front_in_line()
+				if ahead:
+					e = ahead.global_position
+					var away := global_position - e
+					away.y = 0.0
+					if away.length() < 0.1:
+						away = -Vector3(sin(ahead.rotation.y), 0, cos(ahead.rotation.y))
+					spot = e + away.normalized() * LINE_GAP
 				var to := spot - global_position
 				to.y = 0.0
 				if to.length() > 0.3:
@@ -867,12 +938,25 @@ func _threat() -> Dictionary:
 			bd = d
 			best = o
 	var los := false
-	if best:
-		var a := global_position + Vector3(0, 1.5, 0)
-		var b := best.global_position + Vector3(0, 1.4, 0)
-		var q := PhysicsRayQueryParameters3D.create(a, b, 1, [get_rid()])
-		los = get_world_3d().direct_space_state.intersect_ray(q).is_empty() and not Grenades.blocks_sight(a, b)
+	# v0.19.0: nobody sees past SIGHT_MAX, and the sight line is checked
+	# about ten times a second (not every tick for every crook in the city).
+	if best and bd < SIGHT_MAX:
+		_los_t -= get_physics_process_delta_time()
+		if _los_t <= 0.0 or best != _los_who:
+			_los_t = 0.1 + randf() * 0.04
+			_los_who = best
+			var a := global_position + Vector3(0, 1.5, 0)
+			var b := best.global_position + Vector3(0, 1.4, 0)
+			var q := PhysicsRayQueryParameters3D.create(a, b, 1, [get_rid()])
+			_los = get_world_3d().direct_space_state.intersect_ray(q).is_empty() and not Grenades.blocks_sight(a, b)
+		los = _los
 	return {"o": best, "d": bd, "los": los}
+
+
+const SIGHT_MAX := 120.0
+var _los := false
+var _los_t := 0.0
+var _los_who: Officer
 
 
 func _notices(t: Dictionary) -> bool:
@@ -1580,7 +1664,9 @@ func _process(delta: float) -> void:
 			lower = "crouch_idle" if hs < 0.2 else ("walk" if hs < 2.2 else "run")
 			upper = "cuffed"
 		S.IN_CAR:
-			lower = "sit"
+			if not is_host_side():
+				_board_t += delta
+			lower = "walk" if _board_t < _board_len - 0.5 else "sit"
 			upper = "cuffed"
 		_:
 			lower = "idle" if hs < 0.2 else ("walk" if hs < 2.2 else "run")
@@ -1646,6 +1732,13 @@ func apply_net(d: Dictionary) -> void:
 		look = d.look
 		if rig:
 			SuspectLook.apply(rig.model, look)
+	seat = d.seat
+	if d.state != state and d.state == S.IN_CAR:
+		car = null
+		for c in get_tree().get_nodes_in_group("vehicles"):
+			if c.get("net_id") == d.car:
+				car = c
+		_board_len = 1.5
 	if d.state != state:
 		set_state(d.state)
 	weapon = d.weapon

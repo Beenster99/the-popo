@@ -77,7 +77,8 @@ func build(g: CityGenerator, c: CarSync, t: TrafficSystem, d: Dispatcher) -> voi
 		traffic.add_child(v)
 		cars.add_car(v)
 		var dr := {"car": v, "idx": v.net_id, "a": Vector2i.ZERO, "b": Vector2i.ZERO, "pts": [], "wi": 0, "mode": "parked",
-			"t": 0.0, "stuck": 0.0, "wait": 0.0, "rev": 0.0, "yield": 0.0, "pace": 1.3, "look": SuspectLook.PARAMEDIC + i,
+			"t": 0.0, "stuck": 0.0, "wait": 0.0, "rev": 0.0, "yield": 0.0, "pace": 1.3,
+			"off": 0.0, "off_want": 0.0, "pass": 0.0, "tries": 0, "blk": null, "rev_steer": 0.0, "lost": 0.0, "look": SuspectLook.PARAMEDIC + i,
 			"rig": null, "wb": traffic._wheelbase(v), "seen": false, "hold": true}
 		var stretcher := _make_stretcher()
 		add_child(stretcher)
@@ -277,11 +278,9 @@ func _run(a: Dictionary, delta: float) -> void:
 			if ahead > 1.0 and d < ARRIVE and _on_lane(a):
 				a.state = "arrive"
 				a.t = 0.0
-			# Boxed in: round the outside, and if it's still stuck where
-			# nobody can see, start again from closer in.
+			# Boxed in where nobody can see (the traffic's own passing
+			# and backing off didn't free it): start again from closer in.
 			a.stall = float(a.get("stall", 0.0)) + delta if car.linear_velocity.length() < 0.8 else 0.0
-			if a.stall > 5.0 and float(dr.get("overtake", 0.0)) <= 0.0:
-				dr.overtake = 3.5
 			if a.stall > 20.0 and _unseen(car.global_position):
 				a.stall = 0.0
 				_start_out_of_sight(a)

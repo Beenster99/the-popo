@@ -9,6 +9,12 @@ extends Node
 ## never all at once. Workers who get hurt or scared off stop the job until
 ## the site is quiet again (or a fresh crew turns up).
 ##
+## Blood (beenster, 2026-11-24): the spatter and pools a fight leaves stay
+## until a crew comes and cleans them. Blood that has sat a while gets a
+## site of its own (or joins a site close by), and while a crew is working
+## they scrub the marks away one at a time. Blood under a body still lying
+## there is left alone.
+##
 ## The host runs the sites. Workers are civilians, so they sync like anyone
 ## else; the cones go out in MSG_SITES.
 
@@ -21,6 +27,9 @@ const CLEAN_GAP := Vector2(2.5, 0.5)    # seen, unseen: seconds per load carted 
 const BUILD_GAP := Vector2(6.0, 1.0)    # seen, unseen: seconds per piece put back
 const CREW := Vector2i(2, 3)
 const NEW_CREW := 60.0          # crew all down or gone: a new one after this
+const BLOOD_WAIT := 90.0        # real seconds blood sits before a crew is sent for it
+const SCRUB_GAP := Vector2(0.6, 0.15)   # seen, unseen: seconds per blood mark cleaned
+const BODY_CLEAR := 2.5         # blood this close to a body still down is left
 
 var world: DestructionWorld
 var dispatch: Dispatcher
@@ -35,6 +44,9 @@ var rebuilt := 0                # pieces put back (host)
 var _tick := 0.0
 var _send_t := 0.0
 var _cones := {}                # site id -> Node3D (every machine)
+var _cone_at := {}              # site id -> [position, working] (every machine)
+var scrubbed := 0               # blood marks cleaned (this machine)
+var _scrub_t := 0.0
 var _rng := RandomNumberGenerator.new()
 
 
@@ -62,6 +74,7 @@ func _in_site(id: int) -> bool:
 
 
 func _physics_process(delta: float) -> void:
+	_scrub(delta)
 	if not Net.is_host() or world == null:
 		return
 	for id in _broken:
@@ -71,6 +84,7 @@ func _physics_process(delta: float) -> void:
 		_tick = 1.0
 		if enabled:
 			_open_sites()
+			_open_blood_sites()
 	for s in sites.values():
 		_work(s, delta)
 	for id in sites.keys():
@@ -124,11 +138,47 @@ static func on_road(p: Vector3) -> bool:
 	return false
 
 
+## Blood that has sat a while with no site near it gets one.
+func _open_blood_sites() -> void:
+	var now := Time.get_ticks_msec()
+	for d in get_tree().get_nodes_in_group("blood"):
+		var dn := d as Node3D
+		if dn == null or dn.is_queued_for_deletion() or now - int(dn.get_meta("t", now)) < BLOOD_WAIT * 1000.0:
+			continue
+		var at := dn.global_position
+		if sites.values().any(func(s): return s.stage != "done" and Vector2(at.x - s.at.x, at.z - s.at.z).length() < SITE_REACH):
+			continue
+		if near_body(get_tree(), at):
+			continue
+		if sites.size() >= MAX_SITES:
+			return
+		_new_site(-1, at)
+
+
+## Someone still lying here (their blood is left until they're gone).
+static func near_body(tree: SceneTree, at: Vector3) -> bool:
+	for g in ["suspects", "officers"]:
+		for n in tree.get_nodes_in_group(g):
+			var rig = n.get("rig")
+			if rig and (rig as OfficerRig).downed and (n as Node3D).global_position.distance_to(at) < BODY_CLEAR + 1.5:
+				return true
+			if n is Suspect and (n as Suspect).state == Suspect.S.DOWN and (n as Node3D).global_position.distance_to(at) < BODY_CLEAR + 1.5:
+				return true
+	return false
+
+
+## Blood near a site that a crew can clean (not under a body).
+func blood_near(at: Vector3, reach: float) -> Array:
+	return get_tree().get_nodes_in_group("blood").filter(func(d):
+		var p: Vector3 = (d as Node3D).global_position
+		return not (d as Node).is_queued_for_deletion() and Vector2(p.x - at.x, p.z - at.z).length() < reach and not near_body(get_tree(), p))
+
+
 func _new_site(id: int, at: Vector3) -> Dictionary:
 	var ground := Vector3(at.x, BlockGenerator.BASE_Y, at.z)
 	if gen:
 		ground = gen.pavement_near(at)
-	var s := {"id": _next_id, "at": ground, "pieces": [id], "stage": "clean", "crew": [],
+	var s := {"id": _next_id, "at": ground, "pieces": [id] if id >= 0 else [], "stage": "clean", "crew": [],
 		"van": {}, "t": 1.0, "crew_t": 0.0, "paused": false, "said": false}
 	_next_id += 1
 	sites[s.id] = s
@@ -160,6 +210,9 @@ func _work(s: Dictionary, delta: float) -> void:
 		for id in s.pieces:
 			near.append_array(world.rubble_near((world.pieces[id].aabb as AABB).get_center(), 6.0).filter(func(n): return not near.has(n)))
 		if near.is_empty():
+			# The crew scrubs the blood (see _scrub) before moving on.
+			if not blood_near(s.at, SITE_REACH + 6.0).is_empty():
+				return
 			s.stage = "build"
 			return
 		# Nearest the road first, then nearest the crew.
@@ -278,6 +331,7 @@ func _send_sites() -> void:
 		b.put_float(s.at.x)
 		b.put_float(s.at.y)
 		b.put_float(s.at.z)
+		b.put_u8(0 if s.paused else 1)
 	if Net.is_online():
 		Net.broadcast(MSG_SITES, b.data_array, Net.UNRELIABLE)
 	b.seek(0)
@@ -297,14 +351,43 @@ func _show_sites(b: StreamPeerBuffer) -> void:
 	for i in b.get_u8():
 		var id := b.get_u16()
 		var at := Vector3(b.get_float(), b.get_float(), b.get_float())
+		_cone_at[id] = [at, b.get_u8() == 1]
 		seen[id] = true
 		if not _cones.has(id):
 			_cones[id] = _make_cones(at)
 			add_child(_cones[id])
 	for id in _cones.keys():
 		if not seen.has(id):
+			# Site closed: whatever blood the crew left goes with them (on
+			# every machine, as each one's marks differ a little).
+			var at: Vector3 = _cone_at[id][0]
+			for d in blood_near(at, SITE_REACH + 6.0):
+				(d as Node).queue_free()
 			(_cones[id] as Node).queue_free()
 			_cones.erase(id)
+			_cone_at.erase(id)
+
+
+## Every machine: crews at work scrub the blood round their site, a mark at
+## a time (quicker with nobody watching).
+func _scrub(delta: float) -> void:
+	_scrub_t -= delta
+	if _scrub_t > 0.0 or _cone_at.is_empty():
+		return
+	_scrub_t = SCRUB_GAP.x
+	for id in _cone_at:
+		var at: Vector3 = _cone_at[id][0]
+		if not _cone_at[id][1]:
+			continue    # crew off the job
+		var marks := blood_near(at, SITE_REACH + 6.0)
+		if marks.is_empty():
+			continue
+		if _unseen(at):
+			_scrub_t = SCRUB_GAP.y
+		marks.sort_custom(func(a, b): return (a as Node3D).global_position.distance_squared_to(at) < (b as Node3D).global_position.distance_squared_to(at))
+		(marks[0] as Node).remove_from_group("blood")
+		(marks[0] as Node).queue_free()
+		scrubbed += 1
 
 
 static var _cone_mesh: Mesh
