@@ -166,6 +166,12 @@ func _ready() -> void:
 	dhud.armoury = armoury
 	dhud.pawn_getter = func(): return sync.my_pawn()
 	add_child(dhud)
+	var mm := MiniMap.new()
+	mm.name = "MiniMap"
+	mm.city = self
+	mm.dispatcher = dispatch
+	mm.pawn_getter = func(): return sync.my_pawn()
+	add_child(mm)
 	if first_shift == null and not has_node("Benchmark"):
 		var tips := GameTips.new()
 		tips.name = "Tips"
@@ -260,10 +266,11 @@ func _build(s: int) -> void:
 		police_cars.append(pc)
 	_build_yard(st)
 	# The traffic stop's car, parked on the far side of the station block.
-	civ_car = Car.new()
-	civ_car.color = Color("2f5f9a")
+	# v0.16.x: an ordinary sedan (it was the old blue test-box car).
+	civ_car = CivilianVehicle.make("sedan", gen.seed_value + 4041)
+	civ_car.name = "TrafficStopCar"
 	var lot: Vector3 = gen.blocks[gen.block_index(CityGenerator.STATION.x, CityGenerator.STATION.y)].offset
-	civ_car.position = lot + Vector3(20, 0.95, CityGenerator.lot_size(CityGenerator.STATION.x, CityGenerator.STATION.y).y + 2.4)
+	civ_car.position = lot + Vector3(20, 1.3, CityGenerator.lot_size(CityGenerator.STATION.x, CityGenerator.STATION.y).y + 2.4)
 	civ_car.rotation_degrees.y = -90.0
 	add_child(civ_car)
 	cars.add_car(civ_car)

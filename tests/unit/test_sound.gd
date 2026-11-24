@@ -72,10 +72,11 @@ func test_gunshot_layers_and_tail() -> void:
 	add_child(listener_spot)
 	listener_spot.position = Vector3(0, 0, 30)
 	Sfx.attach_listener(listener_spot)
+	Sfx.forget_spaces()
 	Sfx.gunshot(self, Vector3(0, 1.3, 30))
 	var stems := Sfx.history.map(func(s): return s.stem)
-	t.check(stems == ["gun_near"], "outdoor close shot: %s" % [stems])
-	t.check(Sfx.history[-1].bus == Sfx.BUS_OUTDOOR, "outdoor bus")
+	t.check(stems == ["gun_9mm_near"], "outdoor close shot: %s" % [stems])
+	t.check(Sfx.history[-1].bus in Sfx.OUTDOOR_BUSES, "outdoor bus")
 	Sfx.history.clear()
 	Sfx.gunshot(self, Vector3(0, 1.3, 80))
 	t.check(Sfx.history[-1].stem == "gun_far", "distant shot uses the far recording")
@@ -83,9 +84,10 @@ func test_gunshot_layers_and_tail() -> void:
 	z.position = Vector3(0, 1.5, 30)
 	add_child(z)
 	Sfx.history.clear()
+	Sfx.forget_spaces()
 	Sfx.gunshot(self, Vector3(0, 1.3, 30))
-	t.check(Sfx.history.size() == 1 and Sfx.history[0].stem == "gun_dry", "indoors the tail is cut")
-	t.check(Sfx.history[0].bus == Sfx.BUS_INDOOR, "indoor shot on indoor bus")
+	t.check(Sfx.history.size() == 1 and Sfx.history[0].stem == "gun_9mm_room", "indoors the room take: %s" % [Sfx.history])
+	t.check(Sfx.history[0].bus in Sfx.INDOOR_BUSES, "indoor shot on an indoor bus")
 	z.queue_free()
 	listener_spot.queue_free()
 
@@ -99,11 +101,43 @@ func test_shot_behind_a_wall_goes_through_a_muffled_bus() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	Sfx.history.clear()
+	Sfx.forget_spaces()
 	Sfx.gunshot(self, Vector3(40, 1.3, -4))
-	t.check(Sfx.history[-1].played_on == "Outdoor_Muffled1", "played on %s" % Sfx.history[-1].played_on)
+	var base: String = Sfx.history[-1].bus
+	t.check(Sfx.history[-1].played_on == base + "_Muffled1", "played on %s" % Sfx.history[-1].played_on)
 	Sfx.gunshot(self, Vector3(40, 1.3, 3))
-	t.check(Sfx.history[-1].played_on == "Outdoor", "clear shot is not muffled (%s)" % Sfx.history[-1].played_on)
+	t.check(Sfx.history[-1].played_on == Sfx.history[-1].bus, "clear shot is not muffled (%s)" % Sfx.history[-1].played_on)
 	ears.queue_free()
+
+
+## v0.13.0: the space a shot is fired in picks its sound.
+func test_spaces() -> void:
+	Sfx.forget_spaces()
+	# An alley: walls 3 m either side, open along it.
+	_wall(Vector3(200, 4, -3), Vector3(40, 8, 0.4))
+	_wall(Vector3(200, 4, 3), Vector3(40, 8, 0.4))
+	# A small room: a box 3 x 3 with a ceiling, inside a zone.
+	var rx := 300.0
+	_wall(Vector3(rx, 1.5, -1.5), Vector3(3.4, 3, 0.2))
+	_wall(Vector3(rx, 1.5, 1.5), Vector3(3.4, 3, 0.2))
+	_wall(Vector3(rx - 1.5, 1.5, 0), Vector3(0.2, 3, 3.4))
+	_wall(Vector3(rx + 1.5, 1.5, 0), Vector3(0.2, 3, 3.4))
+	_wall(Vector3(rx, 3.1, 0), Vector3(3.4, 0.2, 3.4))
+	var z := SoundZone.new()
+	z.size = Vector3(3, 3, 3)
+	z.position = Vector3(rx, 1.5, 0)
+	add_child(z)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	t.check(Sfx.space_at(self, Vector3(200, 1.3, 0)).kind == "alley", "between close walls: %s" % [Sfx.space_at(self, Vector3(200, 1.3, 0))])
+	t.check(Sfx.space_at(self, Vector3(200, 1.3, 0)).bus == Sfx.BUS_ALLEY, "alley bus")
+	t.check(Sfx.space_at(self, Vector3(rx, 1.3, 0)).kind == "room_small", "a box room: %s" % [Sfx.space_at(self, Vector3(rx, 1.3, 0))])
+	t.check(Sfx.space_at(self, Vector3(rx, 1.3, 0)).indoor, "is indoors")
+	t.check(Sfx.space_at(self, Vector3(400, 12.0, 0)).kind == "rooftop", "high up outside is a rooftop")
+	t.check(Sfx.space_at(self, Vector3(400, 1.3, 400)).kind == "open", "nothing near is open ground")
+	t.check(Sfx.family(2, 1.0) == "shotgun" and Sfx.family(0, 1.6) == "heavy" and Sfx.family(0, 0.8) == "smg"
+		and Sfx.family(0, 1.0) == "9mm" and Sfx.family(1, 1.0) == "9mm", "gun families")
+	z.queue_free()
 
 
 func test_surface_lookup() -> void:

@@ -60,7 +60,10 @@ func _add_lift(b: Dictionary) -> void:
 	# handrail and a lit ceiling.
 	var car := AnimatableBody3D.new()
 	car.name = "LiftCar%d" % lifts.size()
-	car.sync_to_physics = false
+	# v0.13.2: moved in step with physics, so whoever rides it stands on a
+	# moving floor (with its speed) instead of being shoved up each tick,
+	# which made the ride judder.
+	car.sync_to_physics = true
 	car.collision_layer = 1
 	car.collision_mask = 0
 	car.transform = Transform3D(basis, origin)

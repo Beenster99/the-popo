@@ -144,3 +144,19 @@ func _knees_out(a: Animation, sk: Skeleton3D, ap: AnimationPlayer) -> float:
 func test_footsteps_quieter_with_metal() -> void:
 	t.check(GameSounds.STEP_RUN_DB <= -12.0 and GameSounds.STEP_WALK_DB <= -18.0, "footsteps sit well under the action")
 	t.check(Sfx.variants("step_metal") == 4, "boot steps on metal (car roofs)")
+
+
+## v0.13.2 (beenster: "remove skid marks after a period"): marks fade and
+## are gone after LIFETIME seconds, and never more than MAX_STRIPS are kept.
+func test_skid_marks_fade_and_go() -> void:
+	var s := await _marks()
+	for i in 40:
+		s.wheel(777, Vector3(i * 0.3, 0, 9), Vector3.UP, 1.0)
+	t.check(s.strip_count() > 0, "marks laid")
+	s._process(SkidMarks.LIFETIME - SkidMarks.FADE_TIME + 4.0)
+	t.check(s.strip_count() > 0, "still there while fading")
+	s._process(SkidMarks.FADE_TIME)
+	t.check(s.strip_count() == 0, "all gone after their lifetime (%d left)" % s.strip_count())
+	for i in SkidMarks.MAX_STRIPS + 200:
+		s.wheel(778, Vector3(fmod(i * 0.3, 2.0) * 0.0 + i * 0.3, 0, 12), Vector3.UP, 1.0)
+	t.check(s.strip_count() <= SkidMarks.MAX_STRIPS, "capped at %d" % SkidMarks.MAX_STRIPS)

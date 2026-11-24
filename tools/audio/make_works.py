@@ -127,7 +127,7 @@ SOUNDS = [
 ]
 
 if __name__ == "__main__":
-    rows = list(csv.reader(open(MANIFEST)))
+    rows = list(csv.reader(open(MANIFEST, newline="")))
     rows = [r for r in rows if r and not r[0].startswith("sfx/works_")]
     for stem, fn, count, note in SOUNDS:
         for v in range(1, count + 1):
@@ -138,4 +138,4 @@ if __name__ == "__main__":
             rows.append(["sfx/%s_%d.wav" % (stem, v), "Made by tools/audio/make_works.py", "Project's own (no third-party audio)", note])
             print("wrote", path)
     with open(MANIFEST, "w", newline="") as f:
-        csv.writer(f).writerows(rows)
+        csv.writer(f, lineterminator="\n").writerows(rows)

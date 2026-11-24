@@ -370,64 +370,185 @@ func _start_cloud(kind: int, at: Vector3, can: RigidBody3D) -> void:
 	h.volume_db = -2.0
 	h.max_distance = 40.0
 	h.unit_size = 4.0
-	h.bus = Sfx.bus_at(get_tree(), at)
+	h.bus = Sfx.space_bus(self, at)
 	add_child(h)
 	h.global_position = at
 	h.play()
 	c.hiss = h
 
 
-func _cloud_particles(kind: int, at: Vector3) -> CPUParticles3D:
-	var r: float = SMOKE_RADIUS if kind == Kind.SMOKE else GAS_RADIUS
+## The cloud (v0.22.0, beenster: "as realistic as possible"): a dense jet
+## hissing out of the can along the floor, and the body of the cloud, lots
+## of overlapping soft, lumpy puffs that billow out and up, slowly turn,
+## drift with the air and thin away. Lit by the sun (dark at night), faded
+## where they meet the ground or the camera so there are no hard edges.
+func _cloud_particles(kind: int, at: Vector3) -> Node3D:
+	var holder := Node3D.new()
+	holder.name = "Cloud"
+	add_child(holder)
+	holder.global_position = at + Vector3(0, 0.05, 0)
+	var smoke := kind == Kind.SMOKE
+	var r: float = SMOKE_RADIUS if smoke else GAS_RADIUS
+	var tint := Color(0.86, 0.87, 0.88) if smoke else Color(0.93, 0.93, 0.84)
+	var dense := 0.8 if smoke else 0.5
+	var mat := _smoke_material()
+	# The body of the cloud.
+	var body := _puffs(mat, 170 if smoke else 120, 13.0, 0.9)
+	body.direction = Vector3(0, 0.35, 0)
+	body.spread = 85.0
+	body.initial_velocity_min = r * 0.18
+	body.initial_velocity_max = r * 0.48
+	body.damping_min = r * 0.07
+	body.damping_max = r * 0.11
+	body.gravity = Vector3(0.12, 0.07, 0.08)    # a breath of wind, and warm smoke rises
+	body.scale_amount_min = 2.4
+	body.scale_amount_max = 4.2
+	body.scale_amount_curve = _curve([Vector2(0, 0.3), Vector2(0.25, 0.85), Vector2(1, 1.7)])
+	body.color_ramp = _ramp(tint, [0.0, dense, dense * 0.85, 0.0], [0.0, 0.12, 0.6, 1.0])
+	body.color_initial_ramp = _shades(tint)
+	holder.add_child(body)
+	body.position = Vector3(0, 0.6, 0)
+	# The jet out of the can: quick, low, thick.
+	var jet := _puffs(mat, 36, 2.6, 0.12)
+	jet.direction = Vector3(1, 0.25, 0)
+	jet.spread = 180.0
+	jet.flatness = 0.7
+	jet.initial_velocity_min = 2.0
+	jet.initial_velocity_max = 4.0
+	jet.damping_min = 1.6
+	jet.damping_max = 2.4
+	jet.gravity = Vector3(0, 0.25, 0)
+	jet.scale_amount_min = 0.5
+	jet.scale_amount_max = 1.0
+	jet.scale_amount_curve = _curve([Vector2(0, 0.4), Vector2(1, 2.4)])
+	jet.color_ramp = _ramp(tint, [0.0, minf(dense + 0.2, 0.85), dense * 0.6, 0.0], [0.0, 0.08, 0.5, 1.0])
+	jet.color_initial_ramp = _shades(tint)
+	holder.add_child(jet)
+	jet.position = Vector3(0, 0.15, 0)
+	return holder
+
+
+func _puffs(mat: Material, amount: int, life: float, emit_r: float) -> CPUParticles3D:
 	var p := CPUParticles3D.new()
-	p.amount = 140 if kind == Kind.SMOKE else 110
-	p.lifetime = 9.0
-	p.preprocess = 0.0
+	p.amount = amount
+	p.lifetime = life
+	p.randomness = 0.6
+	p.lifetime_randomness = 0.35
+	p.local_coords = false
 	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
-	p.emission_sphere_radius = 0.2
-	p.direction = Vector3.UP
-	p.spread = 180.0
-	p.initial_velocity_min = r * 0.35
-	p.initial_velocity_max = r * 0.75
-	p.damping_min = r * 0.12
-	p.damping_max = r * 0.2
-	p.gravity = Vector3(0, 0.12, 0)
-	p.scale_amount_min = 2.6
-	p.scale_amount_max = 4.4
-	var sc := Curve.new()
-	sc.add_point(Vector2(0, 0.35))
-	sc.add_point(Vector2(0.3, 1.0))
-	sc.add_point(Vector2(1, 1.25))
-	p.scale_amount_curve = sc
+	p.emission_sphere_radius = emit_r
 	p.angle_min = 0.0
 	p.angle_max = 360.0
-	var grad := Gradient.new()
-	if kind == Kind.SMOKE:
-		grad.set_color(0, Color(0.62, 0.64, 0.66, 0.0))
-		grad.add_point(0.08, Color(0.6, 0.62, 0.64, 0.92))
-		grad.add_point(0.75, Color(0.55, 0.57, 0.6, 0.85))
-		grad.set_color(grad.get_point_count() - 1, Color(0.5, 0.52, 0.55, 0.0))
-	else:
-		grad.set_color(0, Color(0.95, 0.95, 0.82, 0.0))
-		grad.add_point(0.08, Color(0.93, 0.93, 0.8, 0.7))
-		grad.add_point(0.75, Color(0.88, 0.9, 0.75, 0.55))
-		grad.set_color(grad.get_point_count() - 1, Color(0.85, 0.87, 0.75, 0.0))
-	p.color_ramp = grad
+	p.angular_velocity_min = -14.0
+	p.angular_velocity_max = 14.0
+	# Each puff is one of the four lumpy shapes in the atlas.
+	p.anim_offset_min = 0.0
+	p.anim_offset_max = 1.0
+	p.anim_speed_min = 0.0
+	p.anim_speed_max = 0.0
 	var q := QuadMesh.new()
-	q.size = Vector2(1.4, 1.4)
-	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
-	m.vertex_color_use_as_albedo = true
-	m.albedo_texture = FireSystem.soft_texture()
-	m.disable_receive_shadows = true
-	q.material = m
+	q.size = Vector2(1.0, 1.0)
+	q.material = mat
 	p.mesh = q
-	add_child(p)
-	p.global_position = at + Vector3(0, 0.3, 0)
 	p.emitting = true
 	return p
+
+
+static var _smoke_mat: StandardMaterial3D
+
+static func _smoke_material() -> StandardMaterial3D:
+	if _smoke_mat == null:
+		var m := StandardMaterial3D.new()
+		# Unshaded: a lit card facing the camera goes dark whenever the sun is
+		# behind it, which smoke doesn't. The day/night level is set on
+		# albedo_color instead (see _clouds_step).
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.blend_mode = BaseMaterial3D.BLEND_MODE_MIX
+		m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		m.billboard_keep_scale = true
+		m.particles_anim_h_frames = 2
+		m.particles_anim_v_frames = 2
+		m.particles_anim_loop = false
+		m.vertex_color_use_as_albedo = true
+		m.albedo_texture = smoke_texture()
+		m.albedo_color = Color(1, 1, 1, 1)
+		m.roughness = 1.0
+		m.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+		m.disable_receive_shadows = true
+		m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		# Soft where a puff cuts into the floor or a wall.
+		m.proximity_fade_enabled = true
+		m.proximity_fade_distance = 1.4
+		# And thin right in front of the camera, so walking through it isn't a
+		# wall of flat cards.
+		m.distance_fade_mode = BaseMaterial3D.DISTANCE_FADE_PIXEL_ALPHA
+		m.distance_fade_min_distance = 0.2
+		m.distance_fade_max_distance = 2.2
+		_smoke_mat = m
+	return _smoke_mat
+
+
+static var _smoke_tex: ImageTexture
+
+## Four lumpy smoke puffs in a 2x2 atlas: noise (big billows and fine wisps)
+## inside a soft round edge, brighter on top so they read as round masses.
+static func smoke_texture() -> Texture2D:
+	if _smoke_tex:
+		return _smoke_tex
+	var n := 128
+	var img := Image.create(n * 2, n * 2, false, Image.FORMAT_RGBA8)
+	for v in 4:
+		var big := FastNoiseLite.new()
+		big.seed = 101 + v * 17
+		big.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+		big.frequency = 0.035
+		big.fractal_type = FastNoiseLite.FRACTAL_FBM
+		big.fractal_octaves = 4
+		var ox := (v % 2) * n
+		var oy := (v / 2) * n
+		for y in n:
+			for x in n:
+				var dx := (x + 0.5) / n * 2.0 - 1.0
+				var dy := (y + 0.5) / n * 2.0 - 1.0
+				var nz := big.get_noise_2d(x, y) * 0.5 + 0.5
+				# The edge wobbles with the noise, so it isn't a circle.
+				var d := sqrt(dx * dx + dy * dy) + (nz - 0.5) * 0.55
+				var edge := clampf(1.0 - d, 0.0, 1.0)
+				edge = edge * edge * (3.0 - 2.0 * edge)
+				var a := clampf(edge * (0.55 + 0.9 * nz), 0.0, 1.0)
+				var shade := clampf(0.78 + 0.22 * nz - dy * 0.1, 0.0, 1.0)
+				img.set_pixel(ox + x, oy + y, Color(shade, shade, shade, a))
+	img.generate_mipmaps()
+	_smoke_tex = ImageTexture.create_from_image(img)
+	return _smoke_tex
+
+
+static func _curve(pts: Array) -> Curve:
+	var c := Curve.new()
+	c.max_value = 3.0
+	for pt in pts:
+		c.add_point(pt)
+	return c
+
+
+## Colour over a puff's life: tint, with these alphas at these offsets.
+static func _ramp(tint: Color, alphas: Array, at: Array) -> Gradient:
+	var g := Gradient.new()
+	g.offsets = PackedFloat32Array(at)
+	var cols := PackedColorArray()
+	for a in alphas:
+		cols.append(Color(tint.r, tint.g, tint.b, a))
+	g.colors = cols
+	return g
+
+
+## Some puffs a little darker than others, for depth.
+static func _shades(tint: Color) -> Gradient:
+	var g := Gradient.new()
+	g.offsets = PackedFloat32Array([0.0, 1.0])
+	g.colors = PackedColorArray([Color(tint.r * 0.72, tint.g * 0.72, tint.b * 0.74, 1.0), Color(1, 1, 1, 1)])
+	return g
 
 
 ## How big a cloud is now (it spreads, then thins at the end).
@@ -444,12 +565,11 @@ func _clouds_step(delta: float) -> void:
 	for c in clouds.duplicate():
 		c.age += delta
 		var left: float = c.life - c.age
-		var p := c.node as CPUParticles3D
-		if p and is_instance_valid(p):
-			if left < 8.0:
-				p.emitting = false
-			# Drifts a little with the air.
-			p.global_position += Vector3(0.05, 0, 0.03) * delta
+		var p := c.node as Node3D
+		if p and is_instance_valid(p) and left < 8.0:
+			for e in p.get_children():
+				if e is CPUParticles3D:
+					(e as CPUParticles3D).emitting = false
 		var h := c.hiss as AudioStreamPlayer3D
 		if h and is_instance_valid(h):
 			h.volume_db = -2.0 - maxf(0.0, c.age - 6.0) * 2.0
@@ -462,6 +582,11 @@ func _clouds_step(delta: float) -> void:
 			clouds.erase(c)
 	if not _headless():
 		_local_effects(delta)
+		if _smoke_mat and not clouds.is_empty():
+			# Bright by day, dim grey at night.
+			var night: float = CityWeather.current.night if CityWeather.current and is_instance_valid(CityWeather.current) else 0.0
+			var k := lerpf(1.0, 0.3, night)
+			_smoke_mat.albedo_color = Color(k, k, k * 1.03, 1.0)
 
 
 ## Anyone: does a smoke cloud stand between a and b? (Suspects can't see,
@@ -534,7 +659,7 @@ func _flash(at: Vector3) -> void:
 				s.flashed(k)
 	if _headless():
 		return
-	Sfx.play(self, "flashbang", at, 9.0, 400.0, 0.04, Sfx.bus_at(get_tree(), at))
+	Sfx.play(self, "flashbang", at, 9.0, 400.0, 0.04, Sfx.space_bus(self, at))
 	Sfx.play(self, "gun_crack_near", at, 6.0, 120.0, 0.05)
 	Sfx.play(self, "gun_sub", at, 6.0, 120.0, 0.05)
 	Feel.blast_shake(get_tree(), at, 2.5)
@@ -619,7 +744,7 @@ func _frag(at: Vector3) -> void:
 		return
 	if world == null or not is_instance_valid(world):
 		Sfx.explosion(self, at, 1.2)   # the world plays it otherwise
-	Sfx.play(self, "frag_crack", at, 8.0, 300.0, 0.05, Sfx.bus_at(get_tree(), at))
+	Sfx.play(self, "frag_crack", at, 8.0, 300.0, 0.05, Sfx.space_bus(self, at))
 	Feel.blast_shake(get_tree(), at, 4.0)
 	var light := OmniLight3D.new()
 	light.light_color = Color(1.0, 0.65, 0.3)
