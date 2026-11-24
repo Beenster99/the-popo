@@ -16,7 +16,13 @@ extends MultiMeshInstance3D
 ## car is only following the host, estimates the slide from how the car
 ## moved (Car._estimate_skids).
 
-const MAX_STRIPS := 6000
+## v0.13.2 (beenster: "remove skid marks after a period to manage fps"):
+## far fewer kept, and each fades away LIFETIME seconds after it was laid
+## instead of lasting the whole shift.
+const MAX_STRIPS := 1500
+const LIFETIME := 40.0        # s until a mark is gone
+const FADE_TIME := 12.0       # s of fading at the end of that
+const TICK := 0.25            # s between fade updates
 const WIDTH := 0.2            # m, a tyre's tread
 const MIN_STEP := 0.22        # m between strips (shorter would waste them)
 const MAX_STEP := 2.5         # m: further means the wheel jumped; start a new mark
@@ -30,6 +36,11 @@ var _count := 0
 ## wheel key -> last point a strip ended at (world), or absent when the tyre is gripping.
 var _last := {}
 var _alpha := PackedFloat32Array()
+var _born := PackedFloat32Array()
+var _clock := 0.0
+var _tick_t := 0.0
+## The oldest strip still showing (the ring's tail).
+var _tail := 0
 
 
 ## The world's skid marks (made on first use).
@@ -75,6 +86,7 @@ func _init() -> void:
 	mm.custom_aabb = AABB(Vector3(-5000, -500, -5000), Vector3(10000, 1000, 10000))
 	multimesh = mm
 	_alpha.resize(MAX_STRIPS)
+	_born.resize(MAX_STRIPS)
 
 
 ## One wheel this physics tick. key: unique per wheel (car id and wheel
@@ -130,15 +142,38 @@ func _lay(a: Vector3, b: Vector3, normal: Vector3, alpha: float) -> void:
 	var i := _next
 	mm.set_instance_transform(i, strip_transform(a, b, normal))
 	_alpha[i] = alpha
+	_born[i] = _clock
 	mm.set_instance_color(i, Color(1, 1, 1, alpha))
 	laid += 1
 	_next = (_next + 1) % MAX_STRIPS
-	_count = mini(_count + 1, MAX_STRIPS)
-	mm.visible_instance_count = _count
-	# The oldest strips (just ahead of the write head) fade out before
-	# reuse: a few spots across that stretch are refreshed each time, so each
-	# old strip steps down in eighths as the head comes round to it.
 	if _count == MAX_STRIPS:
-		for m in FADE_STEPS:
-			var j := (_next + m * FADE_STRIPS / FADE_STEPS) % MAX_STRIPS
-			mm.set_instance_color(j, Color(1, 1, 1, _alpha[j] * float(m) / FADE_STEPS))
+		_tail = _next     # the ring is full: the oldest was just written over
+	else:
+		_count += 1
+	# Draw up to the furthest slot ever used; spent slots are collapsed.
+	mm.visible_instance_count = maxi(mm.visible_instance_count, mini(laid, MAX_STRIPS))
+
+
+## Marks fade out over their last FADE_TIME seconds and are then gone.
+func _process(delta: float) -> void:
+	_clock += delta
+	_tick_t -= delta
+	if _tick_t > 0.0 or _count == 0:
+		return
+	_tick_t = TICK
+	var mm := multimesh
+	var fade_from := LIFETIME - FADE_TIME
+	var k := 0
+	while k < _count:
+		var j := (_tail + k) % MAX_STRIPS
+		var age := _clock - _born[j]
+		if age < fade_from:
+			break     # strips are in age order: the rest are younger
+		if age >= LIFETIME and k == 0:
+			mm.set_instance_transform(j, Transform3D(Basis().scaled(Vector3.ZERO), Vector3.ZERO))
+			_tail = (_tail + 1) % MAX_STRIPS
+			_count -= 1
+			continue
+		var f := clampf(1.0 - (age - fade_from) / FADE_TIME, 0.0, 1.0)
+		mm.set_instance_color(j, Color(1, 1, 1, _alpha[j] * f))
+		k += 1

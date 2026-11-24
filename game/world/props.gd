@@ -509,6 +509,7 @@ func _furnish_outdoors(blk: Dictionary, rng: RandomNumberGenerator, limit: int) 
 			# barrels.
 			var tries := 30
 			var placed := 0
+			var stacks: Array = []   # footprints already used (v0.16.0: they were placed inside each other)
 			while tries > 0 and placed < (8 if blk.style == "docks" else 3) and _next_id < limit - 4:
 				tries -= 1
 				var p := o + Vector3(rng.randf_range(6.0, ex - 6.0), y, rng.randf_range(6.0, ez - 6.0))
@@ -518,8 +519,14 @@ func _furnish_outdoors(blk: Dictionary, rng: RandomNumberGenerator, limit: int) 
 				for bi in range(blk.buildings_from, blk.buildings_to):
 					if (city.buildings[bi].bounds as AABB).grow(1.5).intersects(foot):
 						clash = true
+				# Two containers spawned inside each other were shoved apart by
+				# the physics hard enough to push one down through the ground.
+				for f in stacks:
+					if (f as AABB).intersects(foot):
+						clash = true
 				if clash:
 					continue
+				stacks.append(foot)
 				var id := add_prop("container", Transform3D(Basis(Vector3.UP, yaw), p))
 				_paint_container(id, rng)
 				if rng.randf() < 0.5:
