@@ -68,6 +68,21 @@ player). The custody bay's blue lamp now hangs on the station wall instead
 of a post in the middle of the road, and POLICE on the car doors reads the
 right way round. The frame rate counter (F11) moved to the top right.
 
+TRAFFIC THAT KEEPS MOVING (0.16.0)
+Drivers no longer sit for ever behind a car stopped in their lane (a crash,
+an abandoned car, one of yours left in the road): they edge round it, or
+pull out and overtake it when the other side of the road is clear, and
+duck back in for oncoming traffic.
+Vans and lorries no longer stop dead beside cars parked at the kerb.
+Two drivers waiting on each other in a junction sort it out: one goes.
+A car wedged on something it can't see (rubble, a post) backs off turned
+away from it, tries again, then goes round it on the other side.
+As a last resort, a car that has gone nowhere for 25 seconds, with none of
+you within 70 m, is quietly put back into the traffic somewhere else.
+Pulling over for a siren no longer drives them into the parked cars.
+Shipping containers on the docks no longer drop through the ground: two
+were being placed inside each other and the shove pushed one under.
+
 PRISONERS IN THE CAR (0.14.0)
 Walk your prisoners to a police car and press F at a door: the back door
 swings open and every prisoner walking with you climbs in (back seats
