@@ -4,6 +4,10 @@ Double-click ThePopo-vVERSION.exe. If Windows warns about an unknown app,
 choose More info, then Run anyway.
 
 PLAYING
+JOB CARD: when a call comes in, a card under the clock (top left) tells you
+what it is, the pay, how far and which way it is, the full dispatch
+message, how many suspects and how many are armed (and with what), how many
+you've dealt with, and what to do.
 You start with the gun holstered: H, or holding right mouse, draws it.
 Inside a building the floors above fade out, so nothing hangs over you.
 The opening menu has Single Player (straight into the city), Online (host or

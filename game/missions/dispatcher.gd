@@ -835,6 +835,30 @@ func _check_calls() -> void:
 			say("DISPATCH: we've lost them. %s call closed, suspects got away." % KIND_NAMES[c.kind])
 
 
+## The facts for the job card (2026-11-24, beenster: "a little more
+## information as well as the radio call"): how many crooks, how many armed
+## (and with shotguns), and how many are dealt with (cuffed, down, booked).
+## Host: counted from the call's suspects; clients: from the last snapshot.
+func brief(c: Dictionary) -> Dictionary:
+	if not Net.is_host() and c.has("brief"):
+		return c.brief
+	var out := {"total": 0, "armed": 0, "shotguns": 0, "done": 0}
+	for sid in c.get("suspects", []):
+		var su := suspects.get(sid) as Suspect
+		if su == null or not is_instance_valid(su):
+			continue
+		if su.civilian:
+			continue
+		out.total += 1
+		if su.state in [Suspect.S.CUFFED, Suspect.S.IN_CAR, Suspect.S.DOWN, Suspect.S.BOOKED, Suspect.S.SURRENDER]:
+			out.done += 1
+		elif su.armed:
+			out.armed += 1
+			if su.weapon == EnemyGuns.SHOTGUN:
+				out.shotguns += 1
+	return out
+
+
 func active_calls() -> Array:
 	return calls.values().filter(func(c): return c.state == CallState.ACTIVE)
 
@@ -1040,6 +1064,13 @@ func _encode_state() -> PackedByteArray:
 		b.put_float(c.marker.x)
 		b.put_float(c.marker.y)
 		b.put_float(c.marker.z)
+		# 2026-11-24: the job card's facts (text, crooks, armed, dealt with).
+		var br := brief(c)
+		b.put_utf8_string(c.text)
+		b.put_u8(br.total)
+		b.put_u8(br.armed)
+		b.put_u8(br.shotguns)
+		b.put_u8(br.done)
 	var live := suspects.values().filter(func(s): return (s as Suspect).state != Suspect.S.BOOKED)
 	b.put_u16(live.size())
 	for s in live:
@@ -1075,9 +1106,13 @@ func _on_state(_from: int, data: PackedByteArray) -> void:
 		var id := b.get_u16()
 		var kind := b.get_u8()
 		var m := Vector3(b.get_float(), b.get_float(), b.get_float())
+		var text := b.get_utf8_string()
+		var br := {"total": b.get_u8(), "armed": b.get_u8(), "shotguns": b.get_u8(), "done": b.get_u8()}
 		if not calls.has(id):
 			calls[id] = {"id": id, "kind": kind, "state": CallState.ACTIVE, "pos": m, "marker": m, "t": 0.0, "suspects": [], "text": ""}
 		calls[id].marker = m
+		calls[id].text = text
+		calls[id].brief = br
 		calls[id].state = CallState.ACTIVE
 		keep[id] = true
 	for id in calls.keys():
