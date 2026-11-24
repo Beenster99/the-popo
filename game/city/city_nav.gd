@@ -14,6 +14,7 @@ const MARGIN := CityGenerator.ROAD_W * 0.5
 var world: DestructionWorld
 var city: CityGenerator
 var _regions := {}       # block index -> NavigationRegion3D
+var _synced := {}        # block index -> true once the map uses its region
 var _pending: Array = [] # block indices still to bake, nearest first
 var _baking := -1
 var _focus := Vector3.ZERO
@@ -35,8 +36,29 @@ func set_focus(p: Vector3) -> void:
 	_focus = p
 
 
+## The block's region is baked and the map has taken it in (the map picks
+## a new region up some frames later; until then closest-point and path
+## queries act as if it weren't there).
 func block_ready(k: int) -> bool:
-	return _regions.has(k)
+	if _synced.has(k):
+		return true
+	if not _regions.has(k) or not is_inside_tree():
+		return false
+	var nm: NavigationMesh = (_regions[k] as NavigationRegion3D).navigation_mesh
+	if nm == null or nm.get_polygon_count() == 0:
+		_synced[k] = true
+		return true
+	# The middle of one of its own polygons (not a corner, which the next
+	# block's region may share).
+	var verts := nm.get_vertices()
+	var poly := nm.get_polygon(nm.get_polygon_count() / 2)
+	var c := Vector3.ZERO
+	for i in poly:
+		c += verts[i]
+	c /= poly.size()
+	if NavigationServer3D.map_get_closest_point(get_world_3d().navigation_map, c).distance_to(c) < 0.2:
+		_synced[k] = true
+	return _synced.has(k)
 
 
 func baked_count() -> int:
