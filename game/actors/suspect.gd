@@ -1817,7 +1817,7 @@ func _step_up(want: Vector3) -> void:
 
 # --- every machine: looks -------------------------------------------------------------
 
-const WORK_POSE := {ACT.RUMMAGE: "rummage", ACT.RUMMAGE_LOW: "rummage", ACT.SMASH: "smash", ACT.JIMMY: "jimmy",
+const WORK_POSE := {ACT.RUMMAGE: "rummage", ACT.RUMMAGE_LOW: "rummage_low", ACT.SMASH: "smash", ACT.JIMMY: "jimmy",
 	ACT.DEAL: "deal", ACT.LOOKOUT: "lookout"}
 
 func _process(delta: float) -> void:

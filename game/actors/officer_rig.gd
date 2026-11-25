@@ -13,7 +13,7 @@ const LOWER_STATES := ["idle", "walk", "walk_ready", "run", "crouch_idle", "crou
 	"peek", "slide", "roll", "mantle", "climb", "jump", "fall", "kick", "cover_low_idle", "limp", "sit", "kneel"]
 const UPPER_STATES := ["none", "aim_hold", "ready_hold", "punch", "reload", "holster", "draw", "drive", "hands_up", "cuffed",
 	"civ_phone", "civ_texting", "civ_pockets", "civ_arms_folded", "civ_hands_behind", "work_dig", "work_hammer",
-	"rummage", "smash", "jimmy", "deal", "lookout"]
+	"rummage", "rummage_low", "smash", "jimmy", "deal", "lookout"]
 ## Everyday upper-body loops (OfficerClips.CIVILIAN_PATH) and what each one
 ## holds in the right hand.
 const DAILY_HELD := {"civ_phone": "phone", "civ_texting": "phone", "work_dig": "shovel", "work_hammer": "hammer"}
@@ -72,7 +72,7 @@ func _ready() -> void:
 	anim_player.add_animation_library("", lib)
 	for n in ["idle", "walk", "walk_ready", "walk_back", "walk_left", "walk_right", "run", "crouch_idle", "crouch_walk", "prone_idle", "crawl", "cover_idle", "cover_low_idle", "fall", "aim_hold", "ready_hold", "peek", "limp", "sit", "drive", "kneel", "hands_up", "cuffed",
 			"civ_phone", "civ_texting", "civ_pockets", "civ_arms_folded", "civ_hands_behind", "work_dig", "work_hammer",
-			"rummage", "smash", "jimmy", "deal", "lookout"]:
+			"rummage", "rummage_low", "smash", "jimmy", "deal", "lookout"]:
 		if lib.has_animation(n):
 			lib.get_animation(n).loop_mode = Animation.LOOP_LINEAR
 	if "run" in OfficerClips.mocap_clips:

@@ -23,7 +23,7 @@ func test_rig_has_the_work_moves() -> void:
 	var rig := OfficerRig.new()
 	add_child(rig)
 	await get_tree().process_frame
-	for n in ["rummage", "smash", "jimmy", "deal", "lookout"]:
+	for n in ["rummage", "rummage_low", "smash", "jimmy", "deal", "lookout"]:
 		t.check(rig.anim_player.has_animation(n), "clip %s" % n)
 		t.check(n in OfficerRig.UPPER_STATES, "%s is an upper-body state" % n)
 	rig.queue_free()
