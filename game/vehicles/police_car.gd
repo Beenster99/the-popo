@@ -15,7 +15,7 @@ const GLASS_OPACITY := 0.3
 
 ## Seats in car space, where the officer's feet go: driver, front passenger,
 ## rear left, rear right.
-const SEATS := [Vector3(-0.40, -0.40, 0.08), Vector3(0.40, -0.40, 0.08), Vector3(-0.42, -0.40, -0.78), Vector3(0.42, -0.40, -0.78)]
+const SEATS := [Vector3(-0.40, -0.40, 0.08), Vector3(0.40, -0.40, 0.08), Vector3(-0.42, -0.40, -0.64), Vector3(0.42, -0.40, -0.64)]
 ## Where you stand to get in each seat (car space, x/z), and where you get out.
 const DOORS := [Vector3(-1.45, 0, 0.25), Vector3(1.45, 0, 0.25), Vector3(-1.45, 0, -0.70), Vector3(1.45, 0, -0.70)]
 ## The window each seat leans out of.
