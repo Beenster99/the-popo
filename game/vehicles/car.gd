@@ -803,39 +803,43 @@ func _puff(at: Vector3) -> void:
 static var _smoke_mesh: QuadMesh
 
 
-## Tyre smoke: soft grey puffs that stay where they were made.
+## Tyre smoke: soft, lumpy grey puffs that stay where they were made. Uses
+## the grenade clouds' smoke look (v0.22.0): noise puffs from an atlas,
+## soft edges, and a colour ramp that starts fully clear. (v0.20.0's flat
+## round sprite started each puff at full strength, which showed as dark
+## balls at the tyres while they spun up.)
 func _make_smoke(amount: int, lifetime: float) -> CPUParticles3D:
 	var s := CPUParticles3D.new()
 	s.amount = amount
 	s.lifetime = lifetime
+	s.randomness = 0.5
+	s.lifetime_randomness = 0.3
 	s.local_coords = false
-	s.direction = Vector3.UP
-	s.spread = 35.0
-	s.gravity = Vector3(0, 0.6, 0)
-	s.initial_velocity_min = 0.3
-	s.initial_velocity_max = 1.0
-	s.damping_min = 0.6
-	s.damping_max = 1.2
+	s.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	s.emission_sphere_radius = 0.15
+	s.direction = Vector3(0, 0.6, -1.0)
+	s.spread = 40.0
+	s.gravity = Vector3(0.1, 0.35, 0.05)
+	s.initial_velocity_min = 0.4
+	s.initial_velocity_max = 1.4
+	s.damping_min = 0.8
+	s.damping_max = 1.4
+	s.angle_min = 0.0
+	s.angle_max = 360.0
+	s.angular_velocity_min = -20.0
+	s.angular_velocity_max = 20.0
+	s.anim_offset_min = 0.0
+	s.anim_offset_max = 1.0
 	s.scale_amount_min = 0.7
-	s.scale_amount_max = 1.3
-	var curve := Curve.new()
-	curve.add_point(Vector2(0, 0.4))
-	curve.add_point(Vector2(1, 2.6))
-	s.scale_amount_curve = curve
-	var grad := Gradient.new()
-	grad.set_color(0, Color(0.8, 0.8, 0.82, 0.45))
-	grad.set_color(1, Color(0.88, 0.88, 0.9, 0.0))
-	s.color_ramp = grad
+	s.scale_amount_max = 1.2
+	s.scale_amount_curve = Grenades._curve([Vector2(0, 0.35), Vector2(0.3, 1.0), Vector2(1, 2.4)])
+	var tint := Color(0.88, 0.88, 0.89)
+	s.color_ramp = Grenades._ramp(tint, [0.0, 0.5, 0.3, 0.0], [0.0, 0.15, 0.55, 1.0])
+	s.color_initial_ramp = Grenades._shades(tint)
 	if _smoke_mesh == null:
 		_smoke_mesh = QuadMesh.new()
-		_smoke_mesh.size = Vector2(1.1, 1.1)
-		var m := StandardMaterial3D.new()
-		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
-		m.vertex_color_use_as_albedo = true
-		m.albedo_texture = FireSystem.soft_texture()
-		_smoke_mesh.material = m
+		_smoke_mesh.size = Vector2(1.2, 1.2)
+		_smoke_mesh.material = Grenades._smoke_material()
 	s.mesh = _smoke_mesh
 	s.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return s
