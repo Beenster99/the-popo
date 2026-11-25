@@ -80,7 +80,8 @@ def steering(H, x, y, z, tilt=62):
     return out
 
 
-def fit_out(H, out, W, rows, seat_y, floor_y, dash, wheel, roof_y=None, screen_z=None, doors=None, shelf=None, console=True):
+def fit_out(H, out, W, rows, seat_y, floor_y, dash, wheel, roof_y=None, screen_z=None, doors=None, shelf=None, console=True,
+            bench_headrests=(-0.45, 0.0, 0.45), bench_back_h=0.56, roof_box=None):
     """rows: [(z, "pair"|"bench")], front row first.
     dash: (y, z, depth) of the dash's centre; wheel: (y, z) for the driver.
     roof_y / screen_z: where the mirror and visors hang. doors: {"l": obj, "r": obj}
@@ -96,7 +97,7 @@ def fit_out(H, out, W, rows, seat_y, floor_y, dash, wheel, roof_y=None, screen_z
                 out.append(belt(H, x, seat_y, z, -1 if x < 0 else 1))
         else:
             bw = min(1.40, W - 0.30)
-            out += seat(H, 0.0, seat_y, z, bw, headrests=(-0.45, 0.0, 0.45), back_h=0.56)
+            out += seat(H, 0.0, seat_y, z, bw, headrests=bench_headrests, back_h=bench_back_h)
     # Floor.
     zs = [r[0] for r in rows]
     z0, z1 = min(zs) - 0.40, dash[1] + 0.05
@@ -130,7 +131,13 @@ def fit_out(H, out, W, rows, seat_y, floor_y, dash, wheel, roof_y=None, screen_z
         out.append(H.gbox("interior_mirror_stem", (0.02, 0.07, 0.02), (0, roof_y - 0.06, screen_z - 0.10), dm))
         for vx in (-0.40, 0.40):
             out.append(H.gbox("interior_visor", (0.40, 0.025, 0.16), (vx, roof_y - 0.05, screen_z - 0.16), trim, 0.01))
-        out.append(H.gbox("interior_headliner", (W - 0.36, 0.02, max(0.2, screen_z - min(zs) + 0.2)), (0, roof_y - 0.02, (screen_z + min(zs) - 0.4) / 2), H.mat("seat_hi", SEAT_HI)))
+        if roof_box:
+            # (rear z, half width) of the roof: the headliner stays under it
+            # instead of poking out over the rear window.
+            back, hw = roof_box
+            out.append(H.gbox("interior_headliner", (hw * 2 - 0.08, 0.02, screen_z - back - 0.06), (0, roof_y - 0.02, (screen_z + back) / 2), H.mat("seat_hi", SEAT_HI)))
+        else:
+            out.append(H.gbox("interior_headliner", (W - 0.36, 0.02, max(0.2, screen_z - min(zs) + 0.2)), (0, roof_y - 0.02, (screen_z + min(zs) - 0.4) / 2), H.mat("seat_hi", SEAT_HI)))
     # Door cards (inner door panels) with an armrest and a pull handle.
     for sn, d in (doors or {}).items():
         if d is None:

@@ -187,6 +187,7 @@ B_FRONT, B_REAR = 0.80, -1.10      # base of windscreen / rear window
 T_FRONT, T_REAR = 0.15, -0.72      # top of windscreen / rear window
 B_HW, T_HW = 0.86, 0.70            # half widths at base and roof
 B_PILLAR = -0.22                   # B-pillar
+REAR_BENCH_Z = -0.66               # rear bench (PoliceCar.SEATS rear z matches)
 
 
 def cab(x_sign, y, z):
@@ -364,8 +365,13 @@ def build_details():
     out.append(gbox("lens_red", (0.48, 0.09, 0.22), (-0.27, CAB_T + 0.15, zl), mat("red", RED), 0.02))
     out.append(gbox("lens_blue", (0.48, 0.09, 0.22), (0.27, CAB_T + 0.15, zl), mat("blue", BLUE), 0.02))
     # Interior (tools/blender/interiors.py), and a cage between front and rear.
-    I.fit_out(sys.modules[__name__], out, W, [(0.05, "pair"), (-0.80, "bench")], -0.12, -0.27,
-              (0.22, 0.72, 0.34), (0.32, 0.50), roof_y=CAB_T, screen_z=T_FRONT, doors={sn: bpy.data.objects.get("door_f" + sn) for sn in ("l", "r")}, console=True)
+    # The rear bench sits under the sloping rear window: beenster saw its
+    # back and headrests poking out through the glass (bench at -0.80 with
+    # headrests reached z -1.17 where the glass is at -0.88). Now further
+    # forward, a lower back and no headrests, so all of it stays inside.
+    I.fit_out(sys.modules[__name__], out, W, [(0.05, "pair"), (REAR_BENCH_Z, "bench")], -0.12, -0.27,
+              (0.22, 0.72, 0.34), (0.32, 0.50), roof_y=CAB_T, screen_z=T_FRONT, doors={sn: bpy.data.objects.get("door_f" + sn) for sn in ("l", "r")}, console=True,
+              bench_headrests=(), bench_back_h=0.48, roof_box=(T_REAR, T_HW))
     out.append(gbox("interior_cage", (1.60, 0.55, 0.02), (0, 0.45, -0.42), mat("grey", GREY)))
     return out
 
