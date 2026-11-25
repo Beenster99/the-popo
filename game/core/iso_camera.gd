@@ -47,6 +47,7 @@ var tp_distance := 3.2         # mouse wheel: 1.5 to 8 m
 var _tp_height := 1.55
 var _tp_pull := 3.2            # the distance after walls have pushed the camera in
 var _tp_was := false
+var _shoulder_k := 1.0         # 1 right shoulder, -1 left (peeking left round a wall)
 var _crosshair: CanvasLayer
 ## Wave 3, Phase 3.2: indoors (0..1, eased) the camera comes in closer and
 ## tighter to the shoulder and widens a little, so rooms, doorways and
@@ -282,12 +283,18 @@ func _process_third_person(delta: float) -> void:
 		height = minf(height, lerpf(height, 1.45, _indoor_k))
 	camera.fov = lerpf(TP_FOV, TP_INDOOR_FOV, _indoor_k)
 	_tp_height = lerpf(_tp_height, height, 1.0 - exp(-10.0 * delta))
+	# Peeking round the left end of a wall: the camera swings over to the
+	# left shoulder (and back again after), so the view comes round with them.
+	var want_side := 1.0
+	if target is Officer and (target as Officer).car == null:
+		want_side = (target as Officer).peek_shoulder()
+	_shoulder_k = lerpf(_shoulder_k, want_side, 1.0 - exp(-8.0 * delta))
 	var b := Basis(Vector3.UP, deg_to_rad(_yaw)) * Basis(Vector3.RIGHT, deg_to_rad(tp_pitch))
 	var pivot := global_position + Vector3(0, _tp_height, 0)
 	# Walls push the camera in: first the step out to the shoulder, then back.
 	var space := get_world_3d().direct_space_state
-	var side := b.x * shoulder
-	if shoulder > 0.0:
+	var side := b.x * shoulder * _shoulder_k
+	if side.length() > 0.01:
 		var hs := space.intersect_ray(PhysicsRayQueryParameters3D.create(pivot, pivot + side.normalized() * (shoulder + 0.25), 1 | 4 | 16, exclude))
 		if hs:
 			side = side.normalized() * maxf(pivot.distance_to(hs.position) - 0.25, 0.0)
