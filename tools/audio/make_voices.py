@@ -45,6 +45,10 @@ LINES = [
     ("lawyer", "I want my lawyer!", "crook"),
     ("brutality", "This is police brutality!", "crook"),
     ("stopping", "Alright! Alright! I'm stopping!", "crook"),
+    # (stand_down is beenster's own take, Sound Pack 1.)
+    ("warn_police", "Police! Leg it!", "crook"),
+    ("warn_feds", "Feds! Feds are here!", "crook"),
+    ("warn_bill", "Old Bill! Move, move!", "crook"),
 ]
 
 # Three officer voices (one per player) and three for crooks: model, pitch.

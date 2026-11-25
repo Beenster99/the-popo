@@ -177,6 +177,25 @@ var stay := false
 ## they were cuffed (or called over).
 static var _line_counter := 0
 var line_order := 0
+
+## v0.24 (beenster: "they are active, doing the crime and hiding from the
+## police"): what they're busy with at the scene. work: the spots they go
+## between, each {p, at (what they face), act}. act is what the hands are
+## doing now (synced, for the pose).
+enum ACT { NONE, RUMMAGE, RUMMAGE_LOW, SMASH, JIMMY, DEAL, LOOKOUT, SNEAK }
+const LOOKOUT_SIGHT := 32.0   # m: a lookout watching the street
+const BUSY_SIGHT := 0.6       # heads down in the work: they notice later
+const SNEAK := 1.8            # m/s: slipping away, crouched, before they're seen
+var job := ""
+var work: Array = []
+var act := ACT.NONE
+var _work_i := 0
+var _work_t := -1.0
+var _work_walk := 0.0
+var _work_best := INF
+var _sneak := false
+var _warned_t := 0.0
+var _warn_from := Vector3.INF
 ## Getting into a police car: walked from where they stood to the open door
 ## and into the seat over BOARD_TIME-ish seconds (longer from further off).
 var _board_t := 99.0
@@ -345,6 +364,10 @@ func set_state(s: S) -> void:
 		return
 	state = s
 	state_t = 0.0
+	act = ACT.NONE
+	_work_t = -1.0
+	if s != S.FLEE:
+		_sneak = false
 	if s != S.THROW and _nade:
 		_nade = false
 		holding = _held != null
@@ -630,6 +653,12 @@ func _tick(delta: float) -> void:
 		_unseen_t = 0.0
 	else:
 		_unseen_t += delta
+	if _warned_t > 0.0:
+		_warned_t -= delta
+		if _warned_t <= 0.0 and _idle():
+			_startled(_warn_from)
+			if not is_free():
+				return
 	if is_free():
 		_feel_pressure(delta)
 		if not is_free():
@@ -652,6 +681,10 @@ func _tick(delta: float) -> void:
 					set_state(S.STAGGER)   # takes a wild swing and falls about
 			elif _notices(t):
 				_react(t)
+			elif not work.is_empty():
+				var r := _work_step(delta)
+				wish = r[0]
+				speed = r[1]
 			elif armed and not has_meta("stay"):
 				_wander_t -= delta
 				if _wander_t <= 0.0 or _goal == Vector3.INF:
@@ -661,8 +694,12 @@ func _tick(delta: float) -> void:
 				speed = WALK
 		S.ROB:
 			# Turning the place over until officers show up or they have it.
-			if _notices(t) or state_t > 70.0:
+			if _notices(t) or state_t > 90.0:
 				_react(t)
+			else:
+				var r := _work_step(delta)
+				wish = r[0]
+				speed = r[1]
 		S.SHOOT:
 			if t.o:
 				_face(t.o.global_position)
@@ -682,7 +719,10 @@ func _tick(delta: float) -> void:
 			if _goal == Vector3.INF:
 				_run_to_hide(t)
 			wish = _steer(_goal, delta)
-			speed = RUN
+			if _sneak and t.o and ((t.los and t.d < 18.0) or t.d < CLOSE):
+				_sneak = false   # spotted: run for it
+			speed = SNEAK if _sneak else RUN
+			act = ACT.SNEAK if _sneak else ACT.NONE
 			if armed and t.o and t.los and t.d < SHOOT_RANGE * 0.8 and _shoot_t <= 0.0 and _rng.randf() < 0.6:
 				aim_at = (t.o as Officer).global_position + Vector3(0, 1.2, 0)
 				_fire(t.o)
@@ -771,6 +811,7 @@ func _tick(delta: float) -> void:
 				_react(t)
 			else:
 				var at := _brawl_point()
+				act = ACT.SMASH if brawl_with is Vector3 else ACT.NONE
 				if at == Vector3.INF:
 					set_state(S.LOITER)
 				else:
@@ -1030,7 +1071,18 @@ var _los_who: Officer
 
 
 func _notices(t: Dictionary) -> bool:
-	return t.o != null and ((t.los and t.d < (NOTICE_ARMED if (armed or fighter) else NOTICE)) or t.d < CLOSE)
+	if t.o == null:
+		return false
+	if t.d < CLOSE:
+		return true
+	if not t.los:
+		return false
+	var r := NOTICE_ARMED if (armed or fighter) else NOTICE
+	if job == "lookout":
+		r = maxf(r, LOOKOUT_SIGHT)
+	elif act != ACT.NONE and act != ACT.LOOKOUT:
+		r *= BUSY_SIGHT
+	return t.d < r
 
 
 ## Not yet in the fight (hanging about or robbing; a gang war keeps its own head).
@@ -1083,12 +1135,114 @@ func _feel_pressure(delta: float) -> void:
 			set_state(S.SHOOT)
 
 
-## Seen the police: fighters fight, the rest run.
+## Seen the police: fighters fight; the rest duck out of sight or slip
+## away while they still can, and run once they're seen close.
 func _react(t: Dictionary) -> void:
+	if job == "lookout" or (_idle() and _rng.randf() < 0.5):
+		_warn_crew(t)
+	act = ACT.NONE
 	if fighter:
 		_engage(t)
+	elif (t.o == null or not t.los or t.d > 12.0) and not (armed and t.o and t.los and t.d < SHOOT_RANGE * 0.7) and nav and nav.ready_to_use:
+		_slip(t)
 	else:
 		_bolt(t)
+
+
+## Unseen yet: crouch and get behind something close, or creep off.
+func _slip(t: Dictionary) -> void:
+	var duck := _duck_spot(t) if _rng.randf() < 0.55 else Vector3.INF
+	if duck == Vector3.INF:
+		_run_to_hide(t)
+	else:
+		set_state(S.FLEE)
+		_stuck_n = 0
+		_stuck_t = 0.0
+		_stuck_p = global_position
+		_goal = duck
+		_last_spot = duck
+	_sneak = true
+
+
+## A hiding place a few metres off, on the far side from the police.
+func _duck_spot(t: Dictionary) -> Vector3:
+	var tp: Vector3 = (t.o as Officer).global_position if t.o else _last_seen
+	if tp == Vector3.INF:
+		tp = global_position
+	var mine := global_position.distance_to(tp)
+	var best := Vector3.INF
+	var bd := 14.0
+	for sp in hide_spots:
+		var p: Vector3 = sp
+		var d := p.distance_to(global_position)
+		if d < 2.0 or d > bd or absf(p.y - global_position.y) > 2.0:
+			continue
+		if p.distance_to(tp) < mine:
+			continue
+		if not nav.reaches(global_position, p):
+			continue
+		best = p
+		bd = d
+	return best
+
+
+## The lookout's shout: the rest of the crew hear it a beat later.
+func _warn_crew(t: Dictionary) -> void:
+	if dispatcher == null or call_id < 0 or not ("suspects" in dispatcher):
+		return
+	var from: Vector3 = (t.o as Officer).global_position if t.o else _last_seen
+	if from == Vector3.INF:
+		return
+	if job == "lookout":
+		Voices.say(self, Voices.pick(Voices.Kind.WARN), 0.1)
+	for s in dispatcher.suspects.values():
+		var m := s as Suspect
+		if m == null or m == self or not is_instance_valid(m) or m.call_id != call_id or not m._idle():
+			continue
+		if m.global_position.distance_to(global_position) > 60.0 or m._warned_t > 0.0:
+			continue
+		m._warned_t = _rng.randf_range(0.5, 1.2)
+		m._warn_from = from
+
+
+## Busy at the job: walk between the work spots and do the thing at each.
+## Returns [wish, speed].
+func _work_step(delta: float) -> Array:
+	if work.is_empty():
+		act = ACT.NONE
+		return [Vector3.ZERO, 0.0]
+	var w: Dictionary = work[_work_i % work.size()]
+	var to: Vector3 = w.p - global_position
+	to.y = 0.0
+	if to.length() > 0.7 and not has_meta("stay"):
+		act = ACT.NONE
+		_work_t = -1.0
+		# Getting no closer for a couple of seconds (a counter, a doorway,
+		# a spot off the routes): this is the spot now.
+		if to.length() < _work_best - 0.2:
+			_work_best = to.length()
+			_work_walk = 0.0
+		else:
+			_work_walk += delta
+		var wish := _steer(w.p, delta)
+		if wish == Vector3.ZERO or _work_walk > 2.0:
+			_work_walk = 0.0
+			_work_best = INF
+			w.p = global_position
+			return [Vector3.ZERO, 0.0]
+		return [wish, WALK]
+	_work_walk = 0.0
+	_work_best = INF
+	if _work_t < 0.0:
+		_work_t = _rng.randf_range(6.0, 12.0) if w.act == ACT.LOOKOUT else _rng.randf_range(5.0, 10.0)
+	_face(w.at)
+	act = w.act
+	_work_t -= delta
+	if _work_t <= 0.0:
+		_work_t = -1.0
+		if work.size() > 1:
+			_work_i = (_work_i + _rng.randi_range(1, work.size() - 1)) % work.size()
+	return [Vector3.ZERO, 0.0]
 
 
 ## Off they go: armed ones sometimes stand and shoot first.
@@ -1698,6 +1852,9 @@ func _step_up(want: Vector3) -> void:
 
 # --- every machine: looks -------------------------------------------------------------
 
+const WORK_POSE := {ACT.RUMMAGE: "rummage", ACT.RUMMAGE_LOW: "rummage_low", ACT.SMASH: "smash", ACT.JIMMY: "jimmy",
+	ACT.DEAL: "deal", ACT.LOOKOUT: "lookout"}
+
 func _process(delta: float) -> void:
 	if rig == null or state == S.DOWN:
 		return
@@ -1732,7 +1889,7 @@ func _process(delta: float) -> void:
 			upper = "hands_up"
 		S.BRAWL:
 			lower = "idle" if hs < 0.2 else "walk"
-			upper = "aim_hold" if armed else "punch" if fmod(Time.get_ticks_msec() / 1000.0 + net_id * 0.37, 1.3) < 0.55 else "none"
+			upper = "aim_hold" if armed else "smash" if act == ACT.SMASH else "punch" if fmod(Time.get_ticks_msec() / 1000.0 + net_id * 0.37, 1.3) < 0.55 else "none"
 		S.CUFFED:
 			lower = ("kneel" if stay else "idle") if hs < 0.2 else ("walk" if hs < 2.2 else "run")
 			upper = "cuffed"
@@ -1748,8 +1905,16 @@ func _process(delta: float) -> void:
 			lower = "idle" if hs < 0.2 else ("walk" if hs < 2.2 else "run")
 			if work_crouch and hs < 0.2 and state == S.WANDER:
 				lower = "crouch_idle"
+			if act == ACT.SNEAK:
+				lower = "crouch_walk" if hs > 0.3 else "crouch_idle"
 			if aim_at != Vector3.ZERO:
 				upper = "aim_hold"
+			elif hs < 0.3 and act in WORK_POSE:
+				upper = WORK_POSE[act]
+				if act == ACT.RUMMAGE_LOW:
+					lower = "crouch_idle"
+				elif act == ACT.LOOKOUT and armed:
+					upper = "ready_hold"
 			elif armed and state == S.LOITER:
 				upper = "ready_hold"
 			elif (civilian or part == "worker") and weapon == EnemyGuns.NONE:
@@ -1780,6 +1945,7 @@ func encode(b: StreamPeerBuffer) -> void:
 	b.put_8(seat)
 	b.put_u8(int(clampf(hp, 0.0, 255.0)))
 	b.put_u32(escort_peer if state == S.CUFFED else 0)
+	b.put_u8(act)
 
 
 static func decode(b: StreamPeerBuffer) -> Dictionary:
@@ -1803,6 +1969,7 @@ static func decode(b: StreamPeerBuffer) -> Dictionary:
 	d.seat = b.get_8()
 	d.hp = b.get_u8()
 	d.escort = b.get_u32()
+	d.act = b.get_u8()
 	return d
 
 
@@ -1831,6 +1998,7 @@ func apply_net(d: Dictionary) -> void:
 	hp = d.hp
 	seat = d.seat
 	escort_peer = d.escort
+	act = d.get("act", 0)
 	_show_gun()
 
 
