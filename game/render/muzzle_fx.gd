@@ -81,7 +81,7 @@ static func _flame(parent: Node, tree: SceneTree, at: Vector3, dir: Vector3, siz
 		var t := _part(root, _tongue_mesh)
 		# The tongue's texture runs along its Y; lay Y down the barrel.
 		t.basis = Basis(Vector3(0, 0, -1), i * PI / 3.0) * Basis(Vector3(1, 0, 0), -PI * 0.5)
-		t.scale = Vector3(0.3 * s, length, 1.0)
+		t.scale = Vector3(0.4 * s, length, 1.0)
 		t.position = Vector3(0, 0, -length * 0.5)
 	# Counted in drawn frames, not seconds, so it is always seen however
 	# slow or fast the game runs: full size, then smaller, then gone.
@@ -115,7 +115,7 @@ static func _light(parent: Node, tree: SceneTree, at: Vector3, size: float) -> v
 		old.queue_free()
 	var l := OmniLight3D.new()
 	l.light_color = Color(1.0, 0.78, 0.45)
-	l.light_energy = 2.0 + 1.6 * size
+	l.light_energy = 1.0 + 0.8 * size
 	l.light_indirect_energy = 0.0
 	l.light_volumetric_fog_energy = 0.0
 	l.light_specular = 0.0
@@ -260,12 +260,16 @@ static func _make_meshes() -> void:
 
 
 static func _flame_material(tex: Texture2D) -> StandardMaterial3D:
+	# Smooth fire colours with soft, feathered edges (no cel bands), a
+	# little over full brightness so the glow setting blooms it.
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
 	m.disable_receive_shadows = true
 	m.albedo_texture = tex
+	m.albedo_color = Color(1.25, 1.15, 1.05)
 	return m
 
 
@@ -288,65 +292,85 @@ static func _make_materials() -> void:
 	_smoke_mat.albedo_texture = _puff_texture()
 
 
-## Fire colours in hard bands from the hot middle (t = 0) to the edge (1).
+## Real fire colour from the white-hot middle (t = 0) out to the dim red
+## edge (1), smooth, with the brightness falling away as it goes.
 static func _fire(t: float) -> Color:
-	if t < 0.38:
-		return Color(1.0, 0.97, 0.85)
-	if t < 0.66:
-		return Color(1.0, 0.8, 0.38)
-	return Color(1.0, 0.5, 0.16)
+	t = clampf(t, 0.0, 1.0)
+	var hot := Color(1.0, 0.96, 0.86)
+	var mid := Color(1.0, 0.72, 0.3)
+	var edge := Color(0.85, 0.32, 0.08)
+	var c := hot.lerp(mid, smoothstep(0.0, 0.45, t)).lerp(edge, smoothstep(0.4, 1.0, t))
+	# Opacity falls away smoothly to nothing at the edge.
+	c.a = pow(1.0 - t, 0.7)
+	return c
 
 
-## A spiky star, 5 to 7 points of varying length.
+static func _noise(sd: int, freq: float) -> FastNoiseLite:
+	var n := FastNoiseLite.new()
+	n.seed = sd
+	n.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	n.frequency = freq
+	n.fractal_octaves = 3
+	return n
+
+
+## The flash seen down the barrel: a hot core with ragged, uneven petals and
+## fine streaks, all soft-edged.
 static func _star_texture() -> Texture2D:
-	var n := 96
+	var n := 128
 	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
-	var points := 6
+	var points := 5
 	var lens := []
 	for i in points:
-		lens.append(rng.randf_range(0.55, 1.0))
+		lens.append(rng.randf_range(0.6, 1.0))
+	var streak := _noise(11, 6.0)
 	for y in n:
 		for x in n:
 			var v := Vector2(x + 0.5, y + 0.5) / n * 2.0 - Vector2.ONE
 			var r := v.length()
-			var a := fposmod(v.angle(), TAU) / TAU * points
+			var ang := fposmod(v.angle(), TAU)
+			var a := ang / TAU * points
 			var k := int(a) % points
 			var f := a - floorf(a)
 			var spike := lerpf(float(lens[k]), float(lens[(k + 1) % points]), smoothstep(0.0, 1.0, f))
-			# Sharp points between rounded valleys.
-			var edge := 0.3 + 0.7 * spike * pow(absf(cos(f * PI)), 6.0)
-			edge = maxf(edge, 0.32)
-			var t := r / edge
-			if t >= 1.0:
-				img.set_pixel(x, y, Color(0, 0, 0, 0))
-				continue
-			var c := _fire(t)
-			c.a = clampf((1.0 - t) * 6.0, 0.0, 1.0)
+			var petal := 0.28 + 0.72 * spike * pow(absf(cos(f * PI)), 3.0)
+			# Thin streaks of burning powder running out from the middle.
+			petal *= 0.8 + 0.4 * streak.get_noise_2d(cos(ang) * 3.0, sin(ang) * 3.0)
+			var t := r / maxf(petal, 0.2)
+			var c := _fire(t * 0.95)
+			# Soft round core on top, so the middle burns out to white.
+			var core := exp(-r * r * 22.0)
+			c = c.lerp(Color(1.0, 0.97, 0.9, 1.0), core)
+			c.a = maxf(c.a, core)
 			img.set_pixel(x, y, c)
 	return ImageTexture.create_from_image(img)
 
 
-## A tongue of flame: fat at the muzzle (bottom), ragged, pointed at the tip.
+## A tongue of flame from the side: bright and fat at the muzzle, breaking
+## up into flickering wisps toward the tip.
 static func _tongue_texture() -> Texture2D:
-	var w := 48
-	var h := 128
+	var w := 64
+	var h := 160
 	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	var wisp := _noise(23, 0.09)
 	for y in h:
 		# v: 0 at the muzzle, 1 at the tip (texture V runs top-down, and the
 		# quad's top is +Y, pointing away from the muzzle).
 		var v := 1.0 - (y + 0.5) / h
-		var width := pow(sin(PI * pow(v, 0.55)), 1.3) * (0.85 + 0.15 * sin(v * 23.0))
-		width *= 1.0 - 0.35 * v
+		var width := pow(sin(PI * pow(v, 0.5)), 1.2) * (1.0 - 0.4 * v)
 		for x in w:
-			var u := absf((x + 0.5) / w * 2.0 - 1.0)
-			if width <= 0.001 or u >= width:
+			var u := (x + 0.5) / w * 2.0 - 1.0
+			var wob := wisp.get_noise_2d(u * 10.0, v * 40.0)
+			var wu := absf(u + wob * 0.25 * v) / maxf(width * (0.85 + 0.3 * wob), 0.001)
+			if width <= 0.001:
 				img.set_pixel(x, y, Color(0, 0, 0, 0))
 				continue
-			var t := maxf(u / width, v * 0.9)
+			var t := clampf(maxf(wu, 0.0) * 0.6 + v * 0.45, 0.0, 1.0)
 			var c := _fire(t)
-			c.a = clampf((1.0 - u / width) * 5.0, 0.0, 1.0) * clampf((1.0 - v) * 4.0, 0.0, 1.0)
+			var fade := smoothstep(0.0, 0.6, 1.0 - wu)
+			c.a *= fade
 			img.set_pixel(x, y, c)
 	return ImageTexture.create_from_image(img)
 

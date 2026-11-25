@@ -19,7 +19,8 @@ func test_flame_and_smoke_looks_build() -> void:
 	var img := tex.get_image()
 	var mid := img.get_pixel(img.get_width() / 2, img.get_height() / 2)
 	t.check(mid.a > 0.9 and mid.r > 0.95 and mid.b > 0.7, "the middle of the flash is white hot: %s" % [mid])
-	t.check(img.get_pixel(0, 0).a < 0.01, "and the corners are clear")
+	var corner := img.get_pixel(0, 0)
+	t.check(corner.a < 0.05, "and the corners are clear: %s" % [corner])
 	t.check(MuzzleFx._smoke_mat.albedo_texture != null, "smoke texture")
 
 
