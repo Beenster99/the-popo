@@ -99,15 +99,15 @@ func _run() -> void:
 			s.dispatch.missions.minute = 14 * 60.0
 			var bs: Array = s.gen.buildings.filter(func(x): return x.type == "office" and x.storeys >= 3)
 			var bd: Dictionary = bs[0]
-			# Stand well inside the far corner so the camera behind stays indoors
-			# (not looking in through the glass).
-			o.global_position = bd.origin + bd.u * ((bd.w - 2.0) * 4.0) + bd.v * ((bd.d - 2.0) * 4.0) + Vector3(0, 0.05, 0)
+			o.global_position = bd.origin + bd.u * ((bd.w - 0.5) * 4.0) + bd.v * ((bd.d - 1.5) * 4.0) + Vector3(0, 0.05, 0)
 			s._furnish_near(false)
 			var mid: Vector3 = bd.origin + bd.u * (bd.w * 2.0) + bd.v * (bd.d * 2.0)
 			mid.y = o.global_position.y
 			var aim := {"move": Vector2.ZERO, "buttons": PlayerInput.AIM, "aim_yaw": _yaw_to(o.global_position, mid), "aim_point": mid + Vector3(0, 1.2, 0)}
 			s.sync.input_source = func(): return aim
 			await _frames(40)
-			_shoulder(s, o.global_position, mid, 2.4, 0.7, 1.6)
+			# A short boom so the camera stays indoors (not looking in through the glass).
+			var c := _shoulder(s, o.global_position, mid, 1.1, 0.55, 1.6)
+			c.fov = 78.0
 			await _frames(60)
 			await _save()
