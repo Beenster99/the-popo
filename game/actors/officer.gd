@@ -217,6 +217,7 @@ const BODY_HALF := 0.35   # half the body's width, kept behind the wall
 const COVER_GAP := 0.36   # body centre to the wall: back pressed against it
 const COVER_SNAP := 1.6   # cover within this reach is snapped to
 const PEEK_OUT := 0.22    # the small side step at a wall's edge; the body leans the rest
+const PEEK_LEFT_EXTRA := 0.16   # further out leaning left, so the right-hand gun clears too
 var _shape: CollisionShape3D
 var _visual: Node3D
 
@@ -1632,13 +1633,42 @@ func _wall_reach(p: Vector3, dir: Vector3) -> float:
 ## Which way the officer leans out round the end of a tall wall while
 ## aiming from cover (world direction along the wall), or zero.
 func peek_dir() -> Vector3:
-	if state != S.COVER or _cover_low or not is_aiming():
+	return cover_end_dir() if is_aiming() else Vector3.ZERO
+
+
+## The end of the tall wall the officer is tucked in at (world direction
+## along the wall), aiming or not, or zero away from an end.
+func cover_end_dir() -> Vector3:
+	if state != S.COVER or _cover_low:
 		return Vector3.ZERO
 	var along := Vector3(-_cover_n.z, 0, _cover_n.x)
 	for side in [-1.0, 1.0]:
 		if _wall_reach(_cover_anchor, along * side) < BODY_HALF + 0.15:
 			return along * side
 	return Vector3.ZERO
+
+
+## v0.26 (beenster: "leans out to the right of a corner, but not the left"):
+## which shoulder the camera sits over, 1 right, -1 left. At the left end of
+## a tall wall the camera swaps to the left shoulder, so the view comes round
+## that corner with the body instead of staring at the wall.
+func peek_shoulder() -> float:
+	var e := cover_end_dir()
+	if e == Vector3.ZERO:
+		return 1.0
+	var right := Vector3(sin(aim_yaw), 0, cos(aim_yaw)).cross(Vector3.UP)
+	return -1.0 if e.dot(right) < -0.3 else 1.0
+
+
+## The side step out at the wall's end. Leaning left, the gun (right hand)
+## is on the far side of the body, so the feet step out a little further for
+## it to clear the corner as much as it does leaning right.
+func _peek_step() -> Vector3:
+	var d := peek_dir()
+	if d == Vector3.ZERO:
+		return d
+	var right := Vector3(sin(aim_yaw), 0, cos(aim_yaw)).cross(Vector3.UP)
+	return d * (PEEK_OUT + (PEEK_LEFT_EXTRA if d.dot(right) < -0.3 else 0.0))
 
 
 ## Movement while in cover: slide along the wall but not past its end. Aiming
@@ -1652,7 +1682,7 @@ func _cover_wish(wish: Vector3) -> Vector3:
 			return Vector3.ZERO
 		# Feet stay put at the end of the wall (a small side step at most)
 		# and the body leans out round it (the rig does the lean).
-		var target := _cover_anchor + peek_dir() * PEEK_OUT
+		var target := _cover_anchor + _peek_step()
 		var to := target - here
 		to.y = 0.0
 		return to.normalized() * clampf(to.length() * 8.0 / COVER_SPEED, 0.0, 1.0) if to.length() > 0.03 else Vector3.ZERO

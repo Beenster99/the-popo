@@ -246,6 +246,40 @@ func test_cover_hides_and_peeks_on_aim() -> void:
 	t.check(p.rig._lower_state(p) == "idle" and p.rig._upper_state(p) == "aim_hold", "stands and aims over it")
 
 
+## v0.26 (beenster): peeking works round the left end of a wall too, not
+## only the right: the body leans out far enough that the gun (right hand)
+## clears the corner, and the camera swaps to the left shoulder to see round.
+func test_cover_peeks_left_and_right() -> void:
+	for side: float in [1.0, -1.0]:
+		var bx := 20.0 * side
+		# Wall facing +Z centred at bx. The officer starts 0.1 m inside one end:
+		# side 1: the right end (-X, as seen facing away from the wall), side -1: the left end (+X).
+		var end_x := bx - 1.5 * side
+		var o := _officer(Vector3(end_x + 0.1 * side, 0, 0))
+		ProtoWorld.block(self, Vector3(3, 2.2, 0.3), Vector3(bx, 1.1, 1.0), Color.GRAY)
+		await _run(o, _cmd(), 5)
+		await _run(o, _cmd(Vector2.ZERO, PlayerInput.COVER), 1)
+		await _run(o, _cmd(), 5)
+		t.check(o.state == Officer.S.COVER, "in cover (side %d)" % side)
+		var hidden_x := o.global_position.x
+		var aim := {"move": Vector2.ZERO, "buttons": PlayerInput.AIM, "aim_yaw": 0.0, "aim_point": Vector3(end_x - 1.0 * side, 1.2, 8)}
+		await _run(o, aim, 40)
+		var mz := o.muzzle_position()
+		var out := (end_x - mz.x) * side
+		print("    side %d: muzzle %.2f m past the wall's end, feet moved %.2f, shoulder %.2f" % [side, out, absf(o.global_position.x - hidden_x), o.peek_shoulder()])
+		t.check(out > 0.05, "the gun comes out past the wall's end (side %d): %.2f" % [side, out])
+		t.check(absf(o.global_position.x - hidden_x) < 0.5, "feet stay near the corner (side %d)" % side)
+		t.check(signf(o.peek_shoulder()) == side, "camera on the peeking side (side %d): %.2f" % [side, o.peek_shoulder()])
+		# Nothing between the muzzle and a point straight ahead past the corner.
+		var space := o.get_world_3d().direct_space_state
+		var q := PhysicsRayQueryParameters3D.create(mz, mz + Vector3(0, 0, 4), 1)
+		q.exclude = [o.get_rid()]
+		t.check(space.intersect_ray(q).is_empty(), "clear shot past the corner (side %d)" % side)
+		await _run(o, _cmd(), 40)
+		t.check(absf(o.global_position.x - hidden_x) < 0.1, "back in cover after (side %d)" % side)
+		o.queue_free()
+
+
 ## Climbing a lower ledge: the hands grip the ledge, not the air above it.
 func test_climb_hands_on_the_ledge() -> void:
 	var o := _officer()
