@@ -599,6 +599,35 @@ func _place_in_seat() -> void:
 func _physics_process(delta: float) -> void:
 	if not is_host_side():
 		return
+	# v0.25.1: someone going about their business far from every officer
+	# and the camera thinks and moves every third tick (a city has dozens).
+	_far_n += 1
+	if state in CALM and is_on_floor() and _far_from_eyes():
+		if (_far_n + get_instance_id()) % 3 != 0:
+			return
+		_slide_k = 3.0
+		_tick(delta * 3.0)
+		_slide_k = 1.0
+		return
+	_tick(delta)
+
+
+const CALM := [S.LOITER, S.WANDER, S.ROB]
+const FAR_THINK := 110.0
+var _far_n := 0
+var _slide_k := 1.0   # how many ticks this move stands for
+
+
+func _far_from_eyes() -> bool:
+	var p := global_position
+	for o in get_tree().get_nodes_in_group("officers"):
+		if (o as Node3D).global_position.distance_squared_to(p) < FAR_THINK * FAR_THINK:
+			return false
+	var cam := get_viewport().get_camera_3d()
+	return cam == null or cam.global_position.distance_squared_to(p) > FAR_THINK * FAR_THINK
+
+
+func _tick(delta: float) -> void:
 	state_t += delta
 	_shoot_t -= delta
 	_suppressed_t -= delta
@@ -899,7 +928,13 @@ func _physics_process(delta: float) -> void:
 		rotation.y = lerp_angle(rotation.y, atan2(wish.x, wish.z), 12.0 * delta)
 	elif aim_at != Vector3.ZERO:
 		_face(aim_at)
-	move_and_slide()
+	if _slide_k != 1.0:
+		var v := velocity
+		velocity = Vector3(v.x * _slide_k, v.y, v.z * _slide_k)
+		move_and_slide()
+		velocity = Vector3(velocity.x / _slide_k, velocity.y, velocity.z / _slide_k)
+	else:
+		move_and_slide()
 	_step_up(target)
 
 

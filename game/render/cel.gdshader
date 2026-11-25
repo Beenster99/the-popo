@@ -19,10 +19,23 @@ uniform float specular_size : hint_range(0.0, 1.0) = 0.06;
 instance uniform float fade = 1.0;
 // See-through surfaces (glass) use the same screen-door dither.
 uniform float opacity : hint_range(0.0, 1.0) = 1.0;
+// v0.25.1: merged meshes (furniture) carry each part's colour per vertex, so
+// a whole prop is one surface and one draw instead of one per colour.
+uniform bool use_vertex_color = false;
 
 void fragment() {
 	vec4 t = texture(albedo_tex, UV * uv_scale);
 	ALBEDO = grout_alpha ? mix(grout_color * t.rgb, albedo.rgb * t.rgb, t.a) : albedo.rgb * t.rgb;
+	if (use_vertex_color) {
+		// The colours are stored as picked (sRGB), like albedo; Forward+
+		// lights in linear space, so they are converted the same way.
+#if CURRENT_RENDERER == RENDERER_COMPATIBILITY
+		ALBEDO *= COLOR.rgb;
+#else
+		vec3 c = COLOR.rgb;
+		ALBEDO *= mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c));
+#endif
+	}
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;
 	if (fade * opacity < 0.999) {

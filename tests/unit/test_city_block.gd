@@ -147,18 +147,24 @@ func test_upstairs_furniture_goes_with_the_floor() -> void:
 	cam.look_at(spot.global_position)
 	cam.current = true
 	fader.watch = spot
-	for i in 5:
-		await get_tree().process_frame
+	await _settle()
 	t.check(up.all(func(p): return fader._cut.has(p.body)), "downstairs, the upstairs furniture is cut away with its floor")
 	t.check(not down.any(func(p): return fader._cut.has(p.body)), "and this floor's stays")
 	spot.global_position.y = ground_y + BlockGenerator.STOREY + 0.2
-	for i in 5:
-		await get_tree().process_frame
+	await _settle()
 	t.check(not up.any(func(p): return fader._cut.has(p.body)), "upstairs, it's back")
 	spot.global_position = bb.get_center() + Vector3(bb.size.x, -bb.size.y * 0.5 + 0.2, 0)
+	await _settle()
+	t.check(fader.cut_count() == 0, "and outside nothing is cut")
+
+
+## The cutaway checks loose things ten times a second (v0.19.0), so wait a
+## few of those rather than a fixed number of frames.
+func _settle() -> void:
 	for i in 5:
 		await get_tree().process_frame
-	t.check(fader.cut_count() == 0, "and outside nothing is cut")
+	await get_tree().create_timer(0.25).timeout
+	await get_tree().process_frame
 
 
 ## Phase 1.7: every lit thing on the block wears the cel shader (markers and

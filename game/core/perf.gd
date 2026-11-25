@@ -86,7 +86,7 @@ func render_cpu_ms() -> float:
 func report_lines() -> String:
 	var fps := Engine.get_frames_per_second()
 	var vp := get_viewport()
-	var size := Vector2(vp.get_visible_rect().size) * vp.scaling_3d_scale
+	var size := Vector2(DisplayServer.window_get_size()) * vp.scaling_3d_scale
 	var t := "%d fps   1%% low %d fps   frame %.1f ms" % [fps, low_1pct(), 1000.0 / maxf(fps, 1.0)]
 	t += "\nGPU %.1f ms   render CPU %.1f ms   game code %.1f ms   physics %.1f ms" % [
 		gpu_ms(), render_cpu_ms(),
